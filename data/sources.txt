@@ -1,0 +1,15 @@
+Retrieved: 2019-12-17
+
+https://www.efsa.europa.eu/en/microstrategy/food-composition-data
+Food Compositions.csv
+efsa-121719
+
+https://www.gov.uk/government/publications/composition-of-foods-integrated-dataset-cofid 
+McCance mccance-121719
+
+https://fdc.nal.usda.gov/ 
+https://fdc.nal.usda.gov/download-datasets.html
+
+usda-121719 - USDA FoodData
+
+sr28-121719 - USDA Standard Reference 28

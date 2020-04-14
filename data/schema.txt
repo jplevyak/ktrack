@@ -1,0 +1,17 @@
+name
+  some text
+notes
+  some text
+mcg
+  0
+  1.1
+  null/unknown
+unit
+  100g
+  oz
+  slice
+  cup
+source
+  usda-12172019
+  efsa-12172019
+  mccance-121719

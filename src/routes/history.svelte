@@ -1,0 +1,80 @@
+<script>
+
+import { onMount, onDestroy } from 'svelte';
+import Food from './_food';
+import { weekdays, months, make_history, get_total } from './_util.js';
+import { history_store, profile_store, add_item, backup_history } from './_stores.js';
+
+let the_date = new Date();
+let history = undefined;
+let limit = 30;
+let results = [];
+let added_count = 0;
+let profile = undefined;
+let server_checked = false;
+
+const unsubscribe_profile = profile_store.subscribe(p => { profile = p; });
+const unsubscribe_history = history_store.subscribe(value => {
+  if (value.items == undefined) {
+    value = make_history();
+    history_store.set(value);
+  }
+  history = value;
+  if (!server_checked) {
+    server_checked = true;
+    backup_history(history, profile);
+  }
+});
+onDestroy(() => { unsubscribe_history(); unsubscribe_profile(); });
+
+function get_results() {
+  return history.items.slice(0, limit);
+}
+
+$: results = history.items.slice(0, limit);
+
+onMount(() => {
+  let box = document.getElementById("limit");
+  box.onchange = function() {
+    limit = box.value;
+  };
+});
+
+function do_msg(event) {
+  if (event.status == "completed") return;
+  let entry = event.detail.entry;
+  if (entry < 0 || entry >= history.items.length) {
+    return;
+  }
+  let day = history.items[entry];
+  let index = event.detail.index;
+  if (index < 0 || index >= day.items.length) {
+    return;
+  }
+  let change = event.detail.change;
+  if (change > 0) {
+    add_item(day.items[index], profile);
+    added_count += 1;
+  }
+}
+
+</script>
+
+<svelte:head>
+	<title>KTrack - History</title>
+</svelte:head>
+
+Number of days to view <input type="number" id="limit" value="{limit}" /> 
+&nbsp;&nbsp; Added: {added_count}
+<br><br>
+
+{#each results as day, e}
+<b>Date: {weekdays[day.day]} {months[day.month]} {day.date}, {day.year}</b><br><br>
+{#each day.items as f, i}
+{#if f.del == undefined}
+<Food name={f.name} notes={f.notes} entry={e} index={i} mcg={f.mcg} unit={f.unit} servings={f.servings} source={f.source} on:message={do_msg}/>
+{/if}
+{/each}
+<p></p>Total: {get_total(day).toFixed(2)}
+<br><br>
+{/each}
