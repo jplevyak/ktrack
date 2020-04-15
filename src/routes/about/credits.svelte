@@ -14,6 +14,13 @@ John Plevyak (jplevyak@gmail.com)
 
   <li>McCance: https://www.gov.uk/government/publications/composition-of-foods-integrated-dataset-cofid</li>
 
-  <li>USDA: https://fdc.nal.usda.gov/ FoodData</li>
+  <li>USDA: https://fdc.nal.usda.gov/FoodData</li>
 
+</ul>
+
+<h1>Code</h1>
+<ul>
+  <li>Search: http://elasticlunr.com/docs/index.html</li>
+  <li>Framework: https://svelte.dev</li>
+  <li>Framework: https://sapper.svelte.dev/</li>
 </ul>
