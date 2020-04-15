@@ -168,7 +168,6 @@ export function merge_items(l1, l2) {
     }
   }
   if (changed || l.updated == undefined) {
-    console.log("changed", changed, l.updated);
     l.updated = Date.now();
   }
   return l;
@@ -192,8 +191,6 @@ export function cleanup_history(h) {
   // remove duplicates
   for (let i in h.items) {
     for (let j in h.items) {
-      if (h.items[j].year == undefined)
-        console.log("bad dup", h);
       if (i != j && compare_date(h.items[i], h.items[j]) == 0)
         h.items.splice(j, 1);
     }
@@ -222,7 +219,6 @@ export function merge_history(l1, l2) {
         found = true;
         let m = merge_day(x, y);
         if (m.updated != x.updated) {
-          console.log("m1", m, x);
           changed = true;
         }
         l.items.push(m);
@@ -241,18 +237,14 @@ export function merge_history(l1, l2) {
         continue;
       }
     if (!found) {
-      console.log("m2", x);
       changed = true;
       l.items.push(x);
     }
   }
   if (changed || l.updated == undefined) {
-    console.log("merge_history", changed, l.updated);
     l.updated = Date.now();
   }
   cleanup_history(l);
-  console.log("1", l);
   l.items.sort((x, y) => compare_date(y, x));
-  console.log("2", l);
   return l;
 }

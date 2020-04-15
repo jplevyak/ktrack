@@ -44,7 +44,6 @@ function save_history(day, profile) {
       let c = compare_date(day, history.items[0]);
       if (c == 0 && day.updated > history.items[0].updated) {
         changed = true;
-        console.log(day);
         history.items.splice(0, 1, { ...day });
       } else if (c > 0) {
         changed = true;
@@ -100,7 +99,6 @@ export function save_today(today, profile) {
 
 function backup_internal(l, name, store, merge, profile, item_limit = undefined, update = false) {
   if (profile == undefined || profile.authenticated == undefined) {
-    console.log("not authenticated", profile);
     return;
   }
   var data = {
@@ -109,7 +107,6 @@ function backup_internal(l, name, store, merge, profile, item_limit = undefined,
     updated: l.updated
   };
   if (update) {
-    console.log("update " + name);
     let ll = l;
     if (ll.items != undefined && item_limit) {
       if (item_limit != undefined) {
@@ -119,7 +116,6 @@ function backup_internal(l, name, store, merge, profile, item_limit = undefined,
     }
     data.value = ll;
   } else {
-    console.log("check " + name, l);
   }
   fetch(name, {
     method: 'POST',
@@ -131,7 +127,6 @@ function backup_internal(l, name, store, merge, profile, item_limit = undefined,
     if (!r.ok)
       return;
     r.json().then(data => {
-      console.log('got', name, data);
       if (data.err) {
         console.log(data.err);
         return;
@@ -143,19 +138,13 @@ function backup_internal(l, name, store, merge, profile, item_limit = undefined,
       merged.server_checked = l.server_checked;
       merged.server_synced = Date.now();
       if (merged.updated != l.updated) {
-        console.log("set merged", merged, backup);
         store.set(merged);
       }
-      console.log("backup before comparision", backup, merged.updated, l.updated);
       if (backup.updated == undefined || merged.updated != backup.updated) {
         if (update) {
-          console.log('update of update');
           return;
         }
-        console.log("push merged", merged, backup);
         backup_internal(merged, name, store, merge, profile, item_limit, true);
-      } else {
-        console.log("no updated", merged, backup);
       }
     }).catch(err => {
       console.log('JSON error', err.message)
@@ -214,13 +203,11 @@ export function save_profile(profile) {
       'Content-Type': 'application/json'
     }
   }).then(r => {
-    console.log("save_profile", r);
     if (!r.ok) {
       profile_store.set(profile);
       return;
     }
     r.json().then(data => {
-      console.log('got', name, data);
       if (data.err) {
         console.log(data.err);
         profile_store.set(profile);

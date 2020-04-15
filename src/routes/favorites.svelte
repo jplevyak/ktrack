@@ -19,7 +19,6 @@ let profile = undefined;
 const unsubscribe_profile = profile_store.subscribe(p => { profile = p; });
 const unsubscribe_favorites = favorites_store.subscribe(value => {
   if (value == undefined) {
-    console.log("favorites value undefined", favorites);
     return;
   }
   favorites = value;
@@ -59,7 +58,6 @@ function make_item() {
 function update_results() {
   results_map = undefined;
   if (search_value == undefined || search_value == "") {
-    console.log(favorites);
     results = [...favorites.items];
     return;
   }

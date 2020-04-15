@@ -28,12 +28,10 @@ const unsubscribe_today = today_store.subscribe(t => {
   }
   let new_day = make_today();
   if (compare_date(t, new_day) != 0) {
-    console.log("new day", t, new_day);
     today = new_day;
     save_today(today, profile);
   } else {
     today = t;
-    console.log("set today", today);
     if (!server_checked) {
       server_checked = true;
       backup_today(today, profile);
@@ -80,7 +78,6 @@ function get_change(servings, change) {
   let s = change > 0 ? stops : rstops;
   let ss = change > 0 ? small_stops : rsmall_stops;
   let r;
-  console.log(change, s);
   for (let i = 0; i < s.length - 1; i++)
     if (r = fix_change(x, s[i], s[i+1])) return r;
   if (servings - resolution > 1) {

@@ -24,7 +24,6 @@ const unsubscribe_profile = profile_store.subscribe(p => {
   if (p == undefined)
     p = make_profile();
   profile = p;
-  console.log('set', profile);
 });
 onDestroy(unsubscribe_profile);
 
@@ -41,10 +40,8 @@ onMount(() => {
   let old_password_input = document.getElementById("old_password");
   let save = document.getElementById("save");
   function changed() {
-    console.log('changed');
     if (profile == undefined)
       return;
-    console.log('got', profile);
     if (username_input.value != profile.username || password_input.value != profile.password) {
       profile.username = username_input.value;
       profile.password = password_input.value;

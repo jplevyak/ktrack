@@ -21,39 +21,32 @@ export async function do_post_internal(req, res, username, db, title, merge, mak
     if (data.value == undefined) {
       // check
       if (value == undefined)  {
-        console.log("request all " + title);
         result = make(); // request all
         delete result.updated;
       } else if (data.updated != value.updated) {
-        console.log("send all " + title, data.updated, value.updated);
         result = value; // send what we have
       } else {
-        console.log("all good " + title, data.updated, value.updated);
       }
     } else if (data.value != undefined) {
       // store
-      console.log("data.value", data.value);
       if (value != undefined)
         result = merge(value, data.value);
       else
         result = data.value;
-      console.log(result);
       if (value == undefined || result.updated != value.updated) {
         let string_value = JSON.stringify(result);
-        console.log("db put " + title);
         db.put(username, string_value, function (err) {
           if (err)
             console.log(title +  '.put', err);
         });
       }
       if (result.updated == data.value.updated) {
-        console.log("put clean " + title);
         result = undefined;
       }
     }
     res.setHeader('Content-Type', 'application/json');
     if (err) {
-      console.log("return err ", err);
+      console.log("post err ", err);
       res.end(JSON.stringify({ err: err }));
     } else {
       if (finalize != undefined)
