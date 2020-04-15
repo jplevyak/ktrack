@@ -64,6 +64,18 @@ export function make_today() {
   };
 };
 
+export function make_long_ago() {
+  let the_date = new Date();
+  return {
+    updated: Date.now(),
+    year: the_date.getFullYear() - 10,
+    month: the_date.getMonth(),
+    date: the_date.getDate(),
+    day: the_date.getDay(),
+    items: []
+  };
+};
+
 export function make_favorites() {
   return {
     updated: Date.now(),
