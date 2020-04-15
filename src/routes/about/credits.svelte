@@ -22,5 +22,5 @@ John Plevyak (jplevyak@gmail.com)
 <ul>
   <li>Search: http://elasticlunr.com/docs/index.html</li>
   <li>Framework: https://svelte.dev</li>
-  <li>Framework: https://sapper.svelte.dev/</li>
+  <li>Framework: https://sapper.svelte.dev</li>
 </ul>
