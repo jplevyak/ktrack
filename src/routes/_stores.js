@@ -115,7 +115,6 @@ function backup_internal(l, name, store, merge, profile, item_limit = undefined,
       }
     }
     data.value = ll;
-  } else {
   }
   fetch(name, {
     method: 'POST',
