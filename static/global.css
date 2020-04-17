@@ -20,6 +20,16 @@ a {
 	color: inherit;
 }
 
+hr {
+  display: block;
+  margin-top: 0.2em;
+  margin-bottom: 0.2em;
+  margin-left: auto;
+  margin-right: auto;
+  border-style: inset;
+  border-width: 1px;
+}
+
 code {
 	font-family: menlo, inconsolata, monospace;
 	font-size: calc(1em - 2px);

@@ -37,7 +37,9 @@ function down() { msg("down"); }
 
 <style>
 .food {
-  display: block,
+  display: table;
+  border-style: none none solid none;
+  border-width: 1px;
 }
 </style>
 
