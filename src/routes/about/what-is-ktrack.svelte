@@ -13,5 +13,4 @@
   <li>Store historical intake data.</li>
   <li>Search the data of foods.</li>
   <li>Add custom foods.</li>
-  <li>Take before and after photos of meals for later intake estimation.</li>
 </ul>
