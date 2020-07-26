@@ -1,10 +1,11 @@
 <script>
 
+import { goto } from '@sapper/app';
 import { afterUpdate, onDestroy } from 'svelte';
 import foods from './_foods.json';
 import Food from './_food';
 import { weekdays, months, compare_date, get_total, make_today } from './_util.js';
-import { today_store, profile_store, save_today, save_favorite, backup_today } from './_stores.js';
+import { today_store, profile_store, edit_store, save_today, save_favorite, save_history, backup_today } from './_stores.js';
 
 let total = 0;
 let today = undefined;
@@ -13,6 +14,8 @@ let editing = undefined;
 let editing_index = undefined;
 let server_checked = false;
 let resolution = 0.0001;
+let edit = undefined;
+let day = undefined;
 
 // straddle all small moves.
 let stops = [0.2, 0.250, 0.3, 0.3333333333, 0.4, 0.5, 0.6, 0.6666666666, 0.7, 0.75, 0.8];
@@ -22,12 +25,8 @@ let rsmall_stops = [...small_stops].sort((x, y) => y - x);
 
 const unsubscribe_profile = profile_store.subscribe(p => { profile = p; });
 const unsubscribe_today = today_store.subscribe(t => {
-  if (t.year == undefined) {
-    t = make_today();
-    today_store.set(t);
-  }
   let new_day = make_today();
-  if (compare_date(t, new_day) < 0) {
+  if (t.year == undefined || compare_date(t, new_day) < 0) {
     save_today(new_day, profile);
   } else {
     today = t;
@@ -35,14 +34,29 @@ const unsubscribe_today = today_store.subscribe(t => {
       server_checked = true;
       backup_today(today, profile);
     }
+    if (edit == undefined)
+      day = today;
+    else
+      day = edit;
   }
+});
+const unsubscribe_edit = edit_store.subscribe(d => {
+  edit = d;
+  if (edit == undefined)
+    day = today;
+  else
+    day = edit;
 });
 onDestroy(() => { unsubscribe_today(); unsubscribe_profile(); });
 
 function save_item(item) {
   item.updated = Date.now();
-  today.updated = item.updated;
-  save_today(today, profile);
+  day.updated = item.updated;
+  if (compare_date(day, today) == 0) {
+    save_today(day, profile);
+  } else {
+    save_history(day, profile);
+  }
 }
 
 afterUpdate(() => {
@@ -54,6 +68,13 @@ afterUpdate(() => {
       today.items[editing_index] = editing;
       save_item(editing);
       editing = undefined;
+    };
+  }
+  if (edit != undefined) {
+    document.getElementById("done").onclick = function() {
+      console.log("done");
+      edit_store.set(undefined);
+      goto("/history");
     };
   }
 });
@@ -95,11 +116,11 @@ function get_change(servings, change) {
 function do_msg(event) {
   if (event.status == "completed") return;
   let index = event.detail.index;
-  if (index < 0 || index >= today.items.length) {
+  if (index < 0 || index >= day.items.length) {
     return;
   }
   let change = event.detail.change;
-  let item = today.items[index];
+  let item = day.items[index];
   if (change == "del") {
     item.del = true;
     save_item(item);
@@ -115,17 +136,18 @@ function do_msg(event) {
   }
 }
 
-$: total = get_total(today);
+$: total = get_total(day);
 
 </script>
 
 <svelte:head>
-	<title>KTrack - Today</title>
+	<title>KTrack - Day</title>
 </svelte:head>
 
-<b>Date: {weekdays[today.day]} {months[today.month]} {today.date}, {today.year}</b><br><br>
+<b>Date: {weekdays[day.day]} {months[day.month]} {day.date}, {day.year} {#if edit != undefined}<span style="color:red">Editing History</span> <button type="button" id="done">done</button>{/if}
+</b><br><br>
 {#if editing == undefined}
-{#each today.items as f, i}
+{#each day.items as f, i}
 {#if f.del == undefined}
 <Food name={f.name} notes={f.notes} index={i} mcg={f.mcg} unit={f.unit} servings={f.servings} source={f.source} use_edit=true use_fav=true use_dec=true use_del=true on:message={do_msg}/>
 {/if}

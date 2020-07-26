@@ -3,6 +3,7 @@
 import { afterUpdate, onDestroy } from 'svelte';
 import elasticlunr from './_elasticlunr.js';
 import Food from './_food';
+import { check_for_new_day } from './_util.js';
 import { today_store, favorites_store, profile_store, add_item, backup_favorites, save_favorite } from './_stores.js';
 
 let index = undefined;
@@ -29,7 +30,8 @@ const unsubscribe_favorites = favorites_store.subscribe(value => {
   create_index();
   update_results();
 });
-onDestroy(() => { unsubscribe_favorites(); unsubscribe_profile(); });
+const unsubscribe_today = today_store.subscribe(check_for_new_day);
+onDestroy(() => { unsubscribe_today(); unsubscribe_favorites(); unsubscribe_profile(); });
 
 function create_index() {
   index = elasticlunr(function () {

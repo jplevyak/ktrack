@@ -5,7 +5,8 @@ import foods from './_foods.json';
 import index from './_index.json';
 import elasticlunr from './_elasticlunr.js';
 import Food from './_food';
-import { index_store, profile_store, add_item, save_favorite } from './_stores.js';
+import { check_for_new_day } from './_util.js';
+import { today_store, index_store, profile_store, add_item, save_favorite } from './_stores.js';
 
 let search = index_store.value;
 if (search == undefined) {
@@ -17,7 +18,8 @@ let results = [];
 let added_count = 0;
 
 const unsubscribe_profile = profile_store.subscribe(p => { profile = p; });
-onDestroy(unsubscribe_profile);
+const unsubscribe_today = today_store.subscribe(check_for_new_day);
+onDestroy(() => { unsubscribe_today(); unsubscribe_profile(); });
 
 onMount(() => {
   let search_box = document.getElementById("search_string");

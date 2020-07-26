@@ -1,27 +1,27 @@
 export const merge_history_limit = 10;
 
 export const weekdays = new Array(7);
-weekdays[0] = "Sunday";
-weekdays[1] = "Monday";
-weekdays[2] = "Tuesday";
-weekdays[3] = "Wednesday";
-weekdays[4] = "Thursday";
-weekdays[5] = "Friday";
-weekdays[6] = "Saturday";
+weekdays[0] = 'Sunday';
+weekdays[1] = 'Monday';
+weekdays[2] = 'Tuesday';
+weekdays[3] = 'Wednesday';
+weekdays[4] = 'Thursday';
+weekdays[5] = 'Friday';
+weekdays[6] = 'Saturday';
 
 export const months = new Array(12);
-months[0] = "January";
-months[1] = "February";
-months[2] = "March";
-months[3] = "April";
-months[4] = "May";
-months[5] = "June";
-months[6] = "July";
-months[7] = "August";
-months[8] = "September";
-months[9] = "October";
-months[10] = "November";
-months[11] = "December";
+months[0] = 'January';
+months[1] = 'February';
+months[2] = 'March';
+months[3] = 'April';
+months[4] = 'May';
+months[5] = 'June';
+months[6] = 'July';
+months[7] = 'August';
+months[8] = 'September';
+months[9] = 'October';
+months[10] = 'November';
+months[11] = 'December';
 
 export function compare_date(d1, d2) {
   if (d1.year > d2.year) return 1;
@@ -43,7 +43,10 @@ export function get_total(day) {
   return n;
 }
 
-export function load_async(url, callback, options = { async: true, defer: true }) {
+export function load_async(url, callback, options = {
+  async: true,
+  defer: true
+}) {
   const tag = document.createElement('script')
   tag.src = url;
   tag.async = options.async;
@@ -78,74 +81,65 @@ export function make_long_ago() {
 
 export function make_favorites() {
   return {
-    updated: Date.now(),
-    items: []
+    updated: Date.now(), items: []
   }
 }
 
 export function make_history() {
   return {
-    updated: Date.now(),
-    items: []
+    updated: Date.now(), items: []
   }
 }
 
 export function make_profile() {
   return {
-    username: "",
-    password: "",
-    old_password: "",
-    message: "unauthenticated"
+    username: '', password: '', old_password: '', message: 'unauthenticated'
   }
 }
 
 export function merge_profile(l1, l2) {
-  l1 = {...l1}; // shallow copy
-  l1.message = "";
-  l1.message = "";
+  l1 = {...l1};  // shallow copy
+  l1.message = '';
+  l1.message = '';
   delete l1.authenticated;
   delete l2.authenticated;
   l2.username = l1.username;
-  if (l1.username == "" || l1.password == "") {
-    l2.message = "profile created, authenticated";
+  if (l1.username == '' || l1.password == '') {
+    l2.message = 'profile created, authenticated';
     l2.authenticated = Date.now();
     l2.updated = Date.now();
     return l2;
   }
-  if (l2.password != "" && l2.old_password != "" && l2.old_password != undefined) {
+  if (l2.password != '' && l2.old_password != '' && l2.old_password != undefined) {
     if (l2.old_password != l1.password) {
-      l1.message = "old password mismatch, not authenticated";
+      l1.message = 'old password mismatch, not authenticated';
       l1.updated = Date.now();
       return l1;
     }
-    l2.message = "new password saved, authenticated";
+    l2.message = 'new password saved, authenticated';
     l2.authenticated = Date.now();
     l2.updated = Date.now();
     return l2;
   }
   if (l1.password == l2.password) {
-    l2.message = "profile in sync, authenticated";
+    l2.message = 'profile in sync, authenticated';
     return l2;
   }
-  l1.message = "incorrect password, not authenticated";
+  l1.message = 'incorrect password, not authenticated';
   l1.updated = Date.now();
   return l1;
 }
 
 // merge l1 and l2, set the updated to be the greater and update if the output is different than l1.
 export function merge_items(l1, l2) {
-  var l = {
-    items: [],
-    updated: l1.updated
-  }
+  var l = {items: [], updated: l1.updated};
   if (l2.updated != undefined && l2.updated > l1.updated) {
     l.updated = l2.updated;
   }
   var changed = false;
   var all = new Set();
   for (let x of l1.items) {
-    if (all.has(x.name))
-      continue;
+    if (all.has(x.name)) continue;
     all.add(x.name)
     var found = false
     for (let y of l2.items) {
@@ -165,8 +159,7 @@ export function merge_items(l1, l2) {
     }
   }
   for (let x of l2.items) {
-    if (all.has(x.name))
-      continue;
+    if (all.has(x.name)) continue;
     all.add(x.name)
     var found = false;
     for (let y of l.items)
@@ -187,10 +180,8 @@ export function merge_items(l1, l2) {
 
 export function merge_day(l1, l2) {
   let c = compare_date(l1, l2);
-  if (c > 0)
-    return l1;
-  if (c < 0)
-    return l2;
+  if (c > 0) return l1;
+  if (c < 0) return l2;
   let t = merge_items(l1, l2);
   t.year = l1.year;
   t.month = l1.month;
@@ -203,13 +194,11 @@ export function cleanup_history(h) {
   // remove duplicates
   for (let i in h.items) {
     for (let j in h.items) {
-      if (i != j && compare_date(h.items[i], h.items[j]) == 0)
-        h.items.splice(j, 1);
+      if (i != j && compare_date(h.items[i], h.items[j]) == 0) h.items.splice(j, 1);
     }
   }
   for (let i in h.items)
-    if (h.items[i].year == undefined)
-      h.items.splice(i, 1);
+    if (h.items[i].year == undefined) h.items.splice(i, 1);
   return h;
 }
 
@@ -219,7 +208,7 @@ export function merge_history(l1, l2) {
   var l = {
     items: [],
     updated: l1.updated,
-  }
+  };
   if (l2.updated != undefined && (l1.updated == undefined || l2.updated > l1.updated)) {
     l.updated = l2.updated;
   }
@@ -244,7 +233,7 @@ export function merge_history(l1, l2) {
   for (let x of l2.items.slice(0, merge_history_limit)) {
     var found = false;
     for (let y of l.items)
-      if (compare_date(x, y) ==  0) {
+      if (compare_date(x, y) == 0) {
         found = true;
         continue;
       }
@@ -259,4 +248,11 @@ export function merge_history(l1, l2) {
   cleanup_history(l);
   l.items.sort((x, y) => compare_date(y, x));
   return l;
+}
+
+export function check_for_new_day(t) {
+  let new_day = make_today();
+  if (t.year == undefined || compare_date(t, new_day) < 0) {
+    save_today(new_day, profile);
+  }
 }

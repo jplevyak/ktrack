@@ -1,9 +1,10 @@
 <script>
 
+import { goto } from '@sapper/app';
 import { onMount, onDestroy } from 'svelte';
 import Food from './_food';
-import { weekdays, months, make_history, get_total } from './_util.js';
-import { history_store, profile_store, add_item, backup_history } from './_stores.js';
+import { weekdays, months, make_history, get_total, check_for_new_day } from './_util.js';
+import { today_store, history_store, profile_store, edit_store, add_item, backup_history } from './_stores.js';
 
 let the_date = new Date();
 let history = undefined;
@@ -25,7 +26,8 @@ const unsubscribe_history = history_store.subscribe(value => {
     backup_history(history, profile);
   }
 });
-onDestroy(() => { unsubscribe_history(); unsubscribe_profile(); });
+const unsubscribe_today = today_store.subscribe(check_for_new_day);
+onDestroy(() => { unsubscribe_today(); unsubscribe_history(); unsubscribe_profile(); });
 
 function get_results() {
   return history.items.slice(0, limit);
@@ -58,6 +60,11 @@ function do_msg(event) {
   }
 }
 
+function edit(day) {
+  edit_store.set(day);
+  goto('/');
+}
+
 </script>
 
 <svelte:head>
@@ -69,7 +76,8 @@ Number of days to view <input type="number" id="limit" value="{limit}" />
 <br><br>
 
 {#each results as day, e}
-<b>Date: {weekdays[day.day]} {months[day.month]} {day.date}, {day.year}</b><br><br>
+<b>Date: {weekdays[day.day]} {months[day.month]} {day.date}, {day.year} <button on:click={() => edit(day)}>edit</button>
+</b><br><br>
 {#each day.items as f, i}
 {#if f.del == undefined}
 <Food name={f.name} notes={f.notes} entry={e} index={i} mcg={f.mcg} unit={f.unit} servings={f.servings} source={f.source} on:message={do_msg}/>
