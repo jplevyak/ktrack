@@ -4,7 +4,7 @@ import { goto } from '@sapper/app';
 import { onMount, onDestroy } from 'svelte';
 import Food from './_food';
 import { weekdays, months, make_history, get_total, check_for_new_day } from './_util.js';
-import { today_store, history_store, profile_store, edit_store, add_item, backup_history } from './_stores.js';
+import { today_store, history_store, profile_store, edit_store, add_item, save_favorite, backup_history } from './_stores.js';
 
 let the_date = new Date();
 let history = undefined;
@@ -54,6 +54,10 @@ function do_msg(event) {
     return;
   }
   let change = event.detail.change;
+  if (change == 'fav') {
+    save_favorite(day.items[index], profile);
+    return;
+  }
   if (change > 0) {
     add_item(day.items[index], profile);
     added_count += 1;
@@ -80,7 +84,7 @@ Number of days to view <input type="number" id="limit" value="{limit}" />
 </b><br><br>
 {#each day.items as f, i}
 {#if f.del == undefined}
-<Food name={f.name} notes={f.notes} entry={e} index={i} mcg={f.mcg} unit={f.unit} servings={f.servings} source={f.source} on:message={do_msg}/>
+<Food name={f.name} notes={f.notes} entry={e} index={i} mcg={f.mcg} unit={f.unit} servings={f.servings} source={f.source} use_fav=true on:message={do_msg}/>
 {/if}
 {/each}
 <p></p>Total: {get_total(day).toFixed(2)}
