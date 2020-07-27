@@ -65,14 +65,13 @@ afterUpdate(() => {
       editing = undefined;
     };
     document.getElementById("save").onclick = function() {
-      today.items[editing_index] = editing;
+      day.items[editing_index] = editing;
       save_item(editing);
       editing = undefined;
     };
   }
   if (edit != undefined) {
     document.getElementById("done").onclick = function() {
-      console.log("done");
       edit_store.set(undefined);
       goto("/history");
     };
