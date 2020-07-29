@@ -44,7 +44,8 @@ function down() { msg("down"); }
 </style>
 
 <div class="food">
-{name} @ {mcg == undefined ? "unknown" : mcg} mcg/{unit}{#if notes != undefined && notes != ""}, {notes}{/if}{#if servings != undefined}, {servings.toFixed(3)} servings{/if}{#if use_total}&nbsp= {(mcg * servings).toFixed(3)} mcg{/if}{#if source}, {source} {/if}
+{name}{#if servings != undefined}, {servings.toFixed(3)} servings{/if} @ {mcg == undefined ? "unknown" : mcg} mcg/{unit}{#if notes != undefined && notes != ""}, {notes}{/if}
+{#if use_total}&nbsp= {(mcg * servings).toFixed(3)} mcg{/if}{#if source}, {source} {/if}
 {#if use_edit}<button on:click={edit}>edit</button>{/if}
 {#if use_dup}<button on:click={dup}>dup</button>{/if}
 {#if use_del}<button on:click={del}>x</button>{/if}
