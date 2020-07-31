@@ -34,7 +34,7 @@ onMount(() => {
       results.push(foods[f.ref]);
   }
   search_box.onchange = search_results;
-  document.getElementById("search").onclid = search_results;
+  document.getElementById("search").onclick = search_results;
 
   document.getElementById("clear_input").onclick = () => {
     document.getElementById("search_string").value = "";

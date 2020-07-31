@@ -84,10 +84,12 @@ function save() {
 afterUpdate(() => {
   if (editing == undefined) {
     let search_box = document.getElementById("search_string");
-    search_box.onchange = function () {
+    function search_results() {
       search_value = search_box.value;
       update_results();
     };
+    search_box.onchange = search_results;
+    document.getElementById("search").onclick = search_results;
     document.getElementById("create").onclick = function() {
       editing = make_item();
     };
@@ -194,8 +196,9 @@ th {
 
 {#if editing == undefined}
 Search <input type="text" id="search_string"/>
-<button type="button" id="clear_input">clear</button>
-<button type="button" id="create">create new favorite</button>
+<button type="button" id="search">Search</button>
+<button type="button" id="clear_input">Clear</button>
+<button type="button" id="create">Create New Favorite</button>
 &nbsp;&nbsp; Added: {added_count}
 <br><br>
 {#if favorites != undefined }
