@@ -16,6 +16,9 @@ export let use_del = false;
 export let use_move = false;
 export let use_total = mcg && servings != undefined;
 
+let m = notes.match(/^(\d+)g/);
+let grams = m == undefined ? undefined : m[1];
+
 const dispatch = createEventDispatcher();
 
 function msg(change) {
@@ -33,6 +36,7 @@ function edit() { msg('edit'); }
 function dup() { msg('dup'); }
 function up() { msg("up"); }
 function down() { msg("down"); }
+
 </script>
 
 <style>
@@ -45,7 +49,7 @@ function down() { msg("down"); }
 
 <div class="food">
 {name}{#if servings != undefined}, <b>{servings.toFixed(3)}</b> servings{/if} @ {mcg == undefined ? "unknown" : mcg} mcg/{unit}{#if notes != undefined && notes != ""}, {notes}{/if}
-{#if use_total}&nbsp= <b>{(mcg * servings).toFixed(3)}</b> mcg{/if}{#if source}, {source} {/if}
+{#if use_total}&nbsp= {#if grams != undefined}{(grams * servings).toFixed(3)}g {/if}<b>{(mcg * servings).toFixed(3)}</b> mcg{/if}{#if source}, {source} {/if}
 {#if use_edit}<button on:click={edit}>edit</button>{/if}
 {#if use_dup}<button on:click={dup}>dup</button>{/if}
 {#if use_del}<button on:click={del}>x</button>{/if}
