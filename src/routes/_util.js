@@ -256,3 +256,19 @@ export function check_for_new_day(t) {
     save_today(new_day, profile);
   }
 }
+
+export function compute_averages(h) {
+  var result = [0, 0, 0];
+  if (h == undefined) return result;
+  var a = 0.0;
+  var n = 0;
+  for (let i in h.items) {
+    a += get_total(h.items[i]);
+    n += 1;
+    if (n > 1 && ((n % 2) == 1)) {
+      result[((n - 3) / 2)] = a / n;
+    }
+    if (n >= 7) break;
+  }
+  return result;
+}

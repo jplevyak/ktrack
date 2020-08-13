@@ -4,11 +4,12 @@ import { goto } from '@sapper/app';
 import { afterUpdate, onDestroy } from 'svelte';
 import foods from './_foods.json';
 import Food from './_food';
-import { weekdays, months, compare_date, get_total, make_today } from './_util.js';
-import { today_store, profile_store, edit_store, save_today, save_favorite, save_history, backup_today } from './_stores.js';
+import { weekdays, months, compare_date, get_total, make_today, compute_averages } from './_util.js';
+import { today_store, profile_store, history_store, edit_store, save_today, save_favorite, save_history, backup_today } from './_stores.js';
 
 let total = 0;
 let today = undefined;
+let history = undefined;
 let profile = undefined;
 let editing = undefined;
 let editing_index = undefined;
@@ -40,6 +41,10 @@ const unsubscribe_today = today_store.subscribe(t => {
       day = edit;
   }
 });
+const unsubscribe_history = history_store.subscribe(value => {
+  history = value;
+});
+
 const unsubscribe_edit = edit_store.subscribe(d => {
   edit = d;
   if (edit == undefined)
@@ -47,7 +52,9 @@ const unsubscribe_edit = edit_store.subscribe(d => {
   else
     day = edit;
 });
-onDestroy(() => { unsubscribe_today(); unsubscribe_profile(); });
+onDestroy(() => { unsubscribe_today(); unsubscribe_profile(); unsubscribe_edit(); });
+
+$: averages = compute_averages(history);
 
 function save_item(item) {
   item.updated = Date.now();
@@ -143,6 +150,7 @@ $: total = get_total(day);
 	<title>KTrack - Day</title>
 </svelte:head>
 
+Averages [3, 5, 7] days: [{averages[0].toFixed(1)}, {averages[1].toFixed(1)}, {averages[2].toFixed(1)}]<br>
 <b>Date: {weekdays[day.day]} {months[day.month]} {day.date}, {day.year} {#if edit != undefined}<span style="color:red">Editing History</span> <button type="button" id="done">done</button>{/if}
 </b><br><br>
 {#if editing == undefined}

@@ -1,9 +1,8 @@
 <script>
-
 import { goto } from '@sapper/app';
 import { onMount, onDestroy } from 'svelte';
 import Food from './_food';
-import { weekdays, months, make_history, get_total, check_for_new_day } from './_util.js';
+import { weekdays, months, make_history, get_total, check_for_new_day, compute_averages } from './_util.js';
 import { today_store, history_store, profile_store, edit_store, add_item, save_favorite, backup_history } from './_stores.js';
 
 let the_date = new Date();
@@ -14,7 +13,9 @@ let added_count = 0;
 let profile = undefined;
 let server_checked = false;
 
-const unsubscribe_profile = profile_store.subscribe(p => { profile = p; });
+const unsubscribe_profile = profile_store.subscribe(p => {
+  profile = p;
+});
 const unsubscribe_history = history_store.subscribe(value => {
   if (value.items == undefined) {
     value = make_history();
@@ -27,13 +28,18 @@ const unsubscribe_history = history_store.subscribe(value => {
   }
 });
 const unsubscribe_today = today_store.subscribe(check_for_new_day);
-onDestroy(() => { unsubscribe_today(); unsubscribe_history(); unsubscribe_profile(); });
+onDestroy(() => {
+  unsubscribe_today();
+  unsubscribe_history();
+  unsubscribe_profile();
+});
 
 function get_results() {
   return history.items.slice(0, limit);
 }
 
 $: results = history.items.slice(0, limit);
+$: averages = compute_averages(history);
 
 onMount(() => {
   let box = document.getElementById("limit");
@@ -68,14 +74,15 @@ function edit(day) {
   edit_store.set(day);
   goto('/');
 }
-
 </script>
 
 <svelte:head>
-	<title>KTrack - History</title>
+    <title>KTrack - History</title>
 </svelte:head>
 
-Number of days to view <input type="number" id="limit" value="{limit}" /> 
+
+Averages [3, 5, 7] days: [{averages[0].toFixed(1)}, {averages[1].toFixed(1)}, {averages[2].toFixed(1)}]<br>
+Number of days to view <input type="number" id="limit" value="{limit}" />
 &nbsp;&nbsp; Added: {added_count}
 <br><br>
 
