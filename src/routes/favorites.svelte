@@ -3,8 +3,7 @@
 import { afterUpdate, onDestroy } from 'svelte';
 import elasticlunr from './_elasticlunr.js';
 import Food from './_food';
-import { check_for_new_day } from './_util.js';
-import { today_store, favorites_store, profile_store, add_item, backup_favorites, save_favorite } from './_stores.js';
+import { today_store, favorites_store, profile_store, add_item, backup_favorites, save_favorite, check_for_new_day } from './_stores.js';
 
 let index = undefined;
 let search_value = undefined;

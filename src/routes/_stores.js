@@ -240,3 +240,10 @@ export function reset_data() {
   favorites_store.set(make_favorites());
   history_store.set(make_history());
 }
+
+export function check_for_new_day(t) {
+  let new_day = make_today();
+  if (t.year == undefined || compare_date(t, new_day) < 0) {
+    save_today(new_day, profile);
+  }
+}

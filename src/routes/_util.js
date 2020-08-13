@@ -250,13 +250,6 @@ export function merge_history(l1, l2) {
   return l;
 }
 
-export function check_for_new_day(t) {
-  let new_day = make_today();
-  if (t.year == undefined || compare_date(t, new_day) < 0) {
-    save_today(new_day, profile);
-  }
-}
-
 export function compute_averages(h) {
   var result = [0, 0, 0];
   if (h == undefined) return result;

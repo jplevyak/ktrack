@@ -2,8 +2,8 @@
 import { goto } from '@sapper/app';
 import { onMount, onDestroy } from 'svelte';
 import Food from './_food';
-import { weekdays, months, make_history, get_total, check_for_new_day, compute_averages } from './_util.js';
-import { today_store, history_store, profile_store, edit_store, add_item, save_favorite, backup_history } from './_stores.js';
+import { weekdays, months, make_history, get_total, compute_averages } from './_util.js';
+import { today_store, history_store, profile_store, edit_store, add_item, save_favorite, backup_history, check_for_new_day } from './_stores.js';
 
 let the_date = new Date();
 let history = undefined;

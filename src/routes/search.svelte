@@ -5,8 +5,7 @@ import foods from './_foods.json';
 import index from './_index.json';
 import elasticlunr from './_elasticlunr.js';
 import Food from './_food';
-import { check_for_new_day } from './_util.js';
-import { today_store, index_store, profile_store, add_item, save_favorite } from './_stores.js';
+import { today_store, index_store, profile_store, add_item, save_favorite, check_for_new_day } from './_stores.js';
 
 let search = index_store.value;
 if (search == undefined) {
