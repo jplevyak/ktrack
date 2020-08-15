@@ -5,20 +5,22 @@ import foods from './_foods.json';
 import index from './_index.json';
 import elasticlunr from './_elasticlunr.js';
 import Food from './_food';
-import { today_store, index_store, profile_store, add_item, save_favorite, check_for_new_day } from './_stores.js';
+import { today_store, edit_store, index_store, profile_store, add_item, save_favorite, check_for_new_day } from './_stores.js';
 
 let search = index_store.value;
 if (search == undefined) {
   search = elasticlunr.Index.load(index);
   index_store.set(search);
 }
+let edit = undefined;
 let profile = undefined;
 let results = [];
 let added_count = 0;
 
-const unsubscribe_profile = profile_store.subscribe(p => { profile = p; });
 const unsubscribe_today = today_store.subscribe(check_for_new_day);
-onDestroy(() => { unsubscribe_today(); unsubscribe_profile(); });
+const unsubscribe_edit = edit_store.subscribe(value => { edit = value; });
+const unsubscribe_profile = profile_store.subscribe(p => { profile = p; });
+onDestroy(() => { unsubscribe_today(); unsubscribe_edit(); unsubscribe_profile(); });
 
 onMount(() => {
   let search_box = document.getElementById("search_string");
@@ -51,7 +53,7 @@ function do_msg(event) {
     save_favorite(item, profile);
   } else if (event.detail.change > 0) {
     added_count += 1;
-    add_item(item, profile);
+    add_item(item, edit, profile);
   }
 }
   

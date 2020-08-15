@@ -1,5 +1,5 @@
 import {writable as internal} from 'svelte/store';
-import {compare_date, merge_items, merge_day, merge_history_limit, cleanup_history, merge_history, make_today, make_favorites, make_history, make_profile} from './_util.js';
+import {compare_date, merge_items, merge_day, merge_history_limit, cleanup_history, merge_history, make_today, make_favorites, make_history, make_historical_day, make_profile} from './_util.js';
 
 const check_backup_interval = 5 * 1000;  // 5 seconds.
 
@@ -37,21 +37,30 @@ export function save_history(day, profile) {
   history_store.update(function(history) {
     var changed = false;
     if (history.items.length > 0) {
-      for (let i in history.items) {
+      for (let i = 0; i < history.items.length; i++) {
         let c = compare_date(day, history.items[i]);
         if (c == 0 && day.updated > history.items[i].updated) {
           changed = true;
           history.items.splice(i, 1, {...day});
+          let yesterday = make_historical_day(day, 1);
+          if (history.items.length < i + 2 || compare_date(yesterday, history.items[i + 1]) > 0) {
+            history.items.splice(i + 1, 0, {...yesterday});
+          }
           break;
         } else if (c > 0) {
           changed = true;
           history.items.splice(i, 0, {...day});
+          let yesterday = make_historical_day(day, 1);
+          if (compare_date(yesterday, history.items[i]) > 0) {
+            history.items.splice(i + 1, 0, {...yesterday});
+          }
           break;
         }
       }
     } else {
       changed = true;
       history.items = [{...day}];
+      history.items.push(make_historical_day(day, 1));
     }
     if (changed) {
       backup_history(history, profile);
@@ -67,25 +76,27 @@ export const profile_store = local_writable('profile', make_profile());
 export const edit_store = local_writable('edit', undefined);
 export const index_store = internal(undefined);
 
-export function add_item(item, profile) {
-  today_store.update(function(today) {
-    if (today == undefined) today = make_today();
-    for (let i of today.items) {
+export function add_item(item, edit, profile) {
+  let store = (edit != undefined) ? edit_store : today_store;
+  store.update(function(day) {
+    if (day == undefined) day = make_today();
+    for (let i of day.items) {
       if (i.name == item.name) {
-        if (i.del == undefined) return today;
+        if (i.del == undefined) return day;
         delete i.del;
         i.updated = Date.now();
-        return today;
+        return day;
       }
     }
     item = {...item};
     item.updated = Date.now();
     delete item.del;
     if (item.servings == undefined) item.servings = 1.0;
-    today.items.push(item);
-    today.updated = Date.now();
-    save_history(today, profile);
-    return today;
+    day = {...day};
+    day.items.push(item);
+    day.updated = Date.now();
+    save_history(day, profile);
+    return day;
   });
 }
 

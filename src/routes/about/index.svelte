@@ -51,6 +51,7 @@ onMount(() => {
     }
   }
   save.onclick = changed;
+  document.getElementById("reset").onclick = clear_data;
 })
 
 </script>
@@ -85,3 +86,4 @@ Password: <input type="password" id="password"value="{profile.password}" /><br>
 Old Password (when updating Password) <input type="text" id="old_password"value="{profile.old_password}" /><br>
 <button type="button" id="save">Login/Save</button>
 {/if}
+<input type="button" id="reset" value="Reset All Data"/>

@@ -55,10 +55,10 @@ export function load_async(url, callback, options = {
   document.body.appendChild(tag)
 }
 
-export function make_today() {
+export function make_today(days_ago = 0) {
   let the_date = new Date();
   return {
-    updated: Date.now(),
+    updated: the_date.getTime(),
     year: the_date.getFullYear(),
     month: the_date.getMonth(),
     date: the_date.getDate(),
@@ -67,11 +67,14 @@ export function make_today() {
   };
 };
 
-export function make_long_ago() {
-  let the_date = new Date();
+export function make_historical_day(d, days_ago) {
+  let the_date = new Date(d.year, d.month, d.date);
+  the_date = new Date(the_date.getTime() - (days_ago * 24 * 3600 * 1000));
+  // Ensure that historical days do not overwrite actual history.
+  let updated = new Date(the_date.getTime() - ((days_ago + 2) * 24 * 3600 * 1000));
   return {
-    updated: Date.now(),
-    year: the_date.getFullYear() - 10,
+    updated: updated.getTime(),
+    year: the_date.getFullYear(),
     month: the_date.getMonth(),
     date: the_date.getDate(),
     day: the_date.getDay(),

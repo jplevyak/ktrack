@@ -3,7 +3,7 @@
 import { afterUpdate, onDestroy } from 'svelte';
 import elasticlunr from './_elasticlunr.js';
 import Food from './_food';
-import { today_store, favorites_store, profile_store, add_item, backup_favorites, save_favorite, check_for_new_day } from './_stores.js';
+import { today_store, edit_store, favorites_store, profile_store, add_item, backup_favorites, save_favorite, check_for_new_day } from './_stores.js';
 
 let index = undefined;
 let search_value = undefined;
@@ -14,6 +14,7 @@ let added_count = 0;
 let editing = undefined;
 let editing_replace_index = undefined;
 let server_checked = false;
+let edit = undefined;
 let profile = undefined;
 
 const unsubscribe_profile = profile_store.subscribe(p => { profile = p; });
@@ -30,7 +31,8 @@ const unsubscribe_favorites = favorites_store.subscribe(value => {
   update_results();
 });
 const unsubscribe_today = today_store.subscribe(check_for_new_day);
-onDestroy(() => { unsubscribe_today(); unsubscribe_favorites(); unsubscribe_profile(); });
+const unsubscribe_edit = edit_store.subscribe(value => { edit = value; });
+onDestroy(() => { unsubscribe_today(); unsubscribe_edit(); unsubscribe_favorites(); unsubscribe_profile(); });
 
 function create_index() {
   index = elasticlunr(function () {
@@ -170,7 +172,7 @@ function do_msg(event) {
       j = j + 1;
     }
   } else if (change > 0) {
-    add_item(item, profile);
+    add_item(item, edit, profile);
     added_count += 1;
   }
 }

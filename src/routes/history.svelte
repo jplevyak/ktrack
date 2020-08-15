@@ -2,10 +2,12 @@
 import { goto } from '@sapper/app';
 import { onMount, onDestroy } from 'svelte';
 import Food from './_food';
-import { weekdays, months, make_history, get_total, compute_averages } from './_util.js';
+import { weekdays, months, make_history, make_historical_day, get_total, compute_averages } from './_util.js';
 import { today_store, history_store, profile_store, edit_store, add_item, save_favorite, backup_history, check_for_new_day } from './_stores.js';
 
 let the_date = new Date();
+let today = undefined;
+let edit = undefined;
 let history = undefined;
 let limit = 30;
 let results = [];
@@ -13,13 +15,20 @@ let added_count = 0;
 let profile = undefined;
 let server_checked = false;
 
-const unsubscribe_profile = profile_store.subscribe(p => {
-  profile = p;
+const unsubscribe_today = today_store.subscribe(value => {
+  check_for_new_day(value);
+  today = value;
 });
+const unsubscribe_edit = edit_store.subscribe(value => { edit = value; });
 const unsubscribe_history = history_store.subscribe(value => {
-  if (value.items == undefined) {
+  if (value == undefined || value.items.length == 0) {
     value = make_history();
+    if (today != undefined) {
+      value.items.push(today);
+      value.items.push(make_historical_day(today, 1));
+    }
     history_store.set(value);
+    return;
   }
   history = value;
   if (!server_checked) {
@@ -27,9 +36,12 @@ const unsubscribe_history = history_store.subscribe(value => {
     backup_history(history, profile);
   }
 });
-const unsubscribe_today = today_store.subscribe(check_for_new_day);
+const unsubscribe_profile = profile_store.subscribe(p => {
+  profile = p;
+});
 onDestroy(() => {
   unsubscribe_today();
+  unsubscribe_edit();
   unsubscribe_history();
   unsubscribe_profile();
 });
@@ -65,12 +77,12 @@ function do_msg(event) {
     return;
   }
   if (change > 0) {
-    add_item(day.items[index], profile);
+    add_item(day.items[index], edit, profile);
     added_count += 1;
   }
 }
 
-function edit(day) {
+function edit_day(day) {
   edit_store.set(day);
   goto('/');
 }
@@ -87,7 +99,7 @@ Number of days to view <input type="number" id="limit" value="{limit}" />
 <br><br>
 
 {#each results as day, e}
-<b>Date: {weekdays[day.day]} {months[day.month]} {day.date}, {day.year} <button on:click={() => edit(day)}>edit</button>
+<b>Date: {weekdays[day.day]} {months[day.month]} {day.date}, {day.year} <button on:click={() => edit_day(day)}>edit</button>
 </b><br><br>
 {#each day.items as f, i}
 {#if f.del == undefined}
