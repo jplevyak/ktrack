@@ -169,7 +169,7 @@ export function backup_history(history, profile) {
   if (history.items.length > 0) {
     history.updated = history.items[0].updated;
   }
-  if (Date.now() - history.server_checked < check_backup_interval) {
+  if (Date.now() - history.server_checked <= check_backup_interval) {
     return;
   }
   history.server_checked = Date.now();
