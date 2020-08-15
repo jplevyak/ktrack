@@ -15,6 +15,9 @@ let added_count = 0;
 let profile = undefined;
 let server_checked = false;
 
+const unsubscribe_profile = profile_store.subscribe(p => {
+  profile = p;
+});
 const unsubscribe_today = today_store.subscribe(value => {
   check_for_new_day(value);
   today = value;
@@ -28,7 +31,6 @@ const unsubscribe_history = history_store.subscribe(value => {
       value.items.push(make_historical_day(today, 1));
     }
     history_store.set(value);
-    return;
   }
   history = value;
   if (!server_checked) {
@@ -36,14 +38,11 @@ const unsubscribe_history = history_store.subscribe(value => {
     backup_history(history, profile);
   }
 });
-const unsubscribe_profile = profile_store.subscribe(p => {
-  profile = p;
-});
 onDestroy(() => {
+  unsubscribe_profile();
   unsubscribe_today();
   unsubscribe_edit();
   unsubscribe_history();
-  unsubscribe_profile();
 });
 
 function get_results() {

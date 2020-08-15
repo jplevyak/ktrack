@@ -17,10 +17,10 @@ let profile = undefined;
 let results = [];
 let added_count = 0;
 
+const unsubscribe_profile = profile_store.subscribe(p => { profile = p; });
 const unsubscribe_today = today_store.subscribe(check_for_new_day);
 const unsubscribe_edit = edit_store.subscribe(value => { edit = value; });
-const unsubscribe_profile = profile_store.subscribe(p => { profile = p; });
-onDestroy(() => { unsubscribe_today(); unsubscribe_edit(); unsubscribe_profile(); });
+onDestroy(() => { unsubscribe_profile(); unsubscribe_today(); unsubscribe_edit(); });
 
 onMount(() => {
   let search_box = document.getElementById("search_string");
