@@ -47,11 +47,12 @@ function down() { msg("down"); }
 }
 </style>
 
-<div class="food">
+<div class="food" style="line-height:20px">
 {name}{#if servings != undefined}, <b>{servings.toFixed(3)}</b> servings{/if} @ {mcg == undefined ? "unknown" : mcg} mcg/{unit}{#if notes != undefined && notes != ""}, {notes}{/if}
 {#if use_total}&nbsp= {#if grams != undefined}{(grams * servings).toFixed(3)}g {/if}<b>{(mcg * servings).toFixed(3)}</b> mcg{/if}{#if source}, {source} {/if}
-{#if use_edit}<button on:click={edit}>edit</button>{/if}
-{#if use_dup}<button on:click={dup}>dup</button>{/if}
+{#if use_edit}<button on:click={edit}>edit</button>&nbsp{/if}
+{#if use_dup}<button on:click={dup}>dup</button>&nbsp{/if}
+<span style="font-size:150%">
 {#if use_del}<button on:click={del}>x</button>{/if}
 {#if use_fav}<button on:click={fav}>*</button>{/if}
 {#if use_move}
@@ -60,4 +61,5 @@ function down() { msg("down"); }
 {/if}
 {#if use_dec} <button on:click={dec}>-</button>{/if}
 <button on:click={inc}>+</button>
+</span>
 </div>
