@@ -14,10 +14,18 @@ export let use_fav = false;
 export let use_dec = false;
 export let use_del = false;
 export let use_move = false;
-export let use_total = mcg && servings != undefined;
 
-let m = notes.match(/^(\d+)g/);
-let grams = m == undefined ? undefined : m[1];
+let use_total = undefined;
+let use_notes = undefined;
+let m = undefined;
+let grams = undefined;
+let use_grams = undefined;
+
+$: use_total = ((mcg != undefined) && (servings != undefined));
+$: use_notes = ((notes != undefined) && (notes != ""));
+$: m = use_notes ? notes.match(/^(\d+)g/) : undefined;
+$: grams = (m == undefined) ? undefined : m[1];
+$: use_grams = (grams != undefined) && (servings != 1.0);
 
 const dispatch = createEventDispatcher();
 
@@ -48,8 +56,8 @@ function down() { msg("down"); }
 </style>
 
 <div class="food" style="line-height:20px">
-{name}{#if servings != undefined}, <b>{servings.toFixed(3)}</b> servings{/if} @ {mcg == undefined ? "unknown" : mcg} mcg/{unit}{#if notes != undefined && notes != ""}, {notes}{/if}
-{#if use_total}&nbsp= {#if grams != undefined}{(grams * servings).toFixed(3)}g {/if}<b>{(mcg * servings).toFixed(3)}</b> mcg{/if}{#if source}, {source} {/if}
+{name}{#if servings != undefined}, <b>{servings.toFixed(3)}</b> servings{/if} @ {mcg == undefined ? "unknown" : mcg} mcg/{unit}{#if use_notes}, {notes}{/if}
+{#if use_total}= {#if use_grams}{(grams * servings).toFixed(3)}g {/if}<b>{(mcg * servings).toFixed(3)}</b> mcg{/if}{#if source}, {source} {/if}
 {#if use_edit}<button on:click={edit}>edit</button>&nbsp{/if}
 {#if use_dup}<button on:click={dup}>dup</button>&nbsp{/if}
 <span style="font-size:150%">
