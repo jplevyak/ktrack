@@ -1,7 +1,5 @@
 <script>
 	export let segment;
-
-
 </script>
 
 <style>
@@ -9,8 +7,8 @@
 		border-bottom: 1px solid rgba(255,62,0,0.1);
 		font-weight: 500;
 		padding: 0 1em;
-    width: 100%;
-    font-size: 3.2vmin;
+    width: 90%;
+    font-size: 4.2vmin;
 	}
 
 	ul {
