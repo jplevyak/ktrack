@@ -100,23 +100,17 @@ function fix_change(x, p1, p2) {
 }
 
 function get_change(servings, change) {
-  let x = servings - Math.floor(servings);
+  let fractional_part = servings - Math.floor(servings);
   let s = change > 0 ? stops : rstops;
-  let ss = change > 0 ? small_stops : rsmall_stops;
+  if (servings <= 0.2 + resolution)
+    s = change > 0 ? small_stops : rsmall_stops;
   let r;
   for (let i = 0; i < s.length - 1; i++)
-    if (r = fix_change(x, s[i], s[i+1])) return r;
-  if (servings - resolution > 1) {
-    return change;
-  } else {
-    if (x - resolution > 0.2)
-      return change;
-    for (let i = 0; i < ss.length - 1; i++)
-      if (r = fix_change(x, ss[i], ss[i+1])) return r;
-    if (change < 0 && x - resolution > 0.015625)
-      return 0.0 - x;
-    return change;
-  }
+    if (r = fix_change(fractional_part, s[i], s[i+1])) return r;
+  r = 0.1 * change;
+  if (servings + r >= 0)
+    return r;
+  return -servings;
 }
 
 function do_msg(event) {

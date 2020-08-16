@@ -28,8 +28,8 @@ function msg(change) {
     change: change
   });
 }
-function inc() { msg(0.1); }
-function dec() { msg(-0.1); }
+function inc() { msg(1); }
+function dec() { msg(-1); }
 function del() { msg('del'); }
 function fav() { msg('fav'); }
 function edit() { msg('edit'); }
