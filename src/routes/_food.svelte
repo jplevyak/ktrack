@@ -55,6 +55,10 @@ function down() { msg("down"); }
   border-style: none none solid none;
   border-width: 1px;
 }
+.but {
+  padding: 2 2px;
+  font-size: 21px;
+}
 </style>
 
 <div class="food" style="line-height:20px">
@@ -62,15 +66,15 @@ function down() { msg("down"); }
 {#if use_total}= {#if use_grams}{(grams * servings).toFixed(3)}g {/if}<b>{(mcg * servings).toFixed(3)}</b> mcg{/if}{#if source}, {source} {/if}
 {#if use_edit}<button on:click={edit}>edit</button>&nbsp{/if}
 {#if use_dup}<button on:click={dup}>dup</button>&nbsp{/if}
-<span style="font-size:200%; whitespace:nowrap; float:right;">
-{#if use_del}<button on:click={del}>x</button>{/if}
-{#if use_fav}<button on:click={fav}>*</button>{/if}
+<span style="font-size:100%; whitespace:nowrap; float:right;">
+{#if use_del}<button on:click={del} class="but">x</button>{/if}
+{#if use_fav}<button on:click={fav} class="but">*</button>{/if}
 {#if use_move}
-<button on:click={up}>^</button>
-<button on:click={down}>v</button>
+<button on:click={up} class="but">^</button>
+<button on:click={down} class="but">v</button>
 {/if}
-{#if use_dec} <button on:click={dec}>&lt</button>{/if}
-{#if use_inc} <button on:click={inc}>&gt</button>{/if}
-{#if use_add} <button on:click={inc}>+</button>{/if}
+{#if use_dec} <button on:click={dec} class="but">&lt</button>{/if}
+{#if use_inc} <button on:click={inc} class="but">&gt</button>{/if}
+{#if use_add} <button on:click={inc} class="but">+</button>{/if}
 </span>
 </div>
