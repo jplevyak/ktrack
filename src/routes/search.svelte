@@ -70,5 +70,5 @@ Search <input type="text" id="search_string"/>
 <br><br>
 
 {#each results as f, i}
-<Food name={f.name} notes={f.notes} index={i} mcg={f.mcg} unit={f.unit} source={f.source} use_fav=true on:message={do_msg} />
+<Food name={f.name} notes={f.notes} index={i} mcg={f.mcg} unit={f.unit} source={f.source} use_add=true use_fav=true on:message={do_msg} />
 {/each}

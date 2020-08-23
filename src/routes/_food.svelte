@@ -12,6 +12,8 @@ export let use_edit = false;
 export let use_dup = false;
 export let use_fav = false;
 export let use_dec = false;
+export let use_inc = false;
+export let use_add = false;
 export let use_del = false;
 export let use_move = false;
 
@@ -60,14 +62,15 @@ function down() { msg("down"); }
 {#if use_total}= {#if use_grams}{(grams * servings).toFixed(3)}g {/if}<b>{(mcg * servings).toFixed(3)}</b> mcg{/if}{#if source}, {source} {/if}
 {#if use_edit}<button on:click={edit}>edit</button>&nbsp{/if}
 {#if use_dup}<button on:click={dup}>dup</button>&nbsp{/if}
-<span style="font-size:150%">
+<span style="font-size:200%; whitespace:nowrap; float:right;">
 {#if use_del}<button on:click={del}>x</button>{/if}
 {#if use_fav}<button on:click={fav}>*</button>{/if}
 {#if use_move}
 <button on:click={up}>^</button>
 <button on:click={down}>v</button>
 {/if}
-{#if use_dec} <button on:click={dec}>-</button>{/if}
-<button on:click={inc}>+</button>
+{#if use_dec} <button on:click={dec}>&lt</button>{/if}
+{#if use_inc} <button on:click={inc}>&gt</button>{/if}
+{#if use_add} <button on:click={inc}>+</button>{/if}
 </span>
 </div>

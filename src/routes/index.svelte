@@ -150,7 +150,7 @@ Averages [3, 5, 7] days: [{averages[0].toFixed(1)}, {averages[1].toFixed(1)}, {a
 {#if editing == undefined}
 {#each day.items as f, i}
 {#if f.del == undefined}
-<Food name={f.name} notes={f.notes} index={i} mcg={f.mcg} unit={f.unit} servings={f.servings} source={f.source} use_edit=true use_fav=true use_dec=true use_del=true on:message={do_msg}/>
+<Food name={f.name} notes={f.notes} index={i} mcg={f.mcg} unit={f.unit} servings={f.servings} source={f.source} use_edit=true use_fav=true use_dec=true use_inc=true use_del=true on:message={do_msg}/>
 {/if}
 {/each}
 <p></p>Total: {total.toFixed(2)}

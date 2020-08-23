@@ -205,7 +205,7 @@ Search <input type="text" id="search_string"/>
 {#if favorites != undefined }
 {#each results as f, i}
 {#if f.del == undefined }
-<Food name={f.name} notes={f.notes} index={i} mcg={f.mcg} unit={f.unit} servings={f.servings} source={f.source} use_edit=true use_dup=true use_del=true use_move=true on:message={do_msg} />
+<Food name={f.name} notes={f.notes} index={i} mcg={f.mcg} unit={f.unit} servings={f.servings} source={f.source} use_edit=true use_dup=true use_add=true use_del=true use_move=true on:message={do_msg} />
 {/if}
 {/each}
 {/if}

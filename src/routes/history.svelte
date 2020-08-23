@@ -102,7 +102,7 @@ Number of days to view <input type="number" id="limit" value="{limit}" />
 </b><br><br>
 {#each day.items as f, i}
 {#if f.del == undefined}
-<Food name={f.name} notes={f.notes} entry={e} index={i} mcg={f.mcg} unit={f.unit} servings={f.servings} source={f.source} use_fav=true on:message={do_msg}/>
+<Food name={f.name} notes={f.notes} entry={e} index={i} mcg={f.mcg} unit={f.unit} servings={f.servings} source={f.source} use_add=true use_fav=true on:message={do_msg}/>
 {/if}
 {/each}
 <p></p>Total: {get_total(day).toFixed(2)}
