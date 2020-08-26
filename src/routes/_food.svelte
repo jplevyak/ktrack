@@ -61,7 +61,7 @@ function down() { msg("down"); }
 }
 </style>
 
-<div class="food" style="line-height:20px">
+<div class="food" style="line-height:25px">
 {name}{#if servings != undefined}, <b>{servings.toFixed(3)}</b> servings{/if} @ {mcg == undefined ? "unknown" : mcg} mcg/{unit}{#if use_notes}, {notes}{/if}
 {#if use_total}= {#if use_grams}{(grams * servings).toFixed(3)}g {/if}<b>{(mcg * servings).toFixed(3)}</b> mcg{/if}{#if source}, {source} {/if}
 {#if use_edit}<button on:click={edit}>edit</button>&nbsp{/if}

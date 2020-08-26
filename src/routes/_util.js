@@ -36,7 +36,7 @@ export function compare_date(d1, d2) {
 export function get_total(day) {
   let n = 0.0;
   for (let f of day.items) {
-    if (f.mcg != undefined) {
+    if (f.del == undefined && f.mcg != undefined) {
       n += f.mcg * f.servings;
     }
   }
