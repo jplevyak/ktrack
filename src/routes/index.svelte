@@ -17,6 +17,7 @@ let server_checked = false;
 let resolution = 0.0001;
 let edit = undefined;
 let day = undefined;
+let round_servings = 0.0;
 
 // straddle all small moves.
 let stops = [0.2, 0.250, 0.3, 0.3333333333, 0.4, 0.5, 0.6, 0.6666666666, 0.7, 0.75, 0.8];
@@ -136,7 +137,16 @@ function do_msg(event) {
   }
 }
 
+function servings_input(e) {
+  let v = e.target.value;
+  if (v.toFixed)
+    editing.servings = v;
+  else
+    editing.servings = parseFloat(v);
+}
+
 $: total = get_total(day);
+$: round_servings = editing != undefined ? editing.servings : 0.0;
 
 </script>
 
@@ -160,7 +170,7 @@ Averages [3, 5, 7] days: [{averages[0].toFixed(1)}, {averages[1].toFixed(1)}, {a
 <tr><th>Notes</th><th><input class="val" type="text" bind:value={editing.notes} /></th></tr>
 <tr><th>mcg</th><th> <input class="val" type="number" bind:value={editing.mcg} readonly /></th></tr>
 <tr><th>Unit</th><th><input class="val" type="text" bind:value={editing.unit} readonly /></th></tr>
-<tr><th>Servings</th><th><input class="val" type="number" step=0.1 bind:value={editing.servings} /></th></tr>
+<tr><th>Servings</th><th><input class="val" type="number" step=0.1 value={round_servings} on:input={servings_input} /></th></tr>
 <tr><th>Source</th><th><input class="val" type="text" bind:value={editing.source} readonly /></th></tr>
 </table>
 <br><button type="button" id="cancel">cancel</button>
