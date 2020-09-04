@@ -193,63 +193,45 @@ export function merge_day(l1, l2) {
   return t;
 }
 
-export function cleanup_history(h) {
-  // remove duplicates
-  for (let i in h.items) {
-    for (let j in h.items) {
-      if (i != j && compare_date(h.items[i], h.items[j]) == 0) h.items.splice(j, 1);
-    }
-  }
-  for (let i in h.items)
-    if (h.items[i].year == undefined) h.items.splice(i, 1);
-  return h;
+function date_key(i) {
+  return new Date(i.year, i.month, i.date).getTime();
 }
 
-// merge l1 and l2, set the updated t  be the greater and update if the output is different than l1.
+// merge l1 and l2, set the updated time be the greater and update if the output is different than l1.
 // only merge the most recent month.
 export function merge_history(l1, l2) {
-  var l = {
-    items: [],
-    updated: l1.updated,
-  };
-  if (l2.updated != undefined && (l1.updated == undefined || l2.updated > l1.updated)) {
-    l.updated = l2.updated;
+  var updated = l1.updated;
+  if (l2.updated != undefined && (updated == undefined || l2.updated > updated)) {
+    updated = l2.updated;
   }
   var changed = false;
-  for (let x of l1.items) {
-    var found = false
-    for (let y of l2.items.slice(0, merge_history_limit)) {
-      if (compare_date(x, y) == 0) {
-        found = true;
-        let m = merge_day(x, y);
-        if (m.updated != x.updated) {
-          changed = true;
-        }
-        l.items.push(m);
-        break;
-      }
-    }
-    if (!found) {
-      l.items.push(x);
-    }
-  }
-  for (let x of l2.items.slice(0, merge_history_limit)) {
-    var found = false;
-    for (let y of l.items)
-      if (compare_date(x, y) == 0) {
-        found = true;
-        continue;
-      }
-    if (!found) {
+  var map = new Map();
+  for (let x of l1.items) map.set(date_key(x), x);
+  for (let y of l2.items.slice(0, merge_history_limit)) {
+    var k = date_key(y);
+    var x = map.get(k);
+    if (x == undefined) {
+      map.set(k, y);
       changed = true;
-      l.items.push(x);
+    } else {
+      var m = merge_day(x, y);
+      if (m != x) {
+        map.set(k, m);
+        changed = true;
+      }
     }
   }
+  if (!changed) {
+    return l1;
+  }
+  map = new Map([...map.entries()].sort().reverse())  // sort
+  var l = {
+    items: [...map.values()],
+    updated: updated,
+  };
   if (changed || l.updated == undefined) {
     l.updated = Date.now();
   }
-  cleanup_history(l);
-  l.items.sort((x, y) => compare_date(y, x));
   return l;
 }
 

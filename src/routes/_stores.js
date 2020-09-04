@@ -34,38 +34,13 @@ export function local_writable(key, initialValue) {
 
 export function save_history(day, profile) {
   if (day == undefined) return;
+  var h = {updated: day.updated, items: [day, make_historical_day(day, 1)]};
   history_store.update(function(history) {
-    var changed = false;
-    if (history.items.length > 0) {
-      for (let i = 0; i < history.items.length; i++) {
-        let c = compare_date(day, history.items[i]);
-        if (c == 0 && day.updated > history.items[i].updated) {
-          changed = true;
-          history.items.splice(i, 1, {...day});
-          let yesterday = make_historical_day(day, 1);
-          if (history.items.length < i + 2 || compare_date(yesterday, history.items[i + 1]) > 0) {
-            history.items.splice(i + 1, 0, {...yesterday});
-          }
-          break;
-        } else if (c > 0) {
-          changed = true;
-          history.items.splice(i, 0, {...day});
-          let yesterday = make_historical_day(day, 1);
-          if (compare_date(yesterday, history.items[i]) > 0) {
-            history.items.splice(i + 1, 0, {...yesterday});
-          }
-          break;
-        }
-      }
-    } else {
-      changed = true;
-      history.items = [{...day}];
-      history.items.push(make_historical_day(day, 1));
+    let new_history = merge_history(history, h);
+    if (new_history != history) {
+      backup_history(new_history, profile);
     }
-    if (changed) {
-      backup_history(history, profile);
-    }
-    return history;
+    return new_history;
   });
 }
 
@@ -85,6 +60,7 @@ export function add_item(item, edit, profile) {
         if (i.del == undefined) return day;
         delete i.del;
         i.updated = Date.now();
+        save_history(day, profile);
         return day;
       }
     }
