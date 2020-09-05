@@ -2,7 +2,7 @@
 import { goto } from '@sapper/app';
 import { onMount, onDestroy } from 'svelte';
 import Food from './_food';
-import { weekdays, months, make_history, make_historical_day, get_total, compute_averages } from './_util.js';
+import { weekdays, months, make_history, make_historical_day, get_total, compute_averages, compare_date } from './_util.js';
 import { today_store, history_store, profile_store, edit_store, add_item, save_favorite, backup_history, check_for_new_day } from './_stores.js';
 
 let the_date = new Date();
@@ -15,13 +15,8 @@ let added_count = 0;
 let profile = undefined;
 let server_checked = false;
 
-const unsubscribe_profile = profile_store.subscribe(p => {
-  profile = p;
-});
-const unsubscribe_today = today_store.subscribe(value => {
-  check_for_new_day(value);
-  today = value;
-});
+const unsubscribe_profile = profile_store.subscribe(p => { profile = p; });
+const unsubscribe_today = today_store.subscribe(t => { today = check_for_new_day(t); });
 const unsubscribe_edit = edit_store.subscribe(value => { edit = value; });
 const unsubscribe_history = history_store.subscribe(value => {
   if (value == undefined || value.items.length == 0) {
@@ -76,12 +71,19 @@ function do_msg(event) {
     return;
   }
   if (change > 0) {
-    add_item(day.items[index], edit, profile);
+    add_item(day.items[index], today, edit, profile);
     added_count += 1;
   }
 }
 
 function edit_day(day) {
+  today = check_for_new_day(today);
+  if (compare_date(day, today) == 0) {
+    edit_store.set(undefined);
+    goto('/');
+    return;
+  }
+  day.start_edit = Date.now();
   edit_store.set(day);
   goto('/');
 }

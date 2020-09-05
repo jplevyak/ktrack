@@ -12,13 +12,14 @@ if (search == undefined) {
   search = elasticlunr.Index.load(index);
   index_store.set(search);
 }
+let today = undefined;
 let edit = undefined;
 let profile = undefined;
 let results = [];
 let added_count = 0;
 
 const unsubscribe_profile = profile_store.subscribe(p => { profile = p; });
-const unsubscribe_today = today_store.subscribe(check_for_new_day);
+const unsubscribe_today = today_store.subscribe(t => { today = check_for_new_day(t); });
 const unsubscribe_edit = edit_store.subscribe(value => { edit = value; });
 onDestroy(() => { unsubscribe_profile(); unsubscribe_today(); unsubscribe_edit(); });
 
@@ -53,7 +54,7 @@ function do_msg(event) {
     save_favorite(item, profile);
   } else if (event.detail.change > 0) {
     added_count += 1;
-    add_item(item, edit, profile);
+    add_item(item, today, edit, profile);
   }
 }
   

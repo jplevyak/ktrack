@@ -51,8 +51,18 @@ export const profile_store = local_writable('profile', make_profile());
 export const edit_store = local_writable('edit', undefined);
 export const index_store = internal(undefined);
 
-export function add_item(item, edit, profile) {
+export function add_item(item, today, edit, profile) {
+  if (edit != undefined) {
+    if (Date.now() - edit.start_edit > 10 * 60 * 1000) {  // 10 min.
+      edit_store.set(undefined);
+      edit = undefined;
+    }
+    edit.start_edit = Date.now();
+  }
   let store = (edit != undefined) ? edit_store : today_store;
+  if (edit == undefined) {
+    today = check_for_new_day(today);
+  }
   store.update(function(day) {
     if (day == undefined) day = make_today();
     for (let i of day.items) {
@@ -232,5 +242,7 @@ export function check_for_new_day(t) {
   let new_day = make_today();
   if (t.year == undefined || compare_date(t, new_day) < 0) {
     save_today(new_day, profile);
+    return new_day;
   }
+  return t;
 }

@@ -14,6 +14,7 @@ let added_count = 0;
 let editing = undefined;
 let editing_replace_index = undefined;
 let server_checked = false;
+let today = undefined;
 let edit = undefined;
 let profile = undefined;
 
@@ -30,7 +31,7 @@ const unsubscribe_favorites = favorites_store.subscribe(value => {
   create_index();
   update_results();
 });
-const unsubscribe_today = today_store.subscribe(check_for_new_day);
+const unsubscribe_today = today_store.subscribe(t => { today = check_for_new_day(t); });
 const unsubscribe_edit = edit_store.subscribe(value => { edit = value; });
 onDestroy(() => { unsubscribe_today(); unsubscribe_edit(); unsubscribe_favorites(); unsubscribe_profile(); });
 
@@ -172,7 +173,7 @@ function do_msg(event) {
       j = j + 1;
     }
   } else if (change > 0) {
-    add_item(item, edit, profile);
+    add_item(item, today, edit, profile);
     added_count += 1;
   }
 }

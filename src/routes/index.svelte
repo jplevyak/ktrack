@@ -46,6 +46,12 @@ const unsubscribe_history = history_store.subscribe(value => {
 });
 
 const unsubscribe_edit = edit_store.subscribe(d => {
+  if (d != undefined) {
+    if (Date.now() - d.start_edit > 10 * 60 * 1000) {  // 10 min.
+      edit_store.update(function (d) { return undefined; });
+      d = undefined;
+    }
+  }
   edit = d;
   if (edit == undefined)
     day = today;
