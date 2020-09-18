@@ -36,9 +36,10 @@ export function save_history(day, profile) {
   if (day == undefined) return;
   var h = {updated: day.updated, items: [day, make_historical_day(day, 1)]};
   history_store.update(function(history) {
+    let t = Date.now();
     let new_history = merge_history(history, h);
-    if (new_history != history) {
-      backup_history(new_history, profile);
+    if (t <= history.updated) {
+      backup_history(new_history, profile, true);
     }
     return new_history;
   });
@@ -88,7 +89,7 @@ export function add_item(item, today, edit, profile) {
 
 export function save_today(today, profile) {
   today_store.set(today);
-  backup_today(today, profile);
+  backup_today(today, profile, true);
   save_history(today, profile);
 }
 
@@ -136,26 +137,26 @@ function backup_internal(l, name, store, merge, profile, item_limit = undefined,
       .catch(err => {console.log('POST error', err.message)})
 }
 
-export function backup_today(today, profile) {
+export function backup_today(today, profile, force = false) {
   if (today.server_checked == undefined) today.server_checked = Date.now() - check_backup_interval;
-  if (Date.now() - today.server_checked < check_backup_interval) return;
+  if (!force && Date.now() - today.server_checked < check_backup_interval) return;
   today.server_checked = Date.now();
   backup_internal(today, 'today', today_store, merge_day, profile);
 }
 
-export function backup_favorites(favorites, profile) {
+export function backup_favorites(favorites, profile, force = false) {
   if (favorites.server_checked == undefined) favorites.server_checked = Date.now() - check_backup_interval;
-  if (Date.now() - favorites.server_checked < check_backup_interval) return;
+  if (!force && Date.now() - favorites.server_checked < check_backup_interval) return;
   favorites.server_checked = Date.now();
   backup_internal(favorites, 'favorites', favorites_store, merge_items, profile);
 }
 
-export function backup_history(history, profile) {
+export function backup_history(history, profile, force = false) {
   if (history.server_checked == undefined) history.server_checked = Date.now() - check_backup_interval;
   if (history.items.length > 0) {
     history.updated = history.items[0].updated;
   }
-  if (Date.now() - history.server_checked <= check_backup_interval) {
+  if (!force && Date.now() - history.server_checked <= check_backup_interval) {
     return;
   }
   history.server_checked = Date.now();
@@ -221,13 +222,13 @@ export function save_favorite(item, profile, replace_index) {
     for (let i in favorites.items) {
       if (favorites.items[i].name == item.name) {
         favorites.items.splice(i, 1, item);
-        backup_favorites(favorites, profile);
+        backup_favorites(favorites, profile, true);
         return favorites;
       }
     }
     if (item.servings == undefined) item.servings = 1.0;
     favorites.items.push(item);
-    backup_favorites(favorites, profile);
+    backup_favorites(favorites, profile, true);
     return favorites;
   });
 }

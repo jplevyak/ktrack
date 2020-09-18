@@ -181,16 +181,16 @@ export function merge_items(l1, l2) {
   return l;
 }
 
-export function merge_day(l1, l2) {
-  let c = compare_date(l1, l2);
-  if (c > 0) return l1;
-  if (c < 0) return l2;
-  let t = merge_items(l1, l2);
-  t.year = l1.year;
-  t.month = l1.month;
-  t.date = l1.date;
-  t.day = l1.day;
-  return t;
+export function merge_day(d1, d2) {
+  let c = compare_date(d1, d2);
+  if (c > 0) return d1;
+  if (c < 0) return d2;
+  let d = merge_items(d1, d2);
+  d.year = d1.year;
+  d.month = d1.month;
+  d.date = d1.date;
+  d.day = d1.day;
+  return d;
 }
 
 function date_key(i) {
@@ -214,8 +214,9 @@ export function merge_history(l1, l2) {
       map.set(k, y);
       changed = true;
     } else {
+      let t = Date.now();
       var m = merge_day(x, y);
-      if (m != x) {
+      if (t <= m.updated) {
         map.set(k, m);
         changed = true;
       }

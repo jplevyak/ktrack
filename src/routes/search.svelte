@@ -12,9 +12,9 @@ if (search == undefined) {
   search = elasticlunr.Index.load(index);
   index_store.set(search);
 }
+let profile = undefined;
 let today = undefined;
 let edit = undefined;
-let profile = undefined;
 let results = [];
 let added_count = 0;
 

@@ -6,13 +6,13 @@ import { weekdays, months, make_history, make_historical_day, get_total, compute
 import { today_store, history_store, profile_store, edit_store, add_item, save_favorite, backup_history, check_for_new_day } from './_stores.js';
 
 let the_date = new Date();
+let profile = undefined;
 let today = undefined;
 let edit = undefined;
 let history = undefined;
 let limit = 30;
 let results = [];
 let added_count = 0;
-let profile = undefined;
 let server_checked = false;
 
 const unsubscribe_profile = profile_store.subscribe(p => { profile = p; });

@@ -14,9 +14,9 @@ let added_count = 0;
 let editing = undefined;
 let editing_replace_index = undefined;
 let server_checked = false;
+let profile = undefined;
 let today = undefined;
 let edit = undefined;
-let profile = undefined;
 
 const unsubscribe_profile = profile_store.subscribe(p => { profile = p; });
 const unsubscribe_favorites = favorites_store.subscribe(value => {
@@ -79,7 +79,7 @@ function update_results() {
 function save() {
   favorites.updated = Date.now();
   favorites_store.set(favorites);
-  backup_favorites(favorites, profile);
+  backup_favorites(favorites, profile, true);
   update_results();
 }
 
