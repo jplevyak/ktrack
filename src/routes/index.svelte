@@ -34,7 +34,7 @@ const unsubscribe_today = today_store.subscribe(t => {
     if (!server_checked) {
       server_checked = true;
       backup_today(today, profile);
-      save_history(day, profile);
+      save_history(today, profile);
     }
     if (edit == undefined)
       day = today;
