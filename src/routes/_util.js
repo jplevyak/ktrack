@@ -134,51 +134,51 @@ export function merge_profile(l1, l2) {
 }
 
 // merge l1 and l2, set the updated to be the greater and update if the output is different than l1.
-export function merge_items(l1, l2) {
-  var l = {items: [], updated: l1.updated};
-  if (l2.updated != undefined && l2.updated > l1.updated) {
-    l.updated = l2.updated;
+export function merge_items(d1, d2) {
+  var d = {items: [], updated: d1.updated};
+  if (d2.updated != undefined && d2.updated > d1.updated) {
+    d.updated = d2.updated;
   }
   var changed = false;
   var all = new Set();
-  for (let x of l1.items) {
+  for (let x of d1.items) {
     if (all.has(x.name)) continue;
     all.add(x.name)
     var found = false
-    for (let y of l2.items) {
+    for (let y of d2.items) {
       if (x.name == y.name) {
         found = true;
         if (x.updated >= y.updated) {
-          l.items.push(x);
+          d.items.push(x);
         } else {
           changed = true;
-          l.items.push(y);
+          d.items.push(y);
         }
         break;
       }
     }
     if (!found) {
-      l.items.push(x);
+      d.items.push(x);
     }
   }
-  for (let x of l2.items) {
+  for (let x of d2.items) {
     if (all.has(x.name)) continue;
     all.add(x.name)
     var found = false;
-    for (let y of l.items)
+    for (let y of d.items)
       if (x.name == y.name) {
         found = true;
         continue;
       }
     if (!found) {
       changed = true;
-      l.items.push(x);
+      d.items.push(x);
     }
   }
-  if (changed || l.updated == undefined) {
-    l.updated = Date.now();
+  if (changed || d.updated == undefined) {
+    d.updated = Date.now();
   }
-  return l;
+  return d;
 }
 
 export function merge_day(d1, d2) {
@@ -214,16 +214,12 @@ export function merge_history(l1, l2) {
       map.set(k, y);
       changed = true;
     } else {
-      let t = Date.now();
       var m = merge_day(x, y);
-      if (t <= m.updated) {
+      if (m.updated != x.updated) {
         map.set(k, m);
         changed = true;
       }
     }
-  }
-  if (!changed) {
-    return l1;
   }
   map = new Map([...map.entries()].sort().reverse())  // sort
   var l = {

@@ -1,6 +1,6 @@
 <script>
 import { onMount, onDestroy } from 'svelte';
-import { reset_data, profile_store, save_profile } from '../_stores.js';
+import { reset_data, profile_store, save_profile, today_store, backup_today, favorites_store, backup_favorites, history_store, backup_history } from '../_stores.js';
 import { make_profile } from '../_util.js';
 
 const about = [
@@ -19,19 +19,34 @@ const about = [
 ];
 
 var profile = undefined;
+let today = undefined;
+let favorites = undefined;
+let history = undefined;
 
 const unsubscribe_profile = profile_store.subscribe(p => {
   if (p == undefined)
     p = make_profile();
   profile = p;
 });
-onDestroy(unsubscribe_profile);
+const unsubscribe_today = today_store.subscribe(d => { today = d; });
+const unsubscribe_favorites = favorites_store.subscribe(f => { favorites = f; });
+const unsubscribe_history = history_store.subscribe(h => { history = h; });
+onDestroy(() => { unsubscribe_today(); unsubscribe_favorites(); unsubscribe_history(); unsubscribe_profile(); });
 
 function clear_data() {
   let answer = confirm("Do you really want to delete all the local data? ");
   if (!answer)
     return;
   reset_data();
+}
+
+function force_sync() {
+  backup_today(today, profile, true);
+  backup_favorites(favorites, profile, true);
+  backup_history(history, profile, true);
+  today = today;
+  favorites = favorites;
+  history = history;
 }
 
 onMount(() => {
@@ -52,6 +67,7 @@ onMount(() => {
   }
   save.onclick = changed;
   document.getElementById("reset").onclick = clear_data;
+  document.getElementById("sync").onclick = force_sync;
 })
 
 </script>
@@ -87,3 +103,20 @@ Old Password (when updating Password) <input type="text" id="old_password"value=
 <button type="button" id="save">Login/Save</button>
 {/if}
 <input type="button" id="reset" value="Reset All Data"/>
+<input type="button" id="sync" value="Force Sync All Data"/>
+<br><br>
+Today
+<ul>
+<li>Server Check Time: {today.server_checked ? new Date(today.server_checked).toString() : "unsynced"}</li>
+<li>Server Sync Time: {today.server_synced ? new Date(today.server_synced).toString() : "unsynced"}</li>
+</ul>
+Favorites
+<ul>
+<li>Server Check Time: {favorites.server_checked ? new Date(favorites.server_checked).toString() : "unsynced"}</li>
+<li>Server Sync Time: {favorites.server_synced ? new Date(favorites.server_synced).toString() : "unsynced"}</li>
+</ul>
+History
+<ul>
+<li>Server Check Time: {history.server_checked ? new Date(history.server_checked).toString() : "unsynced"}</li>
+<li>Server Sync Time: {history.server_synced ? new Date(history.server_synced).toString() : "unsynced"}</li>
+</ul>

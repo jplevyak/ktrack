@@ -1,7 +1,7 @@
 import {writable as internal} from 'svelte/store';
 import {compare_date, merge_items, merge_day, merge_history_limit, cleanup_history, merge_history, make_today, make_favorites, make_history, make_historical_day, make_profile} from './_util.js';
 
-const check_backup_interval = 5 * 1000;  // 5 seconds.
+const check_backup_interval = 0 * 1000;  // 0 seconds.
 
 export function local_writable(key, initialValue) {
   const store = internal(initialValue)
@@ -36,12 +36,12 @@ export function save_history(day, profile) {
   if (day == undefined) return;
   var h = {updated: day.updated, items: [day, make_historical_day(day, 1)]};
   history_store.update(function(history) {
-    let t = Date.now();
     let new_history = merge_history(history, h);
-    if (t <= history.updated) {
+    if (new_history.updated != history.updated) {
       backup_history(new_history, profile, true);
+      return new_history;
     }
-    return new_history;
+    return history;
   });
 }
 
@@ -110,31 +110,35 @@ function backup_internal(l, name, store, merge, profile, item_limit = undefined,
   }
   fetch(name, {method: 'POST', body: JSON.stringify(data), headers: {'Content-Type': 'application/json'}})
       .then(r => {
-        if (!r.ok) return;
+        if (!r.ok) {
+          return;
+        }
         r.json()
             .then(data => {
               if (data.err) {
-                console.log(data.err);
+                console.log('backup err', name, data.err);
                 return;
               }
               let backup = data.value;
-              if (backup == undefined) return;
+              if (backup == '') {
+                l.server_synced = Date.now();
+                return;
+              }
               let merged = merge(l, backup);
               merged.server_checked = l.server_checked;
               merged.server_synced = Date.now();
               if (merged.updated != l.updated) {
                 store.set(merged);
+              } else {
+                l.server_synced = l.server_synced;
               }
-              if (backup.updated == undefined || merged.updated != backup.updated) {
-                if (update) {
-                  return;
-                }
+              if (merged.updated != backup.updated) {
                 backup_internal(merged, name, store, merge, profile, item_limit, true);
               }
             })
-            .catch(err => {console.log('JSON error', err.message)});
+            .catch(err => {console.log(name, 'JSON error', err.message)});
       })
-      .catch(err => {console.log('POST error', err.message)})
+      .catch(err => {console.log(name, 'POST error', err.message)})
 }
 
 export function backup_today(today, profile, force = false) {
