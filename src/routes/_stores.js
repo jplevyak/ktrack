@@ -111,6 +111,7 @@ function backup_internal(l, name, store, merge, profile, item_limit = undefined,
   fetch(name, {method: 'POST', body: JSON.stringify(data), headers: {'Content-Type': 'application/json'}})
       .then(r => {
         if (!r.ok) {
+          console.log('not-ok', name, r.status, r.statusText);
           return;
         }
         r.json()
@@ -143,16 +144,18 @@ function backup_internal(l, name, store, merge, profile, item_limit = undefined,
 
 export function backup_today(today, profile, force = false) {
   if (today.server_checked == undefined) today.server_checked = Date.now() - check_backup_interval;
-  if (!force && Date.now() - today.server_checked < check_backup_interval) return;
+  if (!force && Date.now() - today.server_checked < check_backup_interval) {
+    return;
+  }
   today.server_checked = Date.now();
-  backup_internal(today, 'today', today_store, merge_day, profile);
+  backup_internal(today, 'today', today_store, merge_day, profile, undefined, force);
 }
 
 export function backup_favorites(favorites, profile, force = false) {
   if (favorites.server_checked == undefined) favorites.server_checked = Date.now() - check_backup_interval;
   if (!force && Date.now() - favorites.server_checked < check_backup_interval) return;
   favorites.server_checked = Date.now();
-  backup_internal(favorites, 'favorites', favorites_store, merge_items, profile);
+  backup_internal(favorites, 'favorites', favorites_store, merge_items, profile, undefined, force);
 }
 
 export function backup_history(history, profile, force = false) {
@@ -164,12 +167,13 @@ export function backup_history(history, profile, force = false) {
     return;
   }
   history.server_checked = Date.now();
-  backup_internal(history, 'history', history_store, merge_history, profile, merge_history_limit);
+  backup_internal(history, 'history', history_store, merge_history, profile, merge_history_limit, force);
 }
 
 export function save_profile(profile) {
   if (profile.password == '') {
     profile_store.set(profile);
+    console.log('logout');
     return;
   }
   let name = 'profile';
@@ -177,23 +181,21 @@ export function save_profile(profile) {
   fetch(name, {method: 'POST', body: JSON.stringify(data), headers: {'Content-Type': 'application/json'}})
       .then(r => {
         if (!r.ok) {
+          console.log('profile not-ok', r.status, r.statusText);
           profile_store.set(profile);
           return;
         }
         r.json()
             .then(data => {
               if (data.err) {
-                console.log(data.err);
+                console.log('profile err', data.err);
                 profile_store.set(profile);
                 return;
               }
               let p = data.value;
-              if (!p) {
-                profile.message = 'authenticated';
-                profile.authenticated = Date.now();
-                profile.old_password = '';
-              } else {
-                profile.message = p.message;
+              profile.message = p.message;
+              profile.authenticated = p.authenticated;
+              if (p.authenticated) {
                 profile.old_password = '';
               }
               profile_store.set(profile);

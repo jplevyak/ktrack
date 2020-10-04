@@ -103,14 +103,12 @@ export function make_profile() {
 export function merge_profile(l1, l2) {
   l1 = {...l1};  // shallow copy
   l1.message = '';
-  l1.message = '';
   delete l1.authenticated;
-  delete l2.authenticated;
   l2.username = l1.username;
+  l2.authenticated = Date.now();
+  l2.updated = l2.authenticated;
   if (l1.username == '' || l1.password == '') {
     l2.message = 'profile created, authenticated';
-    l2.authenticated = Date.now();
-    l2.updated = Date.now();
     return l2;
   }
   if (l2.password != '' && l2.old_password != '' && l2.old_password != undefined) {
@@ -120,12 +118,11 @@ export function merge_profile(l1, l2) {
       return l1;
     }
     l2.message = 'new password saved, authenticated';
-    l2.authenticated = Date.now();
-    l2.updated = Date.now();
     return l2;
   }
   if (l1.password == l2.password) {
     l2.message = 'profile in sync, authenticated';
+    console.log('authenticated', l2);
     return l2;
   }
   l1.message = 'incorrect password, not authenticated';

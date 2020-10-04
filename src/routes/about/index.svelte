@@ -55,8 +55,10 @@ onMount(() => {
   let old_password_input = document.getElementById("old_password");
   let save = document.getElementById("save");
   function changed() {
-    if (profile == undefined)
+    if (profile == undefined) {
+      console.log('profile undefined');
       return;
+    }
     if (username_input.value != profile.username || password_input.value != profile.password) {
       profile.username = username_input.value;
       profile.password = password_input.value;
