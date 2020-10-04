@@ -57,8 +57,9 @@ export function add_item(item, today, edit, profile) {
     if (Date.now() - edit.start_edit > 10 * 60 * 1000) {  // 10 min.
       edit_store.set(undefined);
       edit = undefined;
+    } else {
+      edit.start_edit = Date.now();
     }
-    edit.start_edit = Date.now();
   }
   let store = (edit != undefined) ? edit_store : today_store;
   if (edit == undefined) {
@@ -71,7 +72,10 @@ export function add_item(item, today, edit, profile) {
         if (i.del == undefined) return day;
         delete i.del;
         i.updated = Date.now();
-        save_history(day, profile);
+        if (edit == undefined) {
+          backup_today(today, profile, true);
+        }
+        save_history(day, profile, true);
         return day;
       }
     }
@@ -82,7 +86,10 @@ export function add_item(item, today, edit, profile) {
     day = {...day};
     day.items.push(item);
     day.updated = Date.now();
-    save_history(day, profile);
+    if (edit == undefined) {
+      backup_today(today, profile, true);
+    }
+    save_history(day, profile, true);
     return day;
   });
 }
