@@ -39,7 +39,7 @@ export async function do_post_internal(req, res, username, db, title, merge, mak
           if (err) console.log(title + '.put', err);
         });
       }
-      if (result.updated == value.updated) {
+      if (value != undefined && result.updated == value.updated) {
         result = '';  // we have nothing to add, send nothing
       }
     }

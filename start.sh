@@ -1,5 +1,5 @@
 #!/bin/sh
-while ;
+while true
 do
 node __sapper__/build
-end
+done

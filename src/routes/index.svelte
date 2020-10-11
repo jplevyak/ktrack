@@ -29,6 +29,7 @@ const unsubscribe_today = today_store.subscribe(t => {
   let new_day = make_today();
   if (t.year == undefined || compare_date(t, new_day) < 0) {
     save_today(new_day, profile);
+    day = new_day;
   } else {
     today = t;
     if (!server_checked) {

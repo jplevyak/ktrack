@@ -122,7 +122,6 @@ export function merge_profile(l1, l2) {
   }
   if (l1.password == l2.password) {
     l2.message = 'profile in sync, authenticated';
-    console.log('authenticated', l2);
     return l2;
   }
   l1.message = 'incorrect password, not authenticated';

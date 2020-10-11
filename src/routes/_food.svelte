@@ -19,6 +19,7 @@ export let use_move = false;
 
 let use_total = undefined;
 let use_notes = undefined;
+let g100 = unit == "100g";
 let m = undefined;
 let grams = undefined;
 let use_grams = undefined;
@@ -26,8 +27,8 @@ let use_grams = undefined;
 $: use_total = ((mcg != undefined) && (servings != undefined));
 $: use_notes = ((notes != undefined) && (notes != ""));
 $: m = use_notes ? notes.match(/^(\d+)g/) : undefined;
-$: grams = (m == undefined) ? undefined : m[1];
-$: use_grams = (grams != undefined) && (servings != 1.0);
+$: grams = (m == undefined) ? (g100 ? 100 : undefined) : m[1];
+$: use_grams = (grams != undefined);
 
 const dispatch = createEventDispatcher();
 
