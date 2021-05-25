@@ -16,7 +16,7 @@ let added_count = 0;
 let server_checked = false;
 
 const unsubscribe_profile = profile_store.subscribe(p => { profile = p; });
-const unsubscribe_today = today_store.subscribe(t => { today = check_for_new_day(t); });
+const unsubscribe_today = today_store.subscribe(t => { today = check_for_new_day(t, profile); });
 const unsubscribe_edit = edit_store.subscribe(value => { edit = value; });
 const unsubscribe_history = history_store.subscribe(value => {
   if (value == undefined || value.items.length == 0) {
@@ -77,7 +77,7 @@ function do_msg(event) {
 }
 
 function edit_day(day) {
-  today = check_for_new_day(today);
+  today = check_for_new_day(today, profile);
   if (compare_date(day, today) == 0) {
     edit_store.set(undefined);
     goto('/');

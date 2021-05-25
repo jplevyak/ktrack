@@ -19,7 +19,7 @@ let results = [];
 let added_count = 0;
 
 const unsubscribe_profile = profile_store.subscribe(p => { profile = p; });
-const unsubscribe_today = today_store.subscribe(t => { today = check_for_new_day(t); });
+const unsubscribe_today = today_store.subscribe(t => { today = check_for_new_day(t, profile); });
 const unsubscribe_edit = edit_store.subscribe(value => { edit = value; });
 onDestroy(() => { unsubscribe_profile(); unsubscribe_today(); unsubscribe_edit(); });
 

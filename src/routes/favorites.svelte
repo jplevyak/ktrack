@@ -31,7 +31,7 @@ const unsubscribe_favorites = favorites_store.subscribe(value => {
   create_index();
   update_results();
 });
-const unsubscribe_today = today_store.subscribe(t => { today = check_for_new_day(t); });
+const unsubscribe_today = today_store.subscribe(t => { today = check_for_new_day(t, profile); });
 const unsubscribe_edit = edit_store.subscribe(value => { edit = value; });
 onDestroy(() => { unsubscribe_today(); unsubscribe_edit(); unsubscribe_favorites(); unsubscribe_profile(); });
 

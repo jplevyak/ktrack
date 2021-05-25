@@ -63,7 +63,7 @@ export function add_item(item, today, edit, profile) {
   }
   let store = (edit != undefined) ? edit_store : today_store;
   if (edit == undefined) {
-    today = check_for_new_day(today);
+    today = check_for_new_day(today, profile);
   }
   store.update(function(day) {
     if (day == undefined) day = make_today();
@@ -252,7 +252,7 @@ export function reset_data() {
   history_store.set(make_history());
 }
 
-export function check_for_new_day(t) {
+export function check_for_new_day(t, profile) {
   let new_day = make_today();
   if (t.year == undefined || compare_date(t, new_day) < 0) {
     save_today(new_day, profile);
