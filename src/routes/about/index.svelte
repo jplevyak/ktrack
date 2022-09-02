@@ -59,7 +59,7 @@ onMount(() => {
       console.log('profile undefined');
       return;
     }
-    if (username_input.value != profile.username || password_input.value != profile.password) {
+    if (username_input.value != profile.username || password_input.value != profile.password || !profile.authenticated) {
       profile.username = username_input.value;
       profile.password = password_input.value;
       profile.old_password = old_password_input.value;

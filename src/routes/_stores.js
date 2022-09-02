@@ -102,6 +102,7 @@ export function save_today(today, profile) {
 
 function backup_internal(l, name, store, merge, profile, item_limit = undefined, update = false) {
   if (profile == undefined || profile.authenticated == undefined) {
+    console.log('bad profile', profile);
     return;
   }
   var data = {username: profile.username, password: profile.password, updated: l.updated};
