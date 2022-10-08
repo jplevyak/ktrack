@@ -1,9 +1,9 @@
 <script>
-import { goto } from '@sapper/app';
+import { goto } from '$app/navigation';
 import { onMount, onDestroy } from 'svelte';
-import Food from './_food';
-import { weekdays, months, make_history, make_historical_day, get_total, compute_averages, compare_date } from './_util.js';
-import { today_store, history_store, profile_store, edit_store, add_item, save_favorite, backup_history, check_for_new_day } from './_stores.js';
+import Food from '../_food.svelte';
+import { weekdays, months, make_history, make_historical_day, get_total, compute_averages, compare_date } from '../_util.js';
+import { today_store, history_store, profile_store, edit_store, add_item, save_favorite, backup_history, check_for_new_day } from '../_stores.js';
 
 let the_date = new Date();
 let profile = undefined;

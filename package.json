@@ -1,31 +1,38 @@
 {
-  "name": "TODO",
-  "description": "TODO",
+  "name": "ktrack",
   "version": "0.0.1",
+  "private": true,
+  "license": "UNLICENSED",
   "scripts": {
-    "dev": "sapper dev",
-    "build": "sapper build",
-    "export": "sapper export",
-    "start": "node __sapper__/build",
-    "cy:run": "cypress run",
-    "cy:open": "cypress open",
-    "test": "run-p --race dev cy:run"
+    "dev": "vite dev",
+    "build": "BODY_SIZE_LIMIT=0 vite build",
+    "preview": "vite preview",
+    "start": "node build",
+    "lint": "prettier --plugin-search-dir . --check . && eslint .",
+    "format": "prettier --plugin-search-dir . --write ."
   },
   "dependencies": {
-    "body-parser": "^1.19.0",
-    "compression": "^1.7.1",
-    "leveldown": "^5.6.0",
-    "levelup": "^4.4.0",
-    "npx": "^10.2.2",
-    "polka": "next",
-    "sirv": "^0.4.6"
+    "leveldown": "^6.1.1",
+    "levelup": "^5.1.1"
   },
   "devDependencies": {
     "json-loader": "^0.5.7",
-    "npm-run-all": "^4.1.5",
-    "sapper": "^0.27.16",
-    "svelte": "^3.24.0",
-    "svelte-loader": "^2.9.0",
-    "webpack": "^4.44.0"
-  }
+    "@sveltejs/adapter-auto": "next",
+    "@sveltejs/adapter-node": "next",
+    "@sveltejs/kit": "next",
+    "@typescript-eslint/eslint-plugin": "^5.27.0",
+    "@typescript-eslint/parser": "^5.27.0",
+    "eslint": "^8.16.0",
+    "eslint-config-prettier": "^8.3.0",
+    "eslint-plugin-svelte3": "^4.0.0",
+    "prettier": "^2.6.2",
+    "prettier-plugin-svelte": "^2.7.0",
+    "svelte": "^3.44.0",
+    "svelte-check": "^2.7.1",
+    "svelte-preprocess": "^4.10.6",
+    "tslib": "^2.3.1",
+    "typescript": "^4.7.4",
+    "vite": "^3.1.0"
+  },
+  "type": "module"
 }

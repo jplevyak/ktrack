@@ -1,22 +1,22 @@
-var levelup = require('levelup');
-var leveldown = require('leveldown')
+import levelup from 'levelup';
+import leveldown from 'leveldown';
+import { error } from '@sveltejs/kit';
 
 export var profile = levelup(leveldown('./profile'));
 
-export async function do_post_internal(req, res, username, db, title, merge, make, finalize) {
-  let data = req.body;
-  var result = '';  // request nothing.
-  db.get(username, function(err, value) {
+export async function do_post_internal(req, data, username, db, title, merge, make, finalize) {
+  return await db.get(username).catch((err) => {
+    if (!(err instanceof levelup.errors.NotFoundError)) {
+      console.log(title + '.get', err, typeof err);
+      return new Response(JSON.stringify({err: err}));
+    }
+  }).then(async (value) => {
+    var result = '';  // request nothing.
     if (value != undefined) {
       value = JSON.parse(value);
       if (value == undefined) {
         console.log('bad json');
       }
-    }
-    if (err && !(err instanceof levelup.errors.NotFoundError)) {
-      console.log(title + '.get', err, typeof err);
-    } else {
-      err = undefined;
     }
     if (data.value == undefined) {  // nothing sent and/or status request
       if (value == undefined) {
@@ -35,56 +35,49 @@ export async function do_post_internal(req, res, username, db, title, merge, mak
       // store if we have nothing or if it is different
       if (value == undefined || result.updated != value.updated) {
         let string_value = JSON.stringify(result);
-        db.put(username, string_value, function(err) {
+        await db.put(username, string_value).catch((err) => {
           if (err) console.log(title + '.put', err);
+          return new Response(JSON.stringify({err: err}));
         });
       }
       if (value != undefined && result.updated == value.updated) {
         result = '';  // we have nothing to add, send nothing
       }
     }
-    res.setHeader('Content-Type', 'application/json');
-    if (err) {
-      console.log('post err ', err);
-      res.end(JSON.stringify({err: err}));
-    } else {
-      if (finalize != undefined) result = finalize(result);
-      res.end(JSON.stringify({value: result}));
-    }
+    if (finalize != undefined) result = finalize(result);
+    return new Response(JSON.stringify({value: result}));
   });
 }
 
-export async function do_post(req, res, db, title, merge, make, finalize) {
-  let data = req.body;
+export async function do_post(req, db, title, merge, make, finalize) {
+  let data = await req.request.json();
   let username = data.username;
   let password = data.password;
   if (username == undefined || !username || typeof username.valueOf() !== 'string') {
     console.log('bad username');
-    res.end(JSON.stringify({err: 'bad usernme'}));
-    return;
+    return new Response(JSON.stringify({err: 'bad username'}));
   }
   if (password == undefined || !password || typeof password.valueOf() !== 'string') {
     console.log('bad password');
-    res.end(JSON.stringify({err: 'bad password'}));
-    return;
+    return new Response(JSON.stringify({err: 'bad password'}));
   }
-  profile.get(username, function(err, value) {
-    if (err || value == undefined) {
+  return await profile.get(username).catch((err) => {
+    console.log('profile missing');
+    return new Response(JSON.stringify({err: 'profile missing'}));
+  }).then(async (value) => {
+    if (!value) {
       console.log('profile missing');
-      res.end(JSON.stringify({err: 'profile missing'}));
-      return;
+      return new Response(JSON.stringify({err: 'profile missing'}));
     }
-    value = JSON.parse(value);
-    if (value == undefined) {
+    let p = JSON.parse(value);
+    if (p == undefined) {
       console.log('bad profile');
-      res.end(JSON.stringify({err: 'bad profile'}));
-      return;
+      return new Response(JSON.stringify({err: 'bad profile'}));
     }
-    if (value.username != username || value.password != password) {
+    if (p.username != username || p.password != password) {
       console.log('incorrect password');
-      res.end(JSON.stringify({err: 'incorrect password'}));
-      return;
+      return new Response(JSON.stringify({err: 'incorrect password'}));
     }
-    return do_post_internal(req, res, username, db, title, merge, make, finalize);
+    return await do_post_internal(req, data, username, db, title, merge, make, finalize);
   });
 }

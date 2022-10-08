@@ -1,5 +1,5 @@
 import {writable as internal} from 'svelte/store';
-import {compare_date, merge_items, merge_day, merge_history_limit, cleanup_history, merge_history, make_today, make_favorites, make_history, make_historical_day, make_profile} from './_util.js';
+import {compare_date, merge_items, merge_day, merge_history_limit, merge_history, make_today, make_favorites, make_history, make_historical_day, make_profile} from './_util.js';
 
 const check_backup_interval = 0 * 1000;  // 0 seconds.
 
@@ -102,7 +102,6 @@ export function save_today(today, profile) {
 
 function backup_internal(l, name, store, merge, profile, item_limit = undefined, update = false) {
   if (profile == undefined || profile.authenticated == undefined) {
-    console.log('bad profile', profile);
     return;
   }
   var data = {username: profile.username, password: profile.password, updated: l.updated};

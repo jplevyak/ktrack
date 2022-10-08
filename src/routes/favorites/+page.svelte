@@ -1,10 +1,11 @@
 <script>
 
 import { afterUpdate, onDestroy } from 'svelte';
-import elasticlunr from './_elasticlunr.js';
-import Food from './_food';
-import { today_store, edit_store, favorites_store, profile_store, add_item, backup_favorites, save_favorite, check_for_new_day } from './_stores.js';
+import Food from '../_food.svelte';
+import { today_store, edit_store, favorites_store, profile_store, add_item, backup_favorites, save_favorite, check_for_new_day } from '../_stores.js';
+import { create_elasticlunr } from '../_elasticlunr.js';
 
+let elasticlunr = create_elasticlunr();
 let index = undefined;
 let search_value = undefined;
 let favorites = undefined;

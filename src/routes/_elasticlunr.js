@@ -8,7 +8,7 @@
  * @license
  */
 
-(function(){
+export function create_elasticlunr() {
 
 /*!
  * elasticlunr.js
@@ -87,7 +87,7 @@ elasticlunr.version = "0.9.5";
 
 // only used this to make elasticlunr.js compatible with lunr-languages
 // this is a trick to define a global alias of elasticlunr
-lunr = elasticlunr;
+let lunr = elasticlunr;
 
 /*!
  * elasticlunr.utils
@@ -108,9 +108,7 @@ elasticlunr.utils = {};
  */
 elasticlunr.utils.warn = (function (global) {
   return function (message) {
-    if (global.console && console.warn) {
-      console.warn(message);
-    }
+    console.warn(message);
   };
 })(this);
 
@@ -2477,31 +2475,6 @@ lunr.SortedSet.prototype.union = function (otherSet) {
 lunr.SortedSet.prototype.toJSON = function () {
   return this.toArray()
 }
-  /**
-   * export the module via AMD, CommonJS or as a browser global
-   * Export code from https://github.com/umdjs/umd/blob/master/returnExports.js
-   */
-  ;(function (root, factory) {
-    if (typeof define === 'function' && define.amd) {
-      // AMD. Register as an anonymous module.
-      define(factory)
-    } else if (typeof exports === 'object') {
-      /**
-       * Node. Does not work with strict CommonJS, but
-       * only CommonJS-like enviroments that support module.exports,
-       * like Node.
-       */
-      module.exports = factory()
-    } else {
-      // Browser globals (root is window)
-      root.elasticlunr = factory()
-    }
-  }(this, function () {
-    /**
-     * Just return a value to define the module export.
-     * This example returns an object, but the module
-     * can return a function as the exported value.
-     */
-    return elasticlunr
-  }))
-})();
+
+return elasticlunr
+}
