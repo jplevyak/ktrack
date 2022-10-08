@@ -14,10 +14,10 @@
   },
   "dependencies": {
     "leveldown": "^6.1.1",
-    "levelup": "^5.1.1"
+    "levelup": "^5.1.1",
+    "svelte-gestures": "^1.4.1"
   },
   "devDependencies": {
-    "json-loader": "^0.5.7",
     "@sveltejs/adapter-auto": "next",
     "@sveltejs/adapter-node": "next",
     "@sveltejs/kit": "next",
@@ -26,6 +26,7 @@
     "eslint": "^8.16.0",
     "eslint-config-prettier": "^8.3.0",
     "eslint-plugin-svelte3": "^4.0.0",
+    "json-loader": "^0.5.7",
     "prettier": "^2.6.2",
     "prettier-plugin-svelte": "^2.7.0",
     "svelte": "^3.44.0",
