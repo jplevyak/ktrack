@@ -53,9 +53,9 @@
 <nav>
 	<ul>
 		<li><a aria-current='{segment === '' ? "page" : undefined}' href='.'>Day</a></li>
-		<li><a aria-current='{segment === "favorites" ? "page" : undefined}' href='favorites'>Favorites</a></li>
-		<li><a aria-current='{segment === "search" ? "page" : undefined}' href='search'>Search</a></li>
-		<li><a aria-current='{segment === "history" ? "page" : undefined}' href='history'>History</a></li>
-		<li><a aria-current='{segment === "about" ? "page" : undefined}' href='about'>KTrack</a></li>
+		<li><a aria-current='{segment === "favorites" ? "page" : undefined}' href='/favorites'>Favorites</a></li>
+		<li><a aria-current='{segment === "search" ? "page" : undefined}' href='/search'>Search</a></li>
+		<li><a aria-current='{segment === "history" ? "page" : undefined}' href='/history'>History</a></li>
+		<li><a aria-current='{segment === "about" ? "page" : undefined}' href='/about'>KTrack</a></li>
 	</ul>
 </nav>

@@ -5,7 +5,9 @@
 
 	export let segment;
 
-  const unsubscribe = page.subscribe(value => { segment = value.url.pathname.slice(1); });
+  const unsubscribe = page.subscribe(value => {
+    segment = value.url.pathname.slice(1).split('/')[0];
+  });
   onDestroy(unsubscribe);
 </script>
 

@@ -5,7 +5,7 @@
   "license": "UNLICENSED",
   "scripts": {
     "dev": "vite dev",
-    "build": "BODY_SIZE_LIMIT=0 vite build",
+    "build": "NODE_OPTIONS='--max-old-space-size=30000' BODY_SIZE_LIMIT=0 vite build",
     "preview": "vite preview",
     "start": "node build",
     "lint": "prettier --plugin-search-dir . --check . && eslint .",
