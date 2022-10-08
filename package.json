@@ -8,6 +8,7 @@
     "build": "NODE_OPTIONS='--max-old-space-size=30000' BODY_SIZE_LIMIT=0 vite build",
     "preview": "vite preview",
     "start": "node build",
+    "start_staging": "PORT=3001 node build",
     "lint": "prettier --plugin-search-dir . --check . && eslint .",
     "format": "prettier --plugin-search-dir . --write ."
   },
