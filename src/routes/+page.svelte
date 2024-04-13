@@ -1,7 +1,6 @@
 <script>
   import { goto } from "$app/navigation";
   import { afterUpdate, onDestroy } from "svelte";
-  import foods from "./_foods.json";
   import Food from "./_food.svelte";
   import {
     weekdays,
