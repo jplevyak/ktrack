@@ -111,52 +111,65 @@ export function make_profile() {
   };
 }
 
-export function merge_profile(l1, l2) {
-  l1 = { ...l1 }; // shallow copy
-  l1.message = "";
-  delete l1.authenticated;
-  l2.username = l1.username;
-  l2.authenticated = Date.now();
-  l2.updated = l2.authenticated;
-  if (l1.username == "" || l1.password == "") {
-    l2.message = "profile created, authenticated";
-    return l2;
+export function limit_date(date, max_date) {
+  if (max_date != undefined) {
+    return Math.min(date, max_date);
   }
-  if (
-    l2.password != "" &&
-    l2.old_password != "" &&
-    l2.old_password != undefined
-  ) {
-    if (l2.old_password != l1.password) {
-      l1.message = "old password mismatch, not authenticated";
-      l1.updated = Date.now();
-      return l1;
-    }
-    l2.message = "new password saved, authenticated";
-    return l2;
-  }
-  if (l1.password == l2.password) {
-    l2.message = "profile in sync, authenticated";
-    return l2;
-  }
-  l1.message = "incorrect password, not authenticated";
-  l1.updated = Date.now();
-  return l1;
+  return date;
 }
 
-// merge l1 and l2, set the updated to be the greater and update if the output is different than l1.
-export function merge_items(d1, d2) {
-  var d = { items: [], updated: d1.updated };
-  if (d2.updated != undefined && d2.updated > d1.updated) {
-    d.updated = d2.updated;
+// Merge the profile provided by the user on the server.
+// max_date is unused because this function is not used on the client.
+export function merge_profile(profile, update, unused_max_date = undefined) {
+  profile = { ...profile }; // shallow copy
+  profile.message = "";
+  delete profile.authenticated;
+  update.username = profile.username;
+  update.authenticated = Date.now();
+  update.updated = update.authenticated;
+  if (profile.username == "" || profile.password == "") {
+    update.message = "profile created, authenticated";
+    return update;
+  }
+  if (
+    update.password != "" &&
+    update.old_password != "" &&
+    update.old_password != undefined
+  ) {
+    if (update.old_password != profile.password) {
+      profile.message = "old password mismatch, not authenticated";
+      profile.updated = Date.now();
+      return profile;
+    }
+    update.message = "new password saved, authenticated";
+    return update;
+  }
+  if (profile.password == update.password) {
+    update.message = "profile in sync, authenticated";
+    return update;
+  }
+  profile.message = "incorrect password, not authenticated";
+  profile.updated = Date.now();
+  return profile;
+}
+
+// merge base and update, set the updated to be the greater and update if the output is different than base.
+// max_date is set only on the server to prevent clients who are ahead in time from setting updates in the future.
+export function merge_items(base, update, max_date = undefined) {
+  var d = { items: [], updated: base.updated };
+  if (update.updated != undefined) {
+    update.updated = limit_date(update.updated, max_date);
+    if (update.updated > base.updated) {
+      d.updated = update.updated;
+    }
   }
   var changed = false;
   var all = new Set();
-  for (let x of d1.items) {
+  for (let x of base.items) {
     if (all.has(x.name)) continue;
     all.add(x.name);
     var found = false;
-    for (let y of d2.items) {
+    for (let y of update.items) {
       if (x.name == y.name) {
         found = true;
         if (x.updated >= y.updated) {
@@ -172,7 +185,7 @@ export function merge_items(d1, d2) {
       d.items.push(x);
     }
   }
-  for (let x of d2.items) {
+  for (let x of update.items) {
     if (all.has(x.name)) continue;
     all.add(x.name);
     var found = false;
@@ -187,20 +200,22 @@ export function merge_items(d1, d2) {
     }
   }
   if (changed || d.updated == undefined) {
-    d.updated = Date.now();
+    d.updated = limit_date(Date.now(), max_date);
   }
   return d;
 }
 
-export function merge_day(d1, d2) {
-  let c = compare_date(d1, d2);
-  if (c > 0) return d1;
-  if (c < 0) return d2;
-  let d = merge_items(d1, d2);
-  d.year = d1.year;
-  d.month = d1.month;
-  d.date = d1.date;
-  d.day = d1.day;
+// merge base and update, set the updated to be the greater and update if the output is different than base.
+// max_date is set only on the server to prevent clients who are ahead in time from setting updates in the future.
+export function merge_day(base, update, max_date = undefined) {
+  let c = compare_date(base, update);
+  if (c > 0) return base;
+  if (c < 0) return update;
+  let d = merge_items(base, update, max_date);
+  d.year = base.year;
+  d.month = base.month;
+  d.date = base.date;
+  d.day = base.day;
   return d;
 }
 
@@ -208,20 +223,21 @@ function date_key(i) {
   return new Date(i.year, i.month, i.date).getTime();
 }
 
-// merge l1 and l2, set the updated time be the greater and update if the output is different than l1.
+// merge base and update, set the updated time be the greater and update if the output is different than base.
 // only merge the most recent month.
-export function merge_history(l1, l2) {
-  var updated = l1.updated;
-  if (
-    l2.updated != undefined &&
-    (updated == undefined || l2.updated > updated)
-  ) {
-    updated = l2.updated;
+// max_date is set only on the server to prevent clients who are ahead in time from setting updates in the future.
+export function merge_history(base, update, max_date = undefined) {
+  var updated = base.updated;
+  if (update.updated != undefined) {
+    update.updated = limit_date(update.updated, max_date);
+  }
+  if (updated == undefined || update.updated > updated) {
+    updated = update.updated;
   }
   var changed = false;
   var map = new Map();
-  for (let x of l1.items) map.set(date_key(x), x);
-  for (let y of l2.items.slice(0, merge_history_limit)) {
+  for (let x of base.items) map.set(date_key(x), x);
+  for (let y of update.items.slice(0, merge_history_limit)) {
     var k = date_key(y);
     var x = map.get(k);
     if (x == undefined) {
@@ -241,7 +257,7 @@ export function merge_history(l1, l2) {
     updated: updated,
   };
   if (changed || l.updated == undefined) {
-    l.updated = Date.now();
+    l.updated = limit_date(Date.now(), max_date);
   }
   return l;
 }
