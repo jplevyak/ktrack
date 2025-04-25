@@ -34,7 +34,7 @@
 </script>
 
 <div
-  use:swipe={{ timeframe: 300, minSwipeDistance: 100, touchAction: 'pan-y' }}
+  use:swipe={() => ({ timeframe: 300, minSwipeDistance: 100, touchAction: 'pan-y' })}
   on:swipe={handle_swipe}
   style="height: 100%;"
 >
