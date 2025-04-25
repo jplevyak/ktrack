@@ -146,7 +146,6 @@ Number of days to view <input type="number" id="limit" value={limit} />
       />
     {/if}
   {/each}
-  <p />
   Total: {get_total(day).toFixed(2)}
   <br /><br />
 {/each}

@@ -1,8 +1,8 @@
 <script>
   import { onDestroy } from "svelte";
   import { page } from "$app/stores";
+  import { swipe } from 'svelte-gestures';
   import Nav from "../components/Nav.svelte";
-  import { swipe } from "svelte-gestures";
   import { goto } from "$app/navigation";
 
   export let segment;

@@ -204,66 +204,18 @@ Averages [3, 5, 7] days: [{averages[0].toFixed(1)}, {averages[1].toFixed(1)}, {a
       />
     {/if}
   {/each}
-  <p />
   Total: {total.toFixed(2)}
 {:else}
   <table>
-    <col /><col />
-    <tr
-      ><th>Name</th><th
-        ><input
-          class="val"
-          type="text"
-          bind:value={editing.name}
-          readonly
-        /></th
-      ></tr
-    >
-    <tr
-      ><th>Notes</th><th
-        ><input class="val" type="text" bind:value={editing.notes} /></th
-      ></tr
-    >
-    <tr
-      ><th>mcg</th><th>
-        <input
-          class="val"
-          type="number"
-          bind:value={editing.mcg}
-          readonly
-        /></th
-      ></tr
-    >
-    <tr
-      ><th>Unit</th><th
-        ><input
-          class="val"
-          type="text"
-          bind:value={editing.unit}
-          readonly
-        /></th
-      ></tr
-    >
-    <tr
-      ><th>Servings</th><th
-        ><input
-          class="val"
-          type="number"
-          step="0.1"
-          bind:value={editing.servings}
-        /></th
-      ></tr
-    >
-    <tr
-      ><th>Source</th><th
-        ><input
-          class="val"
-          type="text"
-          bind:value={editing.source}
-          readonly
-        /></th
-      ></tr
-    >
+    <colgroup> <col ><col > </colgroup>
+    <tbody>
+    <tr><th>Name</th><th><input class="val" type="text" bind:value={editing.name} readonly /></th></tr>
+    <tr><th>Notes</th><th><input class="val" type="text" bind:value={editing.notes} /></th></tr>
+    <tr><th>mcg</th><th><input class="val" type="number" bind:value={editing.mcg} readonly /></th></tr>
+    <tr><th>Unit</th><th><input class="val" type="text" bind:value={editing.unit} readonly /></th></tr>
+    <tr><th>Servings</th><th ><input class="val" type="number" step="0.1" bind:value={editing.servings} /></th></tr>
+    <tr><th>Source</th><th ><input class="val" type="text" bind:value={editing.source} readonly /></th></tr>
+    </tbody>
   </table>
   <br /><button type="button" id="cancel">cancel</button>
   <button type="button" id="save">save</button>

@@ -1,8 +1,8 @@
-import levelup from "levelup";
-import leveldown from "leveldown";
+import LevelPkg from "level";
+const { Level } = LevelPkg;
 import { error } from "@sveltejs/kit";
 
-export var profile = levelup(leveldown("./profile"));
+export var profile = new Level("./profile");
 
 export async function do_post_internal(
   req,

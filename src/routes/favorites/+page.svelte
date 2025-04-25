@@ -228,7 +228,7 @@
   {/if}
 {:else}
   <table>
-    <col /><col />
+  <tbody>
     <tr
       ><th>Name</th><th
         ><input class="val" type="text" bind:value={editing.name} /></th
@@ -264,6 +264,7 @@
         ><input class="val" type="text" bind:value={editing.source} /></th
       ></tr
     >
+  </tbody>
   </table>
   <br /><button type="button" id="cancel">cancel</button>
   <button type="button" id="save">save</button>
@@ -271,9 +272,6 @@
 
 <style>
   table,
-  col {
-    align: "left";
-  }
   th {
     align: "left";
   }

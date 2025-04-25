@@ -1,5 +1,5 @@
-import { merge_profile, make_profile } from "../_util.js";
-import { do_post_internal, profile } from "../_post.js";
+import { merge_profile, make_profile } from "../../_util.js";
+import { do_post_internal, profile } from "../../_post.js";
 
 function finalize_profile(p) {
   if (p != undefined) {
