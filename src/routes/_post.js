@@ -1,6 +1,7 @@
 import LevelPkg from "level";
 const { Level } = LevelPkg;
 import { error } from "@sveltejs/kit";
+import { limit_date } from "./_util.js";
 
 export var profile = new Level("./profile");
 
@@ -42,7 +43,7 @@ export async function do_post_internal(
         }
       } else if (data.value != undefined) {
         // update sent
-        if (value != undefined) result = merge(value, data.value);
+        if (value != undefined) result = merge(value, data.value, limit_date(Date.now(), data.value.updated));
         else result = data.value;
         // store if we have nothing or if it is different
         if (value == undefined || result.updated != value.updated) {
