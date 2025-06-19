@@ -1,0 +1,3 @@
+# Ignore build artifacts and dependencies
+/target
+Cargo.lock

@@ -141,7 +141,7 @@ function backup_internal(
     }
     data.value = ll;
   }
-  fetch('/api/' + name, {
+  fetch('http://localhost:3000/api/' + name, {
     method: "POST",
     body: JSON.stringify(data),
     headers: { "Content-Type": "application/json" },
@@ -259,7 +259,7 @@ export function save_profile(profile) {
     password: profile.password,
     value: profile,
   };
-  fetch('/api/' + name, {
+  fetch('http://localhost:3000/api/' + name, {
     method: "POST",
     body: JSON.stringify(data),
     headers: { "Content-Type": "application/json" },
