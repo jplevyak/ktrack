@@ -8,6 +8,7 @@
     make_history,
     make_historical_day,
     get_total,
+    get_total_fiber,
     compute_averages,
     compare_date,
   } from "../_util.js";
@@ -137,6 +138,7 @@ Number of days to view <input type="number" id="limit" value={limit} />
         entry={e}
         index={i}
         mcg={f.mcg}
+        fiber={f.fiber}
         unit={f.unit}
         servings={f.servings}
         source={f.source}
@@ -146,6 +148,6 @@ Number of days to view <input type="number" id="limit" value={limit} />
       />
     {/if}
   {/each}
-  Total: {get_total(day).toFixed(2)}
+  Total: {get_total(day).toFixed(2)} Total fiber: {get_total_fiber(day)[0].toFixed(2)} {#if get_total_fiber(day)[1]} * some unknown * {/if} 
   <br /><br />
 {/each}

@@ -43,6 +43,21 @@ export function get_total(day) {
   return n;
 }
 
+export function get_total_fiber(day) {
+  let n = 0.0;
+  let unknown = false;
+  for (let f of day.items) {
+    if (f.del == undefined && f.mcg != undefined) {
+      if (f.fiber != "") {
+          n += f.fiber * f.servings;
+      } else {
+        unknown = true;
+      }
+    }
+  }
+  return [n, unknown];
+}
+
 export function load_async(
   url,
   callback,

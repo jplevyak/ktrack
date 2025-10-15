@@ -1,5 +1,7 @@
-var elasticlunr = require("../src/routes/_elasticlunr");
-var fs = require("fs");
+import { create_elasticlunr } from "../src/routes/_elasticlunr.js";
+import * as fs from 'fs';
+
+var elasticlunr = create_elasticlunr();
 
 var index = elasticlunr(function () {
   this.addField("name");

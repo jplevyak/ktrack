@@ -5,6 +5,7 @@
   export let index = -1; // index into items in day or search results.
   export let unit = "";
   export let mcg = undefined;
+  export let fiber = undefined;
   export let servings = undefined;
   export let notes = undefined;
   export let source = "";
@@ -67,7 +68,8 @@
 
 <div class="food" style="line-height:25px">
   {name}{#if servings != undefined}, <b>{servings.toFixed(3)}</b> servings{/if} @
-  {mcg == undefined ? "unknown" : mcg} mcg/{unit}{#if use_notes}, {notes}{/if}
+  {mcg == undefined ? "unknown" : mcg} mcg/{unit}, {#if use_notes} {notes}, {/if}
+  {(fiber == undefined || fiber == "") ? "unknown" : fiber} g fiber/{unit}
   {#if use_total}= {#if use_grams}{(grams * servings).toFixed(3)}g&nbsp;{/if}<b
       >{(mcg * servings).toFixed(3)}</b
     > mcg{/if}{#if source}, {source} {/if}

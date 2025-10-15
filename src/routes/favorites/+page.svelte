@@ -73,6 +73,7 @@
       name: "",
       notes: "",
       mcg: 0.0,
+      fiber: 0.0,
       unit: "",
       servings: 1.0,
       source: "custom",
@@ -213,6 +214,7 @@
           notes={f.notes}
           index={i}
           mcg={f.mcg}
+          fiber={f.fiber}
           unit={f.unit}
           servings={f.servings}
           source={f.source}
@@ -242,6 +244,11 @@
     <tr
       ><th>mcg</th><th>
         <input class="val" type="number" bind:value={editing.mcg} /></th
+      ></tr
+    >
+    <tr
+      ><th>fiber</th><th>
+        <input class="val" type="number" bind:value={editing.fiber} /></th
       ></tr
     >
     <tr

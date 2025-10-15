@@ -91,6 +91,7 @@ Search <input type="text" id="search_string" />
     notes={f.notes}
     index={i}
     mcg={f.mcg}
+    fiber={f.fiber}
     unit={f.unit}
     source={f.source}
     use_add="true"
