@@ -11,18 +11,20 @@ fdc_id2name = {}
 name2fdc_id = {}
 skip = 1
 i = 0
-fieldnames = ["fdc_id", "1", "name"]
-#files = ['food.csv']
-files = ['food.csv', 'branded_food.csv']
+fieldnames = ["fdc_id", "data_type", "description"]
+files = ['food.csv']
 for f in files:
     with open(path + f, encoding="latin-1") as csvfile:
         reader = csv.DictReader(csvfile, fieldnames=fieldnames)
         for row in reader:
             i += 1
             if i <= skip:
+                print(row)
                 continue
-            name = row["name"]
+            name = row["description"]
             fdc_id = row["fdc_id"]
+            if name == "":
+                print(row)
             fdc_id2name[fdc_id] = name
             if name not in name2fdc_id:
                 name2fdc_id[name] = [fdc_id]
@@ -127,16 +129,19 @@ for name, l in name2fdc_id.items():
 no_reverse_name = 0
 no_reverse_fdc_id = 0
 for fdc_id, k in fdc_id2k.items():
+    if not fdc_id in fdc_id2name or fdc_id2name[fdc_id] == "":
+        continue
+    name = fdc_id2name[fdc_id]
     if len(name2fdc_id[fdc_id2name[fdc_id]]) < 1:
         no_reverse_name += 1
         continue
-    if not fdc_id in name2fdc_id[fdc_id2name[fdc_id]]:
-        no_reverse_fdc_id += 1
-        print('fdc_id', fdc_id, 'fdc_id2name[fdc_id]', fdc_id2name[fdc_id], 'name2fdc_id[fdc_id2name[fdc_id]]', name2fdc_id[fdc_id2name[fdc_id]])
-        continue
+    #if not fdc_id in name2fdc_id[fdc_id2name[fdc_id]]:
+    #    no_reverse_fdc_id += 1
+    #    print('fdc_id', fdc_id, 'fdc_id2name[fdc_id]', fdc_id2name[fdc_id], 'name2fdc_id[fdc_id2name[fdc_id]]', name2fdc_id[fdc_id2name[fdc_id]])
+    #    continue
     if fdc_id not in fdc_id2portions:
         datum = {}
-        datum["name"] = fdc_id2name[fdc_id]
+        datum["name"] = name
         datum["mcg"] = str(k)
         if fdc_id in fdc_id2fiber:
             datum["fiber"] = str(fdc_id2fiber[fdc_id])
@@ -163,7 +168,6 @@ for fdc_id, k in fdc_id2k.items():
             if p["modifier"] and not p["modifier"].isdecimal():
                 desc += prefix + p["modifier"]
                 prefix = " "
-            name = fdc_id2name[fdc_id]
             datum = {}
             datum["name"] = name + " (" + desc + ")"
             datum["mcg"] = str(round((float(k) * float(p["gram_weight"])) / 100.0, 3))

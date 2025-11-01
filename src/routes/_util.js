@@ -1,3 +1,5 @@
+import foods from "./_foods.json";
+
 export const merge_history_limit = 10;
 
 export const weekdays = new Array(7);
@@ -22,6 +24,12 @@ months[8] = "September";
 months[9] = "October";
 months[10] = "November";
 months[11] = "December";
+
+var name2food = {};
+
+for (let f in foods) {
+  name2food[foods[f].name] = f;
+}
 
 export function compare_date(d1, d2) {
   if (d1.year > d2.year) return 1;
@@ -48,7 +56,7 @@ export function get_total_fiber(day) {
   let unknown = false;
   for (let f of day.items) {
     if (f.del == undefined && f.mcg != undefined) {
-      if (f.fiber != "") {
+      if (f.hasOwnProperty('fiber') && f.fiber != "") {
           n += f.fiber * f.servings;
       } else {
         unknown = true;
@@ -199,6 +207,20 @@ export function merge_items(d1, d2) {
     if (!found) {
       changed = true;
       d.items.push(x);
+    }
+  }
+  for (let x of d.items) {
+    if (!x.hasOwnProperty('fiber') || x.fiber == "") {
+      if (x.name in name2food) {
+        let yid = name2food[x.name];
+        let y = foods[yid];
+        if (y.hasOwnProperty('fiber') && y.fiber != "") {
+          changed = true;
+          x.fiber = y.fiber;
+        }
+      }
+    } else {
+      x.fiber = "";
     }
   }
   if (changed || d.updated == undefined) {
