@@ -12,7 +12,7 @@ import {
   make_profile,
 } from "./_util.js";
 
-const check_backup_interval = 0 * 1000; // 0 seconds.
+const check_sync_interval = 0 * 1000; // 0 seconds.
 
 export function local_writable(key, initialValue) {
   const store = internal(initialValue);
@@ -51,7 +51,7 @@ export function save_history(day, profile) {
   history_store.update(function (history) {
     let new_history = merge_history(history, h);
     if (new_history.updated != history.updated) {
-      backup_history(new_history, profile, true);
+      sync_history(new_history, profile, true);
       return new_history;
     }
     return history;
@@ -87,7 +87,7 @@ export function add_item(item, today, edit, profile) {
         delete i.del;
         i.updated = Date.now();
         if (edit == undefined) {
-          backup_today(today, profile, true);
+          sync_today(today, profile, true);
         }
         save_history(day, profile, true);
         return day;
@@ -101,7 +101,7 @@ export function add_item(item, today, edit, profile) {
     day.items.push(item);
     day.updated = Date.now();
     if (edit == undefined) {
-      backup_today(today, profile, true);
+      sync_today(today, profile, true);
     }
     save_history(day, profile, true);
     return day;
@@ -110,11 +110,11 @@ export function add_item(item, today, edit, profile) {
 
 export function save_today(today, profile) {
   today_store.set(today);
-  backup_today(today, profile, true);
+  sync_today(today, profile, true);
   save_history(today, profile);
 }
 
-function backup_internal(
+function sync_internal(
   l,
   name,
   store,
@@ -171,7 +171,7 @@ function backup_internal(
             l.server_synced = l.server_synced;
           }
           if (merged.updated != backup.updated) {
-            backup_internal(
+            sync_internal(
               merged,
               name,
               store,
@@ -191,14 +191,14 @@ function backup_internal(
     });
 }
 
-export function backup_today(today, profile, force = false) {
+export function sync_today(today, profile, force = false) {
   if (today.server_checked == undefined)
-    today.server_checked = Date.now() - check_backup_interval;
-  if (!force && Date.now() - today.server_checked < check_backup_interval) {
+    today.server_checked = Date.now() - check_sync_interval;
+  if (!force && Date.now() - today.server_checked < check_sync_interval) {
     return;
   }
   today.server_checked = Date.now();
-  backup_internal(
+  sync_internal(
     today,
     "today",
     today_store,
@@ -209,13 +209,13 @@ export function backup_today(today, profile, force = false) {
   );
 }
 
-export function backup_favorites(favorites, profile, force = false) {
+export function sync_favorites(favorites, profile, force = false) {
   if (favorites.server_checked == undefined)
-    favorites.server_checked = Date.now() - check_backup_interval;
-  if (!force && Date.now() - favorites.server_checked < check_backup_interval)
+    favorites.server_checked = Date.now() - check_sync_interval;
+  if (!force && Date.now() - favorites.server_checked < check_sync_interval)
     return;
   favorites.server_checked = Date.now();
-  backup_internal(
+  sync_internal(
     favorites,
     "favorites",
     favorites_store,
@@ -226,17 +226,17 @@ export function backup_favorites(favorites, profile, force = false) {
   );
 }
 
-export function backup_history(history, profile, force = false) {
+export function sync_history(history, profile, force = false) {
   if (history.server_checked == undefined)
-    history.server_checked = Date.now() - check_backup_interval;
+    history.server_checked = Date.now() - check_sync_interval;
   if (history.items.length > 0) {
     history.updated = history.items[0].updated;
   }
-  if (!force && Date.now() - history.server_checked <= check_backup_interval) {
+  if (!force && Date.now() - history.server_checked <= check_sync_interval) {
     return;
   }
   history.server_checked = Date.now();
-  backup_internal(
+  sync_internal(
     history,
     "history",
     history_store,
@@ -313,13 +313,13 @@ export function save_favorite(item, profile, replace_index) {
     for (let i in favorites.items) {
       if (favorites.items[i].name == item.name) {
         favorites.items.splice(i, 1, item);
-        backup_favorites(favorites, profile, true);
+        sync_favorites(favorites, profile, true);
         return favorites;
       }
     }
     if (item.servings == undefined) item.servings = 1.0;
     favorites.items.push(item);
-    backup_favorites(favorites, profile, true);
+    sync_favorites(favorites, profile, true);
     return favorites;
   });
 }

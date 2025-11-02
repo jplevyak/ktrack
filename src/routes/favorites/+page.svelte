@@ -7,7 +7,7 @@
     favorites_store,
     profile_store,
     add_item,
-    backup_favorites,
+    sync_favorites,
     save_favorite,
     check_for_new_day,
   } from "../_stores.js";
@@ -22,7 +22,7 @@
   let added_count = 0;
   let editing = undefined;
   let editing_replace_index = undefined;
-  let sync_favorites = true;
+  let force_sync_favorites = true;
   let profile = undefined;
   let today = undefined;
   let edit = undefined;
@@ -37,9 +37,9 @@
     favorites = value;
     create_index();
     update_results();
-    if (sync_favorites) {
-      sync_favorites = false;
-      backup_favorites(favorites, profile, true);
+    if (force_sync_favorites) {
+      force_sync_favorites = false;
+      sync_favorites(favorites, profile, true);
     }
   });
   const unsubscribe_today = today_store.subscribe((t) => {
@@ -98,7 +98,7 @@
 
   function save(favs) {
     favs.updated = Date.now();
-    sync_favorites = true;
+    force_sync_favorites = true;
     favorites_store.set(favs);
   }
 

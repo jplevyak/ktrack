@@ -19,7 +19,7 @@
     edit_store,
     add_item,
     save_favorite,
-    backup_history,
+    sync_history,
     check_for_new_day,
   } from "../_stores.js";
 
@@ -54,7 +54,7 @@
     history = value;
     if (!server_checked) {
       server_checked = true;
-      backup_history(history, profile);
+      sync_history(history, profile);
     }
   });
   onDestroy(() => {

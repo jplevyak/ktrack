@@ -19,7 +19,7 @@
     save_today,
     save_favorite,
     save_history,
-    backup_today,
+    sync_today,
   } from "./_stores.js";
 
   let total = 0;
@@ -55,7 +55,7 @@
       today = t;
       if (!server_checked) {
         server_checked = true;
-        backup_today(today, profile);
+        sync_today(today, profile);
         save_history(today, profile);
       }
       if (edit == undefined) day = today;

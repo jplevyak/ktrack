@@ -5,11 +5,11 @@
     profile_store,
     save_profile,
     today_store,
-    backup_today,
+    sync_today,
     favorites_store,
-    backup_favorites,
+    sync_favorites,
     history_store,
-    backup_history,
+    sync_history,
   } from "../_stores.js";
   import { make_profile } from "../_util.js";
 
@@ -60,9 +60,9 @@
   }
 
   function force_sync() {
-    backup_today(today, profile, true);
-    backup_favorites(favorites, profile, true);
-    backup_history(history, profile, true);
+    sync_today(today, profile, true);
+    sync_favorites(favorites, profile, true);
+    sync_history(history, profile, true);
     today = today;
     favorites = favorites;
     history = history;
