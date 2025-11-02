@@ -22,7 +22,7 @@
   let added_count = 0;
   let editing = undefined;
   let editing_replace_index = undefined;
-  let server_checked = false;
+  let sync_favorites = true;
   let profile = undefined;
   let today = undefined;
   let edit = undefined;
@@ -35,12 +35,12 @@
       return;
     }
     favorites = value;
-    if (!server_checked) {
-      server_checked = true;
-      backup_favorites(favorites, profile);
-    }
     create_index();
     update_results();
+    if (sync_favorites) {
+      sync_favorites = false;
+      backup_favorites(favorites, profile, true);
+    }
   });
   const unsubscribe_today = today_store.subscribe((t) => {
     today = check_for_new_day(t, profile);
@@ -96,11 +96,10 @@
     }
   }
 
-  function save() {
-    favorites.updated = Date.now();
-    favorites_store.set(favorites);
-    backup_favorites(favorites, profile, true);
-    update_results();
+  function save(favs) {
+    favs.updated = Date.now();
+    sync_favorites = true;
+    favorites_store.set(favs);
   }
 
   afterUpdate(() => {
@@ -122,14 +121,15 @@
       };
     } else {
       document.getElementById("cancel").onclick = function () {
-        editing = undefined;
         editing_replace_index = undefined;
+        editing = undefined;
       };
       document.getElementById("save").onclick = function () {
-        editing.updated = Date.now();
-        save_favorite(editing, profile, editing_replace_index);
-        editing = undefined;
+        let edited = { ...editing };
+        edited.updated = Date.now();
+        save_favorite(edited, profile, editing_replace_index);
         editing_replace_index = undefined;
+        editing = undefined;
       };
     }
   });
@@ -147,29 +147,33 @@
       if (!y) return;
       item.updated = Date.now();
       item.del = true;
-      save();
+      save(favorites);
     } else if (change == "edit") {
       editing_replace_index = index;
       if (results_map != undefined)
         editing_replace_index = results_map.get(index);
-      editing = { ...item };
-      delete editing.del;
-      editing.source = "custom";
+      let edit = { ...item };
+      delete edit.del;
+      edit.source = "custom";
+      editing = edit;
     } else if (change == "dup") {
-      editing = { ...item };
-      editing.name = editing.name + " (dup)";
-      delete editing.del;
-      editing.source = "custom";
+      let edit = { ...item };
+      edit.name = edit.name + " (dup)";
+      delete edit.del;
+      edit.source = "custom";
+      editing = edit;
     } else if (change == "up") {
       let i = index;
       if (results_map != undefined) i = results_map.get(index);
       let j = i - 1;
       while (j >= 0) {
         if (favorites.items[j].del == undefined) {
+          let favs = favorites;
           let f = favorites.items[i];
-          favorites.items.splice(i, 1);
-          favorites.items.splice(j, 0, f);
-          save();
+          f.updated = Date.now();
+          favs.items.splice(i, 1);
+          favs.items.splice(j, 0, f);
+          save(favs);
           return;
         }
         j = j - 1;
@@ -180,10 +184,12 @@
       let j = i + 1;
       while (j < favorites.items.length) {
         if (favorites.items[j].del == undefined) {
-          let f = favorites.items[i];
-          favorites.items.splice(i, 1);
-          favorites.items.splice(j, 0, f);
-          save();
+          let favs = favorites;
+          let f = favs.items[i];
+          f.updated = Date.now();
+          favs.items.splice(i, 1);
+          favs.items.splice(j, 0, f);
+          save(favs);
           return;
         }
         j = j + 1;

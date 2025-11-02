@@ -210,7 +210,11 @@ export function merge_items(d1, d2) {
     }
   }
   for (let x of d.items) {
-    if (!x.hasOwnProperty('fiber') || x.fiber == "") {
+    if (!x.hasOwnProperty('fiber')) {
+      changed = true;
+      x.fiber = "";
+    }
+    if (x.fiber == "") {
       if (x.name in name2food) {
         let yid = name2food[x.name];
         let y = foods[yid];
@@ -219,8 +223,6 @@ export function merge_items(d1, d2) {
           x.fiber = y.fiber;
         }
       }
-    } else {
-      x.fiber = "";
     }
   }
   if (changed || d.updated == undefined) {
