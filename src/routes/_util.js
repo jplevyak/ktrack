@@ -243,10 +243,7 @@ function date_key(i) {
 // only merge the most recent month.
 export function merge_history(l1, l2) {
   var updated = l1.updated;
-  if (
-    l2.updated != undefined &&
-    (updated == undefined || l2.updated > updated)
-  ) {
+  if (l2.updated != undefined && (updated == undefined || l2.updated > updated)) {
     updated = l2.updated;
   }
   var changed = false;

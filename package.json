@@ -14,7 +14,8 @@
   },
   "dependencies": {
     "level": "^10.0.0",
-    "svelte-gestures": "^5.1.4"
+    "svelte-gestures": "^5.1.4",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@sveltejs/adapter-auto": "^6.0.0",

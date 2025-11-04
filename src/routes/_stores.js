@@ -1,4 +1,4 @@
-import { writable as internal } from "svelte/store";
+import { writable as internal, get as get_internal } from "svelte/store";
 import {
   compare_date,
   merge_items,
@@ -11,6 +11,7 @@ import {
   make_historical_day,
   make_profile,
 } from "./_util.js";
+import { v4 as uuidv4 } from 'uuid';
 
 const check_sync_interval = 0 * 1000; // 0 seconds.
 
@@ -63,6 +64,7 @@ export const favorites_store = local_writable("favorites", make_favorites());
 export const history_store = local_writable("history", make_history());
 export const profile_store = local_writable("profile", make_profile());
 export const edit_store = local_writable("edit", undefined);
+export const site_id_store = local_writable(uuidv4());
 export const index_store = internal(undefined);
 
 export function add_item(item, today, edit, profile) {
