@@ -249,7 +249,7 @@ export function sync_history(history, profile, force = false) {
 
 export function save_profile(profile) {
   if (profile.password == "") {
-    profile_store.set(profile);
+    profile_store.set(make_profile());
     console.log("logout");
     return;
   }
@@ -324,10 +324,17 @@ export function save_favorite(item, profile, replace_index) {
   });
 }
 
-export function reset_data() {
+export function logout() {
+  profile_store.set(make_profile());
   today_store.set(make_today());
   favorites_store.set(make_favorites());
   history_store.set(make_history());
+}
+
+export function reset_data() {
+  today_store.set(make_today(true));
+  favorites_store.set(make_favorites(true));
+  history_store.set(make_history(true));
 }
 
 export function check_for_new_day(t, profile) {

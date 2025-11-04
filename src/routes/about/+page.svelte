@@ -1,6 +1,7 @@
 <script>
   import { onMount, onDestroy } from "svelte";
   import {
+    logout,
     reset_data,
     profile_store,
     save_profile,
@@ -83,14 +84,19 @@
         password_input.value != profile.password ||
         !profile.authenticated
       ) {
+        if (profile.username || profile.password) {
+          logout();
+        }
         profile.username = username_input.value;
         profile.password = password_input.value;
         profile.old_password = old_password_input.value;
         profile.updated = Date.now();
         save_profile(profile);
+        force_sync();
       }
     }
     save.onclick = changed;
+    document.getElementById("logout").onclick = logout;
     document.getElementById("reset").onclick = clear_data;
     document.getElementById("sync").onclick = force_sync;
   });
@@ -123,6 +129,7 @@ is lost.
   <input type="text" id="old_password" value={profile.old_password} /><br />
   <button type="button" id="save">Login/Save</button>
 {/if}
+<input type="button" id="logout" value="Logout" />
 <input type="button" id="reset" value="Reset All Data" />
 <input type="button" id="sync" value="Force Sync All Data" />
 <br /><br />

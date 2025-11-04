@@ -82,10 +82,20 @@ export function load_async(
   document.body.appendChild(tag);
 }
 
-export function make_today(days_ago = 0) {
+function get_updated_time(the_time, reset) {
+  if (!reset) {
+     // It was updated a long time in the past (so that it will not overwrite anything on the server.
+     return the_time - 1000 * 24 * 3600 * 1000;
+  } else {
+     // It was updated now so that it will overwrite the server data.
+     return the_time;
+  }
+}
+
+export function make_today(reset = false) {
   let the_date = new Date();
   return {
-    updated: the_date.getTime(),
+    updated: get_updated_time(the_date.getTime(), reset),
     year: the_date.getFullYear(),
     month: the_date.getMonth(),
     date: the_date.getDate(),
@@ -97,12 +107,8 @@ export function make_today(days_ago = 0) {
 export function make_historical_day(d, days_ago) {
   let the_date = new Date(d.year, d.month, d.date);
   the_date = new Date(the_date.getTime() - days_ago * 24 * 3600 * 1000);
-  // Ensure that historical days do not overwrite actual history.
-  let updated = new Date(
-    the_date.getTime() - (days_ago + 2) * 24 * 3600 * 1000
-  );
   return {
-    updated: updated.getTime(),
+    updated: get_updated_time(the_date.getTime(), false),
     year: the_date.getFullYear(),
     month: the_date.getMonth(),
     date: the_date.getDate(),
@@ -111,16 +117,18 @@ export function make_historical_day(d, days_ago) {
   };
 }
 
-export function make_favorites() {
+export function make_favorites(reset = false) {
+  let the_date = new Date();
   return {
-    updated: Date.now(),
+    updated: get_updated_time(the_date.getTime(), reset),
     items: [],
   };
 }
 
-export function make_history() {
+export function make_history(reset = false) {
+  let the_date = new Date();
   return {
-    updated: Date.now(),
+    updated: get_updated_time(the_date.getTime(), reset),
     items: [],
   };
 }
