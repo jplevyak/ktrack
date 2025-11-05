@@ -88,9 +88,7 @@
 
   $: averages = compute_averages(history);
 
-  function save_item(item) {
-    item.updated = Date.now();
-    day.updated = item.updated;
+  function save_day() {
     if (compare_date(day, today) == 0) {
       save_today(day, profile);
     } else {
@@ -105,7 +103,7 @@
       };
       document.getElementById("save").onclick = function () {
         day.items[editing_index] = editing;
-        save_item(editing);
+        save_day();
         editing = undefined;
       };
     }
@@ -152,10 +150,10 @@
       return;
     }
     let change = event.detail.change;
-    let item = day.items[index];
+    let item = day.getData()[index];
     if (change == "del") {
-      item.del = true;
-      save_item(item);
+      day.items.deleteItem(item.itemId);
+      save_day();
     } else if (event.detail.change == "fav") {
       save_favorite(item, profile);
     } else if (event.detail.change == "edit") {
@@ -163,10 +161,12 @@
       editing_index = index;
     } else {
       change = get_change(item.servings, change);
-      item.servings += change;
+      let data = { ...item.data };
+      data.servings += change;
       // round to prevent small errors from accumulating.
-      item.servings = parseFloat(item.servings.toFixed(6));
-      save_item(item);
+      data.servings = parseFloat(item.servings.toFixed(6));
+      day.items.updateItem(item.itemId, data);
+      save_day();
     }
   }
 

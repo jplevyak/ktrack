@@ -1,4 +1,5 @@
 import foods from "./_foods.json";
+import { CollabArray } from './_crdt.js';
 
 export const merge_history_limit = 10;
 
@@ -92,44 +93,50 @@ function get_updated_time(the_time, reset) {
   }
 }
 
-export function make_today(reset = false) {
+export function make_today() {
   let the_date = new Date();
+  let items = new CollabArray();
   return {
-    updated: get_updated_time(the_date.getTime(), reset),
     year: the_date.getFullYear(),
     month: the_date.getMonth(),
     date: the_date.getDate(),
     day: the_date.getDay(),
-    items: [],
+    items,
+    updated: items.clock,
+    synced: 0,
   };
 }
 
 export function make_historical_day(d, days_ago) {
   let the_date = new Date(d.year, d.month, d.date);
   the_date = new Date(the_date.getTime() - days_ago * 24 * 3600 * 1000);
+  let items = new CollabArray();
   return {
-    updated: get_updated_time(the_date.getTime(), false),
     year: the_date.getFullYear(),
     month: the_date.getMonth(),
     date: the_date.getDate(),
     day: the_date.getDay(),
-    items: [],
+    items,
+    updated: items.clock,
+    synced: 0,
   };
 }
 
-export function make_favorites(reset = false) {
-  let the_date = new Date();
+export function make_favorites() {
+  let items = new CollabArray();
   return {
-    updated: get_updated_time(the_date.getTime(), reset),
-    items: [],
+    items,
+    updated: items.clock,
+    synced: 0,
   };
 }
 
-export function make_history(reset = false) {
+export function make_history() {
   let the_date = new Date();
   return {
-    updated: get_updated_time(the_date.getTime(), reset),
-    items: [],
+    items,
+    updated: items.clock,
+    synced: 0,
   };
 }
 
@@ -175,52 +182,13 @@ export function merge_profile(l1, l2) {
   return l1;
 }
 
-// merge l1 and l2, set the updated to be the greater and update if the output is different than l1.
+// merge d2 ops into d1
 export function merge_items(d1, d2) {
-  var d = { items: [], updated: d1.updated };
-  if (d2.updated != undefined && d2.updated > d1.updated) {
-    d.updated = d2.updated;
+  for (op in d2.items.ops) {
+    d1.items.applyOp(op);
+    d1.synced = Math.max(d1.synced, op.timestamp);
   }
-  var changed = false;
-  var all = new Set();
-  for (let x of d1.items) {
-    if (all.has(x.name)) continue;
-    all.add(x.name);
-    var found = false;
-    for (let y of d2.items) {
-      if (x.name == y.name) {
-        found = true;
-        if (x.updated >= y.updated) {
-          d.items.push(x);
-        } else {
-          changed = true;
-          d.items.push(y);
-        }
-        break;
-      }
-    }
-    if (!found) {
-      d.items.push(x);
-    }
-  }
-  for (let x of d2.items) {
-    if (all.has(x.name)) continue;
-    all.add(x.name);
-    var found = false;
-    for (let y of d.items)
-      if (x.name == y.name) {
-        found = true;
-        continue;
-      }
-    if (!found) {
-      changed = true;
-      d.items.push(x);
-    }
-  }
-  if (changed || d.updated == undefined) {
-    d.updated = Date.now();
-  }
-  return d;
+  d1.updated = d1.items.clock;
 }
 
 export function merge_day(d1, d2) {
@@ -239,16 +207,13 @@ function date_key(i) {
   return new Date(i.year, i.month, i.date).getTime();
 }
 
-// merge l1 and l2, set the updated time be the greater and update if the output is different than l1.
-// only merge the most recent month.
+// merge only the most recent month.
 export function merge_history(l1, l2) {
-  var updated = l1.updated;
-  if (l2.updated != undefined && (updated == undefined || l2.updated > updated)) {
-    updated = l2.updated;
-  }
+  var updated = l1.updated > l2.updated ? l1.updated : l2.updated;
   var changed = false;
   var map = new Map();
-  for (let x of l1.items) map.set(date_key(x), x);
+  for (let x of l1.items)
+    map.set(date_key(x), x);
   for (let y of l2.items.slice(0, merge_history_limit)) {
     var k = date_key(y);
     var x = map.get(k);
@@ -257,9 +222,10 @@ export function merge_history(l1, l2) {
       changed = true;
     } else {
       var m = merge_day(x, y);
-      if (m.updated != x.updated) {
+      if (m.items.clock != x.items.clock) {
         map.set(k, m);
         changed = true;
+        updated = Math.max(updated, m.items.clock);
       }
     }
   }
@@ -267,10 +233,8 @@ export function merge_history(l1, l2) {
   var l = {
     items: [...map.values()],
     updated: updated,
+    synced: l2.updated;
   };
-  if (changed || l.updated == undefined) {
-    l.updated = Date.now();
-  }
   return l;
 }
 

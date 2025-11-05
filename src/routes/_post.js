@@ -34,10 +34,12 @@ export async function do_post_internal(
     }
   }  else {
     // update sent
-    if (value != undefined) result = merge(value, data.value);
-    else result = data.value;
+    if (value != undefined)
+      result = merge(value, data.value);
+    else
+      result = data.value;
     // store if we have nothing or if it is different
-    if (value == undefined || data.updated < result.updated || result.updated != value.updated) {
+    if (value == undefined || data.updated != result.updated || result.updated != value.updated) {
       let string_value = JSON.stringify(result);
       await db.put(username, string_value);
     } else {
