@@ -1,5 +1,6 @@
-import { readable, writable/, get } from "svelte/store";
+import { readable, writable, get } from "svelte/store";
 import { browser } from '$app/environment';
+import { CollabJSON } from "./_crdt.js";
 import {
   compare_date,
   merge_items,
@@ -23,18 +24,20 @@ function debounce(func, wait) {
   };
 }
 
-export function synced_store(key, initialValue, sync) {
+export function synced_store(key, initialValue, sync, fromJSON) {
   const SYNC_INTERVAL = 1000 * 60 * 5; // 5 minutes
   const DEBOUNCE_WAIT = 2000; // 2 seconds
 
   const dirtyKey = `${key}:dirty`;
 
   let storedValue = initialValue;
+  let isDirty = false;
 
   if (browser) {
     const fromStorage = localStorage.getItem(key);
     if (fromStorage) {
-      storedValue = JSON.parse(fromStorage);
+      const parsed = JSON.parse(fromStorage);
+      storedValue = fromJSON ? fromJSON(parsed) : parsed;
     }
     isDirty = localStorage.getItem(dirtyKey) === 'true';
   }
@@ -56,9 +59,11 @@ export function synced_store(key, initialValue, sync) {
 
     try {
       const currentValue = get({ subscribe });
-      const ok = await sync(current_value);
+      const ok = await sync(currentValue);
 
       if (!ok) throw new Error('Server sync failed');
+
+      svelteSet(currentValue); // Notify Svelte of mutated value
 
       isDirty = false;
       if (browser) localStorage.setItem(dirtyKey, 'false');
@@ -128,7 +133,7 @@ export async function sync_profile(profile) {
       return false;
     }
     try {
-      const data = aweait r.json();
+      const data = await response.json();
       if (data.err) {
         console.log("profile err", data.err);
         localStorage.setItem('profile', profile);
@@ -172,17 +177,23 @@ export const index_store = writable(undefined);
 export const edit_store = local_writable("edit", undefined);
 export const profile_store = synced_store("profile", make_profile(), sync_profile);
 
-async function sync_internal(v, key, get_updates, do_merge) {
-  v.server_checked = Date.now();
-  const profile = get(profile_store);
-  if (profile == undefined || profile.authenticated == undefined) {
+async function sync_internal(doc, name) {
+  if (!(doc instanceof CollabJSON)) {
+    console.error(`Sync object for "${name}" is not a CollabJSON document. Aborting sync.`);
     return false;
   }
-  var data = {
+  const profile = get(profile_store);
+  if (profile == undefined || !profile.authenticated) {
+    return false;
+  }
+  
+  const syncRequest = doc.getSyncRequest();
+  const data = {
     username: profile.username,
     password: profile.password,
-    updates: get_updates(v),
+    ...syncRequest,
   };
+
   try {
     const response = await fetch('/api/' + name, {
       method: "POST",
@@ -190,67 +201,49 @@ async function sync_internal(v, key, get_updates, do_merge) {
       headers: { "Content-Type": "application/json" },
     });
     if (!response.ok) {
-      console.log("not-ok", name, r.status, r.statusText);
+      console.log("not-ok", name, response.status, response.statusText);
       return false;
     }
-    try { 
-      const data = await response.json();
-      if (data.err) {
-        console.log("backup err", name, data.err);
+    try {
+      const sync_response = await response.json();
+      if (sync_response.err) {
+        console.log("sync err", name, sync_response.err);
         return false;
       }
-      let backup = data.value;
-      if (backup == "") {
-        v.server_synced = Date.now();
-        return true;
-      }
-      let merged = do_merge(l, backup);
-        merged.server_checked = v.server_checked;
-        merged.server_synced = Date.now();
-        if (merged.updated != v.updated) {
-          localStorage.setItem(key, merged);
-        }
-      } else {
-        v.server_synced = v.server_synced;
-      }
-    } catch((err) => {
+      doc.applySyncResponse(sync_response);
+    } catch (err) {
       console.log(name, "JSON error", err.message);
       return false;
     }
-  } catch((err) => {
+  } catch (err) {
     console.log(name, "POST error", err.message);
     return false;
   }
   return true;
 }
 
-function get_simple_updates(v) {
-  return { clock: v.items.clock, ops: v.items.ops };
-}
-
 async function sync_today(today) {
-  return await sync_internal(today, "today", merge_day, get_simple_updates);
+  return await sync_internal(today.items, "today");
 }
 
 async function sync_favorites(favorites) {
-  return await sync_internal(favorites, "favorites", merge_items, get_simple_updates);
+  return await sync_internal(favorites.items, "favorites");
 }
 
-function get_history_updates(h) {
-  let updates = [];
-  for (d in h.items) {
-    updates.push({ key: date_key(d), clock: d.items.clock, ops: d.items.ops });
-  }
-  return updates;
+export async function sync_history(history) {
+  return await sync_internal(history.items, "history");
 }
 
-export function sync_history(history) {
-  return await sync_internal(history, "history", merge_history, get_history_updates);
+function collab_from_json(parsed) {
+    if (parsed && parsed.items) {
+        parsed.items = CollabJSON.fromJSON(parsed.items);
+    }
+    return parsed;
 }
 
-export const today_store = synced_store("today", make_today(), sync_today);
-export const favorites_store = synced_store("favorites", make_favorites(), sync_favorites);
-export const history_store = synced_store("history", make_history(), sync_history);
+export const today_store = synced_store("today", make_today(), sync_today, collab_from_json);
+export const favorites_store = synced_store("favorites", make_favorites(), sync_favorites, collab_from_json);
+export const history_store = synced_store("history", make_history(), sync_history, collab_from_json);
 
 export function add_item(item, today, edit, profile) {
   if (edit != undefined) {
