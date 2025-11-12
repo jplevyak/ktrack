@@ -90,7 +90,6 @@
         profile.username = username_input.value;
         profile.password = password_input.value;
         profile.old_password = old_password_input.value;
-        profile.updated = Date.now();
         await sync_profile(profile);
         profile = profile;
         force_sync();
@@ -136,42 +135,18 @@ is lost.
 <br /><br />
 Today
 <ul>
-  <li>
-    Server Check Time: {today.server_checked
-      ? new Date(today.server_checked).toString()
-      : "unsynced"}
-  </li>
-  <li>
-    Server Sync Time: {today.server_synced
-      ? new Date(today.server_synced).toString()
-      : "unsynced"}
-  </li>
+  <li> Server Check Time: {today.checked ? new Date(today.checked).toString() : "unsynced"} </li>
+  <li> Server Sync Time: {today.synced ? new Date(today.synced).toString() : "unsynced"} </li>
 </ul>
 Favorites
 <ul>
-  <li>
-    Server Check Time: {favorites.server_checked
-      ? new Date(favorites.server_checked).toString()
-      : "unsynced"}
-  </li>
-  <li>
-    Server Sync Time: {favorites.server_synced
-      ? new Date(favorites.server_synced).toString()
-      : "unsynced"}
-  </li>
+  <li> Server Check Time: {favorites.checked ? new Date(favorites.checked).toString() : "unsynced"} </li>
+  <li> Server Sync Time: {favorites.synced ? new Date(favorites.synced).toString() : "unsynced"} </li>
 </ul>
 History
 <ul>
-  <li>
-    Server Check Time: {history.server_checked
-      ? new Date(history.server_checked).toString()
-      : "unsynced"}
-  </li>
-  <li>
-    Server Sync Time: {history.server_synced
-      ? new Date(history.server_synced).toString()
-      : "unsynced"}
-  </li>
+  <li> Server Check Time: {history.checked ? new Date(history.checked).toString() : "unsynced"} </li>
+  <li> Server Sync Time: {history.synced ? new Date(history.synced).toString() : "unsynced"} </li>
 </ul>
 
 <style>
