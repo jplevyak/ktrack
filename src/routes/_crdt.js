@@ -223,6 +223,7 @@ export class CollabJSON {
         toContainer._applyAndStore({
             type: 'ADD_ITEM',
             itemId: itemToMove.id,
+            containerId: toContainer.id,
             data: itemToMove.data,
             sortKey: newSortKey,
             timestamp: this._tick(),
