@@ -170,13 +170,13 @@ test('Concurrent adds at same position converge', () => {
 
     // Concurrent adds
     doc1.addItem([1], { text: 'from 1' });
+    const op1 = doc1.ops[doc1.ops.length - 1];
     doc2.addItem([1], { text: 'from 2' });
+    const op2 = doc2.ops[doc2.ops.length - 1];
 
     // Sync
-    const ops1 = doc1.ops.slice(1);
-    const ops2 = doc2.ops.slice(1);
-    ops1.forEach(op => doc2.applyOp(op));
-    ops2.forEach(op => doc1.applyOp(op));
+    doc2.applyOp(op1);
+    doc1.applyOp(op2);
 
     assert.deepStrictEqual(doc1.getData(), doc2.getData());
     assert.strictEqual(doc1.getData().length, 3);
@@ -191,14 +191,14 @@ test('Concurrent update (LWW)', () => {
     // Concurrent updates. Force clock to determine winner.
     doc1.clock = 10;
     doc1.updateItem([0], { text: 'update from 1' }); // This one is later
+    const op1 = doc1.ops[doc1.ops.length - 1];
     doc2.clock = 5;
     doc2.updateItem([0], { text: 'update from 2' }); // This one is earlier
+    const op2 = doc2.ops[doc2.ops.length - 1];
 
     // Sync
-    const ops1 = doc1.ops.slice(1);
-    const ops2 = doc2.ops.slice(1);
-    ops1.forEach(op => doc2.applyOp(op));
-    ops2.forEach(op => doc1.applyOp(op));
+    doc2.applyOp(op1);
+    doc1.applyOp(op2);
 
     assert.deepStrictEqual(doc1.getData(), [{ text: 'update from 1' }]);
     assert.deepStrictEqual(doc2.getData(), [{ text: 'update from 1' }]);
@@ -213,14 +213,14 @@ test('Concurrent delete and update converge', () => {
     // Concurrent update and delete
     doc1.clock = 10;
     doc1.deleteItem([0]); // delete wins (later timestamp)
+    const op1 = doc1.ops[doc1.ops.length - 1];
     doc2.clock = 5;
     doc2.updateItem([0], { text: 'update from 2' });
+    const op2 = doc2.ops[doc2.ops.length - 1];
 
     // Sync
-    const ops1 = doc1.ops.slice(1);
-    const ops2 = doc2.ops.slice(1);
-    ops1.forEach(op => doc2.applyOp(op));
-    ops2.forEach(op => doc1.applyOp(op));
+    doc2.applyOp(op1);
+    doc1.applyOp(op2);
 
     assert.deepStrictEqual(doc1.getData(), []);
     assert.deepStrictEqual(doc2.getData(), []);
