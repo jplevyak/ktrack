@@ -87,8 +87,10 @@ export class CollabJSON {
   }
 
   getItem(path) {
-    const { container, index } = this._resolvePath([...path, 0]); // path resolves to container, index is last part
-    const itemData = container._getSortedItems()[path[path.length-1]].data;
+    const { container, index } = this._resolvePath(path);
+    const item = container._getSortedItems()[index];
+    if (!item) throw new Error('Item not found for getItem');
+    const itemData = item.data;
 
     if (itemData instanceof CollabJSON) {
         const newDoc = new CollabJSON();
