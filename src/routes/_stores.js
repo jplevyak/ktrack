@@ -44,7 +44,15 @@ export function synced_store(key, initialValue, sync, fromJSON) {
 
   const status = writable(isDirty ? 'dirty' : 'idle');
 
-  const { subscribe, set: svelteSet, update: svelteUpdate } = writable(storedValue);
+  let intervalId;
+  const { subscribe, set: svelteSet, update: svelteUpdate } = writable(storedValue, () => {
+    if (!browser) return;
+    // Start function (on first subscriber)
+    if (isDirty) syncToServer();
+    intervalId = setInterval(syncToServer, SYNC_INTERVAL);
+    // Stop function (on last unsubscriber)
+    return () => clearInterval(intervalId);
+  });
 
   async function syncToServer() {
     if (!browser || !isDirty || !get(online)) {
@@ -92,13 +100,6 @@ export function synced_store(key, initialValue, sync, fromJSON) {
   const update = (updater) => {
     set(updater(get({ subscribe })));
   };
-
-  if (browser) {
-    if (isDirty) {
-      syncToServer();
-    }
-    const intervalId = setInterval(syncToServer, SYNC_INTERVAL);
-  }
 
   return {
     subscribe,
@@ -296,76 +297,97 @@ export function add_item(item, today, edit, profile) {
   }
   store.update(function (day) {
     if (day == undefined) day = make_today();
-    for (let i of day.items) {
-      if (i.name == item.name) {
-        if (i.del == undefined) return day;
-        delete i.del;
-        i.updated = Date.now();
-        if (edit == undefined) {
-          sync_today(today, profile, true);
-        }
-        save_history(day, profile, true);
-        return day;
-      }
+    const items_doc = day.items;
+    const items_array = items_doc.getData();
+    const existing_index = items_array.findIndex(i => i.name == item.name);
+
+    if (existing_index !== -1) {
+      const existing_item = items_array[existing_index];
+      if (existing_item.del == undefined) return day; // Already exists and not deleted
+
+      delete existing_item.del;
+      existing_item.updated = Date.now();
+      items_doc.updateItem([existing_index], existing_item);
+    } else {
+      item = { ...item };
+      item.updated = Date.now();
+      delete item.del;
+      if (item.servings == undefined) item.servings = 1.0;
+      items_doc.addItem([items_array.length], item);
     }
-    item = { ...item };
-    item.updated = Date.now();
-    delete item.del;
-    if (item.servings == undefined) item.servings = 1.0;
-    day = { ...day };
-    day.items.push(item);
+
     day.updated = Date.now();
+
     if (edit == undefined) {
-      sync_today(today, profile, true);
+      save_history(day, profile);
     }
-    save_history(day, profile, true);
     return day;
   });
 }
 
 export function save_history(day, profile) {
   if (day == undefined) return;
-  var h = { updated: day.updated, items: [day, make_historical_day(day, 1)] };
   history_store.update(function (history) {
-    let new_history = merge_history(history, h);
-    if (new_history.updated != history.updated) {
-      sync_history(new_history, profile, true);
-      return new_history;
+    if (history == undefined) history = make_history();
+    const history_doc = history.items;
+    const history_items = history_doc.getData();
+    const key = date_key(day);
+    const existing_index = history_items.findIndex(d => d && date_key(d) === key);
+
+    if (existing_index !== -1) {
+      history_doc.updateItem([existing_index], day);
+    } else {
+      const insert_index = history_items.findIndex(d => d && date_key(d) < key);
+      history_doc.addItem([insert_index === -1 ? history_items.length : insert_index], day);
     }
+    
+    const limit = merge_history_limit || 50;
+    const current_items = history_doc.getData();
+    if (current_items.length > limit) {
+        // Prune oldest items if history exceeds limit
+        for (let i = limit; i < current_items.length; i++) {
+            history_doc.deleteItem([limit]); // Always delete item at `limit` index as list shrinks
+        }
+    }
+
+    history.updated = Date.now();
     return history;
   });
 }
 
 export function save_today(today, profile) {
   today_store.set(today);
-  sync_today(today, profile, true);
   save_history(today, profile);
 }
 
 export function save_favorite(item, profile, replace_index) {
   favorites_store.update(function (favorites) {
     if (favorites == undefined) favorites = make_favorites();
+    const favorites_doc = favorites.items;
+    
     item = { ...item };
     item.updated = Date.now();
     favorites.updated = item.updated;
+
     if (replace_index != undefined) {
-      if (replace_index >= favorites.items.length) {
+      if (replace_index >= favorites_doc.getData().length) {
         console.log("bad replace_index", replace_index);
         return favorites;
       }
-      favorites.items.splice(replace_index, 1, item);
+      favorites_doc.updateItem([replace_index], item);
       return favorites;
     }
-    for (let i in favorites.items) {
-      if (favorites.items[i].name == item.name) {
-        favorites.items.splice(i, 1, item);
-        sync_favorites(favorites, profile, true);
-        return favorites;
-      }
+    
+    const items_array = favorites_doc.getData();
+    const existing_index = items_array.findIndex(i => i.name == item.name);
+
+    if (existing_index !== -1) {
+      favorites_doc.updateItem([existing_index], item);
+    } else {
+      if (item.servings == undefined) item.servings = 1.0;
+      favorites_doc.addItem([items_array.length], item);
     }
-    if (item.servings == undefined) item.servings = 1.0;
-    favorites.items.push(item);
-    sync_favorites(favorites, profile, true);
+    
     return favorites;
   });
 }
