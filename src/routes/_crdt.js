@@ -17,6 +17,8 @@ export class CollabJSON {
       this.dvv = new Map();
       this.ops = []; // local ops for the whole document
       this.history = []; // all ops on server
+      this.snapshot = null;
+      this.snapshotDvv = new Map();
     }
   }
 
@@ -254,6 +256,16 @@ export class CollabJSON {
       timestamp: this._tick(),
     });
   }
+
+  prune(pruneFn) {
+    if (this.root !== this) throw new Error('Pruning can only be done on the root document.');
+
+    pruneFn(this);
+
+    this.snapshot = this.getData();
+    this.snapshotDvv = new Map(this.dvv);
+    this.history = [];
+  }
   
   // --- Sync Function ---
 
@@ -347,8 +359,36 @@ export class CollabJSON {
     };
   }
 
-  applySyncResponse({ ops, dvv }) {
+  applySyncResponse({ ops, dvv, snapshot, snapshotDvv, reset }) {
     if (this.root !== this) throw new Error('Sync methods can only be called on the root document.');
+
+    if (reset) {
+        this.ops = []; // Discard local ops, client was too far behind.
+        
+        const tempDoc = new CollabJSON({ clientId: this.clientId });
+        function build(doc, data) {
+            data.forEach((item, index) => {
+                if (Array.isArray(item)) {
+                    const nested = new CollabJSON();
+                    doc.addItem([index], nested);
+                    build(nested, item);
+                } else {
+                    doc.addItem([index], item);
+                }
+            });
+        }
+        build(tempDoc, snapshot);
+        
+        this.items = tempDoc.items;
+        this.items.forEach(item => {
+            if (item.data instanceof CollabJSON) {
+                item.data._setRoot(this);
+            }
+        });
+        
+        this.dvv = new Map(Object.entries(snapshotDvv));
+        return;
+    }
 
     ops.forEach(op => this.applyOp(op));
     this.dvv = new Map(Object.entries(dvv));
@@ -357,6 +397,26 @@ export class CollabJSON {
   getSyncResponse({ dvv: clientDvv, ops: clientOps, clientId }) {
     if (this.root !== this) throw new Error('Sync methods can only be called on the root document.');
     const clientDvvMap = new Map(Object.entries(clientDvv));
+
+    // Check if client is too far behind and needs a snapshot
+    if (this.snapshot) {
+        let needsReset = false;
+        // If client is missing knowledge from snapshot, it needs reset.
+        for (const [cId, ts] of this.snapshotDvv.entries()) {
+            if ((clientDvvMap.get(cId) || 0) < ts) {
+                needsReset = true;
+                break;
+            }
+        }
+
+        if (needsReset) {
+            return {
+                snapshot: this.snapshot,
+                snapshotDvv: Object.fromEntries(this.snapshotDvv),
+                reset: true
+            };
+        }
+    }
 
     clientOps.forEach(op => {
         this.applyOp(op);
