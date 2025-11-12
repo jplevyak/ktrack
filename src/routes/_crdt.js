@@ -116,8 +116,8 @@ export class CollabJSON {
     const { container, index } = this._resolvePath(path);
 
     if (data instanceof CollabJSON) {
-      container._mergeClock(data.clock);
-      data.ops.forEach(op => container._mergeClock(op.timestamp));
+      this._mergeClock(data.clock);
+      data.ops.forEach(op => this._mergeClock(op.timestamp));
     }
 
     const sortedItems = container._getSortedItems();
@@ -130,7 +130,7 @@ export class CollabJSON {
       itemId: newItemId,
       data: data,
       sortKey: newSortKey,
-      timestamp: container._tick(),
+      timestamp: this._tick(),
     };
     container._applyAndStore(op);
 
@@ -161,18 +161,39 @@ export class CollabJSON {
     if (!itemToMove) throw new Error('Item to move not found');
     
     const { container: toContainer, index: toIndex } = this._resolvePath(toPath);
-    const targetSortedItems = toContainer._getSortedItems().filter(item => item.id !== itemToMove.id);
-    const { prevKey, nextKey } = toContainer._findSortKeys(targetSortedItems, toIndex);
-    const newSortKey = this._generateSortKey(prevKey, nextKey);
 
-    // This op affects an item, which could be in any container.
-    // The top-level applyOp will find it.
-    this._applyAndStore({
-      type: 'MOVE_ITEM',
-      itemId: itemToMove.id,
-      newSortKey: newSortKey,
-      timestamp: this._tick(),
-    });
+    if (fromContainer !== toContainer) {
+        // Cross-container move is a delete then an add to preserve item identity.
+        this._applyAndStore({
+            type: 'DELETE_ITEM',
+            itemId: itemToMove.id,
+            timestamp: this._tick(),
+        });
+
+        const targetSortedItems = toContainer._getSortedItems();
+        const { prevKey, nextKey } = toContainer._findSortKeys(targetSortedItems, toIndex);
+        const newSortKey = this._generateSortKey(prevKey, nextKey);
+        
+        toContainer._applyAndStore({
+            type: 'ADD_ITEM',
+            itemId: itemToMove.id,
+            data: itemToMove.data,
+            sortKey: newSortKey,
+            timestamp: this._tick(),
+        });
+    } else {
+        // Same-container move just needs a sortKey update.
+        const targetSortedItems = toContainer._getSortedItems().filter(item => item.id !== itemToMove.id);
+        const { prevKey, nextKey } = toContainer._findSortKeys(targetSortedItems, toIndex);
+        const newSortKey = this._generateSortKey(prevKey, nextKey);
+
+        this._applyAndStore({
+            type: 'MOVE_ITEM',
+            itemId: itemToMove.id,
+            newSortKey: newSortKey,
+            timestamp: this._tick(),
+        });
+    }
   }
 
   deleteItem(path) {
