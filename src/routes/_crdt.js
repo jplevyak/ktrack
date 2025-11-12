@@ -6,22 +6,30 @@
 import { v4 as uuidv4 } from 'uuid';
 
 export class CollabJSON {
-  constructor() {
+  constructor(options = {}) {
     this.items = new Map();
-    this.clock = 0;
-    this.ops = [];
+    this.id = options.id || uuidv4();
+    this.root = options.root || this;
+
+    if (this.root === this) {
+      this.clientId = options.clientId || uuidv4();
+      this.clock = 0;
+      this.dvv = new Map();
+      this.ops = []; // local ops for the whole document
+      this.history = []; // all ops on server
+    }
   }
 
   // --- Private Helper Functions ---
 
   _tick() {
-    this.clock = Math.round(this.clock) + 1.0 + Math.random();
-    return this.clock;
+    this.root.clock = Math.round(this.root.clock) + 1.0 + Math.random();
+    return this.root.clock;
   }
 
   _mergeClock(remoteTimestamp) {
     if (remoteTimestamp) {
-      this.clock = Math.round(Math.max(this.clock, remoteTimestamp)) + 1.0 + Math.random();
+      this.root.clock = Math.round(Math.max(this.root.clock, remoteTimestamp)) + 1.0 + Math.random();
     }
   }
 
@@ -60,8 +68,40 @@ export class CollabJSON {
   }
 
   _applyAndStore(op) {
+    op.clientId = this.root.clientId;
     this.applyOp(op);
-    this.ops.push(op);
+    this.root.ops.push(op);
+  }
+
+  _setRoot(root) {
+    this.root = root;
+    for (const item of this.items.values()) {
+      if (item.data instanceof CollabJSON) {
+        item.data._setRoot(root);
+      }
+    }
+  }
+
+  _findItem(itemId) {
+    if (this.items.has(itemId)) return this.items.get(itemId);
+    for (const i of this.items.values()) {
+        if (i.data instanceof CollabJSON) {
+            const found = i.data._findItem(itemId);
+            if (found) return found;
+        }
+    }
+    return null;
+  }
+
+  _findContainer(containerId) {
+    if (this.id === containerId) return this;
+    for (const i of this.items.values()) {
+        if (i.data instanceof CollabJSON) {
+            const found = i.data._findContainer(containerId);
+            if (found) return found;
+        }
+    }
+    return null;
   }
 
   _resolvePath(path) {
@@ -116,8 +156,10 @@ export class CollabJSON {
     const { container, index } = this._resolvePath(path);
 
     if (data instanceof CollabJSON) {
-      this._mergeClock(data.clock);
-      data.ops.forEach(op => this._mergeClock(op.timestamp));
+      data._setRoot(this.root);
+      this._mergeClock(data.root.clock);
+      // When adding a doc, its ops become part of the history of this doc.
+      data.ops.forEach(op => this.root.ops.push(op));
     }
 
     const sortedItems = container._getSortedItems();
@@ -128,6 +170,7 @@ export class CollabJSON {
     const op = {
       type: 'ADD_ITEM',
       itemId: newItemId,
+      containerId: container.id,
       data: data,
       sortKey: newSortKey,
       timestamp: this._tick(),
@@ -220,23 +263,20 @@ export class CollabJSON {
 
     let item;
 
-    // Helper to find an item anywhere in the nested structure.
-    const findItem = (doc, itemId) => {
-        if (doc.items.has(itemId)) return doc.items.get(itemId);
-        for (const i of doc.items.values()) {
-            if (i.data instanceof CollabJSON) {
-                const found = findItem(i.data, itemId);
-                if (found) return found;
-            }
-        }
-        return null;
-    };
-
     switch (op.type) {
       case 'ADD_ITEM':
-        // ADD must be applied to the correct container.
-        if (!this.items.has(op.itemId)) {
-          this.items.set(op.itemId, {
+        const container = this.root._findContainer(op.containerId);
+        if (!container) {
+            console.warn(`Container ${op.containerId} not found for ADD_ITEM.`);
+            break;
+        }
+
+        if (op.data instanceof CollabJSON) {
+          op.data._setRoot(this.root);
+        }
+
+        if (!container.items.has(op.itemId)) {
+          container.items.set(op.itemId, {
             id: op.itemId,
             data: op.data,
             sortKey: op.sortKey,
@@ -244,9 +284,14 @@ export class CollabJSON {
             _deleted: false,
           });
         }
-        item = this.items.get(op.itemId);
+        item = container.items.get(op.itemId);
         if (op.timestamp >= item.updated) {
-            item.data = op.data;
+            if (op.data instanceof CollabJSON) {
+              item.data = new CollabJSON({ root: this.root, id: op.data.id });
+              op.data.ops.forEach(childOp => item.data.applyOp(childOp));
+            } else {
+              item.data = op.data;
+            }
             item.sortKey = op.sortKey;
             item.updated = op.timestamp;
             item._deleted = false;
@@ -254,7 +299,7 @@ export class CollabJSON {
         break;
 
       case 'MOVE_ITEM':
-        item = findItem(this, op.itemId);
+        item = this.root._findItem(op.itemId);
         if (!item) break;
         if (op.timestamp > item.updated) {
           item.sortKey = op.newSortKey;
@@ -263,7 +308,7 @@ export class CollabJSON {
         break;
 
       case 'UPDATE_ITEM':
-        item = findItem(this, op.itemId);
+        item = this.root._findItem(op.itemId);
         if (!item) break;
         if (op.timestamp > item.updated) {
           item.data = op.data;
@@ -273,7 +318,7 @@ export class CollabJSON {
         break;
 
       case 'DELETE_ITEM':
-        item = findItem(this, op.itemId);
+        item = this.root._findItem(op.itemId);
         if (!item) break;
         if (op.timestamp > item.updated) {
           item._deleted = true;
@@ -281,5 +326,53 @@ export class CollabJSON {
         }
         break;
     }
+  }
+
+  // --- DVV Sync Methods ---
+
+  getSyncRequest() {
+    if (this.root !== this) throw new Error('Sync methods can only be called on the root document.');
+
+    const lastSeenBySystem = this.dvv.get(this.clientId) || 0;
+    const newOps = this.ops.filter(op => op.timestamp > lastSeenBySystem);
+    
+    return {
+      dvv: Object.fromEntries(this.dvv),
+      ops: newOps,
+      clientId: this.clientId
+    };
+  }
+
+  applySyncResponse({ ops, dvv }) {
+    if (this.root !== this) throw new Error('Sync methods can only be called on the root document.');
+
+    ops.forEach(op => this.applyOp(op));
+    this.dvv = new Map(Object.entries(dvv));
+  }
+
+  getSyncResponse({ dvv: clientDvv, ops: clientOps, clientId }) {
+    if (this.root !== this) throw new Error('Sync methods can only be called on the root document.');
+    const clientDvvMap = new Map(Object.entries(clientDvv));
+
+    clientOps.forEach(op => {
+        this.applyOp(op);
+        this.history.push(op);
+    });
+
+    const maxTs = clientOps.reduce((max, op) => op.clientId === clientId ? Math.max(max, op.timestamp) : max, 0);
+    if (maxTs > 0) {
+      const currentTs = this.dvv.get(clientId) || 0;
+      this.dvv.set(clientId, Math.max(currentTs, maxTs));
+    }
+
+    const opsForClient = this.history.filter(op => {
+        const lastSeenByClient = clientDvvMap.get(op.clientId) || 0;
+        return op.timestamp > lastSeenByClient;
+    });
+
+    return {
+        ops: opsForClient,
+        dvv: Object.fromEntries(this.dvv)
+    };
   }
 }

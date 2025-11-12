@@ -240,5 +240,126 @@ test('Throws error on invalid path for resolving', () => {
     assert.throws(() => doc.addItem([0, 0], { text: 'b' }), /not a CollabJSON/);
 });
 
+// --- DVV Sync Tests ---
+
+test('getSyncRequest is repeatable', () => {
+    const client = new CollabJSON();
+    client.addItem([0], { text: 'a' });
+    const req1 = client.getSyncRequest();
+    const req2 = client.getSyncRequest();
+    assert.deepStrictEqual(req1, req2);
+    assert.strictEqual(req1.ops.length, 1);
+});
+
+test('applySyncResponse is idempotent', () => {
+    const client = new CollabJSON();
+    const server = new CollabJSON({ clientId: 'server' });
+
+    client.addItem([0], { text: 'a' });
+    const request = client.getSyncRequest();
+    const response = server.getSyncResponse(request);
+
+    client.applySyncResponse(response);
+    const state1 = client.getData();
+    const dvv1 = client.dvv;
+
+    client.applySyncResponse(response);
+    const state2 = client.getData();
+    const dvv2 = client.dvv;
+
+    assert.deepStrictEqual(state1, state2);
+    assert.deepStrictEqual(dvv1, dvv2);
+});
+
+test('Full client-server-client sync cycle', () => {
+    const server = new CollabJSON({ clientId: 'server' });
+    const client1 = new CollabJSON({ clientId: 'c1' });
+    const client2 = new CollabJSON({ clientId: 'c2' });
+
+    // C1 adds item, syncs with server
+    client1.addItem([0], { text: 'from c1' });
+    let req1 = client1.getSyncRequest();
+    let res1 = server.getSyncResponse(req1);
+    client1.applySyncResponse(res1);
+
+    assert.deepStrictEqual(server.getData(), [{ text: 'from c1' }]);
+
+    // C2 syncs with server, gets C1's changes
+    let req2 = client2.getSyncRequest();
+    let res2 = server.getSyncResponse(req2);
+    client2.applySyncResponse(res2);
+
+    assert.deepStrictEqual(client2.getData(), [{ text: 'from c1' }]);
+
+    // C2 adds item, syncs with server
+    client2.addItem([1], { text: 'from c2' });
+    req2 = client2.getSyncRequest();
+    res2 = server.getSyncResponse(req2);
+    client2.applySyncResponse(res2);
+
+    assert.deepStrictEqual(server.getData(), [{ text: 'from c1' }, { text: 'from c2' }]);
+
+    // C1 syncs again, gets C2's changes
+    req1 = client1.getSyncRequest();
+    res1 = server.getSyncResponse(req1);
+    client1.applySyncResponse(res1);
+
+    assert.deepStrictEqual(client1.getData(), server.getData());
+});
+
+test('Concurrent changes from two clients converge', () => {
+    const server = new CollabJSON({ clientId: 'server' });
+    const client1 = new CollabJSON({ clientId: 'c1' });
+    const client2 = new CollabJSON({ clientId: 'c2' });
+
+    // C1 and C2 both add an item offline
+    client1.addItem([0], { text: 'from c1' });
+    client2.addItem([0], { text: 'from c2' });
+
+    // C1 syncs
+    const req1 = client1.getSyncRequest();
+    const res1 = server.getSyncResponse(req1);
+    client1.applySyncResponse(res1);
+
+    // C2 syncs
+    const req2 = client2.getSyncRequest();
+    const res2 = server.getSyncResponse(req2);
+    client2.applySyncResponse(res2);
+
+    // Final sync for C1 to get C2's changes
+    const finalReq1 = client1.getSyncRequest();
+    const finalRes1 = server.getSyncResponse(finalReq1);
+    client1.applySyncResponse(finalRes1);
+
+    assert.deepStrictEqual(client1.getData(), client2.getData());
+    assert.strictEqual(client1.getData().length, 2);
+    assert.deepStrictEqual(client1.getData(), server.getData());
+});
+
+test('addItem with nested CollabJSON syncs correctly', () => {
+    const server = new CollabJSON({ clientId: 'server' });
+    const client1 = new CollabJSON({ clientId: 'c1' });
+    const client2 = new CollabJSON({ clientId: 'c2' });
+
+    // C1 adds a nested doc
+    const nested = new CollabJSON();
+    nested.addItem([0], { val: 1 });
+    client1.addItem([0], nested);
+    client1.addItem([0, 1], { val: 2 });
+    
+    // Sync C1 to server
+    const req1 = client1.getSyncRequest();
+    const res1 = server.getSyncResponse(req1);
+    client1.applySyncResponse(res1);
+
+    // Sync server to C2
+    const req2 = client2.getSyncRequest();
+    const res2 = server.getSyncResponse(req2);
+    client2.applySyncResponse(res2);
+    
+    assert.deepStrictEqual(client2.getData(), [[{ val: 1 }, { val: 2 }]]);
+});
+
+
 // Run all tests
 runTests();
