@@ -26,12 +26,6 @@ months[9] = "October";
 months[10] = "November";
 months[11] = "December";
 
-var name2food = {};
-
-for (let f in foods) {
-  name2food[foods[f].name] = f;
-}
-
 export function compare_date(d1, d2) {
   if (d1.year > d2.year) return 1;
   if (d1.year < d2.year) return -1;
@@ -83,16 +77,6 @@ export function load_async(
   document.body.appendChild(tag);
 }
 
-function get_updated_time(the_time, reset) {
-  if (!reset) {
-     // It was updated a long time in the past (so that it will not overwrite anything on the server.
-     return the_time - 1000 * 24 * 3600 * 1000;
-  } else {
-     // It was updated now so that it will overwrite the server data.
-     return the_time;
-  }
-}
-
 export function make_today() {
   let the_date = new Date();
   let items = new CollabArray();
@@ -102,8 +86,6 @@ export function make_today() {
     date: the_date.getDate(),
     day: the_date.getDay(),
     items,
-    updated: items.clock,
-    synced: 0,
   };
 }
 
@@ -117,8 +99,6 @@ export function make_historical_day(d, days_ago) {
     date: the_date.getDate(),
     day: the_date.getDay(),
     items,
-    updated: items.clock,
-    synced: 0,
   };
 }
 
@@ -126,17 +106,13 @@ export function make_favorites() {
   let items = new CollabArray();
   return {
     items,
-    updated: items.clock,
-    synced: 0,
   };
 }
 
 export function make_history() {
-  let the_date = new Date();
+  let items = new CollabArray();
   return {
     items,
-    updated: items.clock,
-    synced: 0,
   };
 }
 
@@ -188,7 +164,6 @@ export function merge_items(d, ops) {
     d.items.applyOp(op);
     d.synced = Math.max(d1.synced, op.timestamp);
   }
-  d1.updated = d.items.clock;
 }
 
 export function merge_day(d1, d2) {
@@ -232,8 +207,6 @@ export function merge_history(l1, l2) {
   map = new Map([...map.entries()].sort().reverse()); // sort
   var l = {
     items: [...map.values()],
-    updated: updated,
-    synced: l2.updated;
   };
   return l;
 }

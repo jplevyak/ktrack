@@ -10,7 +10,6 @@ import {
   make_today,
   make_favorites,
   make_history,
-  make_historical_day,
   make_profile,
   date_key,
 } from "./_util.js";
@@ -306,17 +305,13 @@ export function add_item(item, today, edit, profile) {
       if (existing_item.del == undefined) return day; // Already exists and not deleted
 
       delete existing_item.del;
-      existing_item.updated = Date.now();
       items_doc.updateItem([existing_index], existing_item);
     } else {
       item = { ...item };
-      item.updated = Date.now();
       delete item.del;
       if (item.servings == undefined) item.servings = 1.0;
       items_doc.addItem([items_array.length], item);
     }
-
-    day.updated = Date.now();
 
     if (edit == undefined) {
       save_history(day, profile);
@@ -350,7 +345,6 @@ export function save_history(day, profile) {
         }
     }
 
-    history.updated = Date.now();
     return history;
   });
 }
@@ -366,8 +360,6 @@ export function save_favorite(item, profile, replace_index) {
     const favorites_doc = favorites.items;
     
     item = { ...item };
-    item.updated = Date.now();
-    favorites.updated = item.updated;
 
     if (replace_index != undefined) {
       if (replace_index >= favorites_doc.getData().length) {
