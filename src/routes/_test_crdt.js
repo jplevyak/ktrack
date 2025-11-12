@@ -151,7 +151,7 @@ test('getItem', () => {
 
 test('Basic sync: one-way propagation', () => {
     const doc1 = new CollabJSON();
-    const doc2 = new CollabJSON();
+    const doc2 = new CollabJSON({id: doc1.id});
 
     doc1.addItem([0], { text: 'a' });
     doc1.addItem([1], { text: 'b' });
@@ -163,9 +163,9 @@ test('Basic sync: one-way propagation', () => {
 });
 
 test('Concurrent adds at same position converge', () => {
-    const doc1 = new CollabJSON();
+    const doc1 = new CollabJSON({clientId: 'c1'});
     doc1.addItem([0], { text: 'common' });
-    const doc2 = new CollabJSON();
+    const doc2 = new CollabJSON({id: doc1.id, clientId: 'c2'});
     doc2.applyOp(doc1.ops[0]);
 
     // Concurrent adds
@@ -183,16 +183,16 @@ test('Concurrent adds at same position converge', () => {
 });
 
 test('Concurrent update (LWW)', () => {
-    const doc1 = new CollabJSON();
+    const doc1 = new CollabJSON({clientId: 'c1'});
     doc1.addItem([0], { text: 'original' });
-    const doc2 = new CollabJSON();
+    const doc2 = new CollabJSON({id: doc1.id, clientId: 'c2'});
     doc2.applyOp(doc1.ops[0]);
 
     // Concurrent updates. Force clock to determine winner.
-    doc1.clock = 10;
+    doc1.root.clock = 10;
     doc1.updateItem([0], { text: 'update from 1' }); // This one is later
     const op1 = doc1.ops[doc1.ops.length - 1];
-    doc2.clock = 5;
+    doc2.root.clock = 5;
     doc2.updateItem([0], { text: 'update from 2' }); // This one is earlier
     const op2 = doc2.ops[doc2.ops.length - 1];
 
@@ -205,16 +205,16 @@ test('Concurrent update (LWW)', () => {
 });
 
 test('Concurrent delete and update converge', () => {
-    const doc1 = new CollabJSON();
+    const doc1 = new CollabJSON({clientId: 'c1'});
     doc1.addItem([0], { text: 'original' });
-    const doc2 = new CollabJSON();
+    const doc2 = new CollabJSON({id: doc1.id, clientId: 'c2'});
     doc2.applyOp(doc1.ops[0]);
 
     // Concurrent update and delete
-    doc1.clock = 10;
+    doc1.root.clock = 10;
     doc1.deleteItem([0]); // delete wins (later timestamp)
     const op1 = doc1.ops[doc1.ops.length - 1];
-    doc2.clock = 5;
+    doc2.root.clock = 5;
     doc2.updateItem([0], { text: 'update from 2' });
     const op2 = doc2.ops[doc2.ops.length - 1];
 
@@ -252,8 +252,9 @@ test('getSyncRequest is repeatable', () => {
 });
 
 test('applySyncResponse is idempotent', () => {
-    const client = new CollabJSON();
-    const server = new CollabJSON({ clientId: 'server' });
+    const docId = 'doc1';
+    const client = new CollabJSON({ id: docId });
+    const server = new CollabJSON({ clientId: 'server', id: docId });
 
     client.addItem([0], { text: 'a' });
     const request = client.getSyncRequest();
@@ -272,9 +273,10 @@ test('applySyncResponse is idempotent', () => {
 });
 
 test('Full client-server-client sync cycle', () => {
-    const server = new CollabJSON({ clientId: 'server' });
-    const client1 = new CollabJSON({ clientId: 'c1' });
-    const client2 = new CollabJSON({ clientId: 'c2' });
+    const docId = 'doc1';
+    const server = new CollabJSON({ clientId: 'server', id: docId });
+    const client1 = new CollabJSON({ clientId: 'c1', id: docId });
+    const client2 = new CollabJSON({ clientId: 'c2', id: docId });
 
     // C1 adds item, syncs with server
     client1.addItem([0], { text: 'from c1' });
@@ -308,9 +310,10 @@ test('Full client-server-client sync cycle', () => {
 });
 
 test('Concurrent changes from two clients converge', () => {
-    const server = new CollabJSON({ clientId: 'server' });
-    const client1 = new CollabJSON({ clientId: 'c1' });
-    const client2 = new CollabJSON({ clientId: 'c2' });
+    const docId = 'doc1';
+    const server = new CollabJSON({ clientId: 'server', id: docId });
+    const client1 = new CollabJSON({ clientId: 'c1', id: docId });
+    const client2 = new CollabJSON({ clientId: 'c2', id: docId });
 
     // C1 and C2 both add an item offline
     client1.addItem([0], { text: 'from c1' });
@@ -337,9 +340,10 @@ test('Concurrent changes from two clients converge', () => {
 });
 
 test('addItem with nested CollabJSON syncs correctly', () => {
-    const server = new CollabJSON({ clientId: 'server' });
-    const client1 = new CollabJSON({ clientId: 'c1' });
-    const client2 = new CollabJSON({ clientId: 'c2' });
+    const docId = 'doc1';
+    const server = new CollabJSON({ clientId: 'server', id: docId });
+    const client1 = new CollabJSON({ clientId: 'c1', id: docId });
+    const client2 = new CollabJSON({ clientId: 'c2', id: docId });
 
     // C1 adds a nested doc
     const nested = new CollabJSON();

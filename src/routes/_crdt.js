@@ -69,7 +69,7 @@ export class CollabJSON {
 
   _applyAndStore(op) {
     op.clientId = this.root.clientId;
-    this.applyOp(op);
+    this.root.applyOp(op);
     this.root.ops.push(op);
   }
 
@@ -140,11 +140,21 @@ export class CollabJSON {
     const itemData = item.data;
 
     if (itemData instanceof CollabJSON) {
-        const newDoc = new CollabJSON();
-        // Deep copy of items and ops
-        newDoc.items = new Map(JSON.parse(JSON.stringify(Array.from(itemData.items))));
-        newDoc.ops = JSON.parse(JSON.stringify(itemData.ops));
-        newDoc.clock = itemData.clock;
+        const newDoc = new CollabJSON({ id: itemData.id });
+        const data = itemData.getData();
+
+        function build(doc, data) {
+            data.forEach((item, index) => {
+                if (Array.isArray(item)) {
+                    const nested = new CollabJSON();
+                    doc.addItem([index], nested);
+                    build(nested, item);
+                } else {
+                    doc.addItem([index], item);
+                }
+            });
+        }
+        build(newDoc, data);
         return newDoc;
     }
     return itemData;
@@ -176,13 +186,6 @@ export class CollabJSON {
       timestamp: this._tick(),
     };
     container._applyAndStore(op);
-
-    if (data instanceof CollabJSON) {
-        data.ops.forEach(childOp => {
-            // Simply append ops. Assumes item IDs are universally unique.
-            container.ops.push(childOp);
-        });
-    }
   }
 
   updateItem(path, newData) {
