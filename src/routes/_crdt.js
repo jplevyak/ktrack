@@ -434,6 +434,9 @@ export class CollabJSON {
 
     ops.forEach(op => this.applyOp(op));
     this.dvv = new Map(Object.entries(dvv));
+
+    // Prune local ops that have been acknowledged by the server
+    this.ops = this.ops.filter(op => op.timestamp > (this.dvv.get(this.clientId) || 0));
   }
 
   getSyncResponse({ dvv: clientDvv, ops: clientOps, clientId }) {

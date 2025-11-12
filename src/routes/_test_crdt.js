@@ -386,6 +386,35 @@ test('addItem with nested CollabJSON syncs correctly', () => {
 });
 
 
+test('Client ops are pruned after successful sync', () => {
+    const docId = 'prune-ops-doc';
+    const server = new CollabJSON({ clientId: 'server', id: docId });
+    const client = new CollabJSON({ clientId: 'c1', id: docId });
+
+    // 1. Client creates an operation
+    client.addItem([0], { text: 'op1' });
+    assert.strictEqual(client.ops.length, 1);
+
+    // 2. Client syncs with server
+    const req1 = client.getSyncRequest();
+    const res1 = server.getSyncResponse(req1);
+    
+    // 3. Client applies response
+    client.applySyncResponse(res1);
+
+    // 4. Assert local ops are pruned
+    assert.strictEqual(client.ops.length, 0, 'Ops should be pruned after sync');
+
+    // 5. Client creates another op to ensure log is still functional
+    client.addItem([0], { text: 'op2' });
+    assert.strictEqual(client.ops.length, 1);
+
+    const req2 = client.getSyncRequest();
+    assert.strictEqual(req2.ops.length, 1, 'New sync request should contain only the new op');
+    assert.strictEqual(req2.ops[0].data.text, 'op2');
+});
+
+
 test('Sync with a pruned server sends snapshot', () => {
     const docId = 'prune-doc';
     let server = new CollabJSON({ clientId: 'server', id: docId });
