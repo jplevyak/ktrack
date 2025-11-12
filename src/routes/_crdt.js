@@ -344,6 +344,48 @@ export class CollabJSON {
     }
   }
 
+  // --- Persistence Methods ---
+
+  toJSON() {
+    if (this.root !== this) throw new Error('toJSON can only be called on the root document.');
+    return {
+      id: this.id,
+      history: this.history,
+      dvv: Object.fromEntries(this.dvv),
+      snapshot: this.snapshot,
+      snapshotDvv: Object.fromEntries(this.snapshotDvv),
+    };
+  }
+
+  static fromJSON(state, options = {}) {
+    const doc = new CollabJSON({ ...options, id: state ? state.id : undefined });
+    if (state) {
+        if (state.snapshot) {
+            const tempDoc = new CollabJSON({ clientId: doc.clientId });
+            function build(d, data) {
+                data.forEach((item, index) => {
+                    if (Array.isArray(item)) {
+                        const nested = new CollabJSON();
+                        d.addItem([index], nested);
+                        build(nested, item);
+                    } else {
+                        d.addItem([index], item);
+                    }
+                });
+            }
+            build(tempDoc, state.snapshot);
+            doc.items = tempDoc.items;
+            doc.snapshot = state.snapshot;
+            doc.snapshotDvv = new Map(Object.entries(state.snapshotDvv || {}));
+        }
+        
+        doc.history = state.history || [];
+        doc.dvv = new Map(Object.entries(state.dvv || {}));
+        doc.history.forEach(op => doc.applyOp(op));
+    }
+    return doc;
+  }
+
   // --- DVV Sync Methods ---
 
   getSyncRequest() {

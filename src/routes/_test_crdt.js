@@ -388,7 +388,7 @@ test('addItem with nested CollabJSON syncs correctly', () => {
 
 test('Sync with a pruned server sends snapshot', () => {
     const docId = 'prune-doc';
-    const server = new CollabJSON({ clientId: 'server', id: docId });
+    let server = new CollabJSON({ clientId: 'server', id: docId });
     const client1 = new CollabJSON({ clientId: 'c1', id: docId });
     const client2 = new CollabJSON({ clientId: 'c2', id: docId }); // New client
 
@@ -408,6 +408,10 @@ test('Sync with a pruned server sends snapshot', () => {
     server.prune((doc) => {}); // Dummy prune function
     assert.strictEqual(server.history.length, 0);
     assert.ok(server.snapshot);
+
+    // Simulate saving and reloading server state from DB
+    const serverState = server.toJSON();
+    server = CollabJSON.fromJSON(serverState, { clientId: 'server' });
 
     // Now, new client (client2) tries to sync. It has an empty DVV.
     const req2 = client2.getSyncRequest();

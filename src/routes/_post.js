@@ -18,36 +18,9 @@ export async function do_post_internal(req, data, username, db, prune) {
     }
   }
 
-  let server_doc_state;
-  if (db_value_str) {
-    server_doc_state = JSON.parse(db_value_str);
-  }
+  const server_doc_state = db_value_str ? JSON.parse(db_value_str) : null;
   
-  const server_doc = new CollabJSON({ clientId: 'server', id: server_doc_state ? server_doc_state.id : undefined });
-  if (server_doc_state) {
-    if (server_doc_state.snapshot) {
-        const tempDoc = new CollabJSON({clientId: 'server'});
-        function build(doc, data) {
-            data.forEach((item, index) => {
-                if (Array.isArray(item)) {
-                    const nested = new CollabJSON();
-                    doc.addItem([index], nested);
-                    build(nested, item);
-                } else {
-                    doc.addItem([index], item);
-                }
-            });
-        }
-        build(tempDoc, server_doc_state.snapshot);
-        server_doc.items = tempDoc.items;
-        server_doc.snapshot = server_doc_state.snapshot;
-        server_doc.snapshotDvv = new Map(Object.entries(server_doc_state.snapshotDvv || {}));
-    }
-    
-    server_doc.history = server_doc_state.history || [];
-    server_doc.dvv = new Map(Object.entries(server_doc_state.dvv || {}));
-    server_doc.history.forEach(op => server_doc.applyOp(op));
-  }
+  const server_doc = CollabJSON.fromJSON(server_doc_state, { clientId: 'server' });
 
   // Prune if a prune function is provided and history is long
   if (prune && server_doc.history.length > 100) {
@@ -56,14 +29,7 @@ export async function do_post_internal(req, data, username, db, prune) {
 
   const sync_response = server_doc.getSyncResponse(data);
 
-  const new_server_state = {
-    id: server_doc.id,
-    history: server_doc.history,
-    dvv: Object.fromEntries(server_doc.dvv),
-    snapshot: server_doc.snapshot,
-    snapshotDvv: Object.fromEntries(server_doc.snapshotDvv),
-  };
-  await db.put(username, JSON.stringify(new_server_state));
+  await db.put(username, JSON.stringify(server_doc.toJSON()));
 
   return new Response(JSON.stringify(sync_response));
 }
