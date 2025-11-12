@@ -39,15 +39,22 @@ export class CollabJSON {
   _getSortedItems() {
     return Array.from(this.items.values())
       .filter(item => !item._deleted)
-      .sort((a, b) => a.sortKey - b.sortKey);
+      .sort((a, b) => {
+        if (a.sortKey !== b.sortKey) {
+          return a.sortKey - b.sortKey;
+        }
+        // Tie-break with item ID for deterministic ordering
+        return a.id < b.id ? -1 : 1;
+      });
   }
 
   _findSortKeys(list, index) {
+    if (index > list.length) index = list.length;
     const prevItem = list[index - 1] || null;
     const nextItem = list[index] || null;
 
     const prevKey = prevItem ? prevItem.sortKey : null;
-    const nextKey = nextItem ? nextKey.sortKey : null;
+    const nextKey = nextItem ? nextItem.sortKey : null;
 
     return { prevKey, nextKey };
   }
