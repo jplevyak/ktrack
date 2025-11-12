@@ -1,6 +1,7 @@
 import LevelPkg from "level";
 const { Level } = LevelPkg;
 import { error } from "@sveltejs/kit";
+import { CollabJSON } from "./_crdt.js";
 
 export var profile = new Level("./profile");
 
@@ -14,40 +15,40 @@ export async function do_post_internal(
   make,
   finalize
 ) {
-  let value = await db.get(username);
-  var result = ""; // request nothing.
-  if (value != undefined) {
-    value = JSON.parse(value);
-    if (value == undefined) {
-      console.log("bad json");
+  let db_value_str;
+  try {
+    db_value_str = await db.get(username);
+  } catch (e) {
+    // 'not-found' error indicates the key is not in the database
+    if (e.code === 'LEVEL_NOT_FOUND') {
+      db_value_str = undefined;
+    } else {
+      throw e;
     }
   }
-  if (data.value == undefined) {
-    // nothing sent and/or status request
-    if (value == undefined) {
-      result = make(); // request all
-      delete result.updated;
-    } else if (data.updated != value.updated) {
-      result = value; // send what we have
-    } else {
-      result = ""; // we are up to date, do nothing
-    }
-  }  else {
-    // update sent
-    if (value != undefined)
-      result = merge(value, data.value);
-    else
-      result = data.value;
-    // store if we have nothing or if it is different
-    if (value == undefined || data.updated != result.updated || result.updated != value.updated) {
-      let string_value = JSON.stringify(result);
-      await db.put(username, string_value);
-    } else {
-      result = ""; // we have nothing to add, send nothing
-    }
+
+  let server_doc_state;
+  if (db_value_str) {
+    server_doc_state = JSON.parse(db_value_str);
   }
-  if (finalize != undefined) result = finalize(result);
-  return new Response(JSON.stringify({ value: result }));
+  
+  const server_doc = new CollabJSON({ clientId: 'server', id: server_doc_state ? server_doc_state.id : undefined });
+  if (server_doc_state) {
+    server_doc.history = server_doc_state.history;
+    server_doc.dvv = new Map(Object.entries(server_doc_state.dvv));
+    server_doc.history.forEach(op => server_doc.applyOp(op));
+  }
+
+  const sync_response = server_doc.getSyncResponse(data);
+
+  const new_server_state = {
+    id: server_doc.id,
+    history: server_doc.history,
+    dvv: Object.fromEntries(server_doc.dvv),
+  };
+  await db.put(username, JSON.stringify(new_server_state));
+
+  return new Response(JSON.stringify(sync_response));
 }
 
 export async function do_post(req, db, title, merge, make, finalize) {
