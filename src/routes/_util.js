@@ -26,13 +26,29 @@ months[9] = "October";
 months[10] = "November";
 months[11] = "December";
 
+function _get_date_info(day) {
+    if (!day || !day.getData) return null;
+    const items = day.getData();
+    if (!items || items.length === 0) return null;
+    // Assume date info is an item that has a 'year' property and no 'mcg' property.
+    return items.find(item => typeof item.year !== 'undefined' && typeof item.mcg === 'undefined');
+}
+
 export function compare_date(d1, d2) {
-  if (d1.year > d2.year) return 1;
-  if (d1.year < d2.year) return -1;
-  if (d1.month > d2.month) return 1;
-  if (d1.month < d2.month) return -1;
-  if (d1.date > d2.date) return 1;
-  if (d1.date < d2.date) return -1;
+  const d1_info = _get_date_info(d1);
+  const d2_info = _get_date_info(d2);
+
+  if (!d1_info || !d2_info) {
+    if (d1_info === d2_info) return 0;
+    return d1_info ? 1 : -1;
+  }
+
+  if (d1_info.year > d2_info.year) return 1;
+  if (d1_info.year < d2_info.year) return -1;
+  if (d1_info.month > d2_info.month) return 1;
+  if (d1_info.month < d2_info.month) return -1;
+  if (d1_info.date > d2_info.date) return 1;
+  if (d1_info.date < d2_info.date) return -1;
   return 0;
 }
 
@@ -82,21 +98,31 @@ export function load_async(
 export function make_today() {
   let the_date = new Date();
   const doc = new CollabJSON();
-  doc.year = the_date.getFullYear();
-  doc.month = the_date.getMonth();
-  doc.date = the_date.getDate();
-  doc.day = the_date.getDay();
+  doc.addItem([0], {
+    year: the_date.getFullYear(),
+    month: the_date.getMonth(),
+    date: the_date.getDate(),
+    day: the_date.getDay(),
+  });
   return doc;
 }
 
 export function make_historical_day(d, days_ago) {
-  let the_date = new Date(d.year, d.month, d.date);
+  const d_info = _get_date_info(d);
+  if (!d_info) {
+    // Cannot create a historical day from a document without date info.
+    // Return an empty doc as a fallback.
+    return new CollabJSON();
+  }
+  let the_date = new Date(d_info.year, d_info.month, d_info.date);
   the_date = new Date(the_date.getTime() - days_ago * 24 * 3600 * 1000);
   const doc = new CollabJSON();
-  doc.year = the_date.getFullYear();
-  doc.month = the_date.getMonth();
-  doc.date = the_date.getDate();
-  doc.day = the_date.getDay();
+  doc.addItem([0], {
+    year: the_date.getFullYear(),
+    month: the_date.getMonth(),
+    date: the_date.getDate(),
+    day: the_date.getDay(),
+  });
   return doc;
 }
 
@@ -151,8 +177,9 @@ export function merge_profile(l1, l2) {
 }
 
 export function date_key(i) {
-  if (!i || typeof i.year === 'undefined') return 0;
-  return new Date(i.year, i.month, i.date).getTime();
+  const date_info = _get_date_info(i);
+  if (!date_info) return 0;
+  return new Date(date_info.year, date_info.month, date_info.date).getTime();
 }
 
 export function compute_averages(h) {
