@@ -122,13 +122,13 @@ export async function sync_profile(profile) {
     value: profile,
   };
   try {
-    const response = await fetch('/api/' + name, {
+    const response = await fetch('/api/profile', {
       method: "POST",
       body: JSON.stringify(data),
       headers: { "Content-Type": "application/json" },
     });
     if (!response.ok) {
-      console.log("profile not-ok", r.status, r.statusText);
+      console.log("profile not-ok", response.status, response.statusText);
       profile_store.set(profile);
       return false;
     }
@@ -136,7 +136,7 @@ export async function sync_profile(profile) {
       const data = await response.json();
       if (data.err) {
         console.log("profile err", data.err);
-        localStorage.setItem('profile', profile);
+        localStorage.setItem('profile', JSON.stringify(profile));
         return false;
       }
       let p = data.value;
@@ -145,15 +145,15 @@ export async function sync_profile(profile) {
       if (p.authenticated) {
         profile.old_password = "";
       }
-      localStorage.setItem('profile', profile);
-    } catch((err) => {
+      localStorage.setItem('profile', JSON.stringify(profile));
+    } catch (err) {
       console.log("JSON error", err.message);
-      localStorage.setItem('profile', profile);
+      localStorage.setItem('profile', JSON.stringify(profile));
       return false;
     }
-  } catch((err) => {
+  } catch (err) {
     console.log("POST error", err.message);
-    localStorage.setItem('profile', profile);
+    localStorage.setItem('profile', JSON.stringify(profile));
     return false;
   }
   return true;
@@ -171,7 +171,42 @@ export const online = readable(browser ? navigator.onLine : true, (set) => {
     window.removeEventListener('online', updateOnlineStatus);
     window.removeEventListener('offline', updateOnlineStatus);
   };
-};
+});
+
+function local_writable(key, initialValue) {
+    let storedValue = initialValue;
+    if (browser) {
+        const fromStorage = localStorage.getItem(key);
+        if (fromStorage && fromStorage !== 'undefined') {
+            try {
+                storedValue = JSON.parse(fromStorage);
+            } catch(e) {
+                console.error(`Could not parse stored value for ${key}`, e);
+            }
+        }
+    }
+
+    const { subscribe, set, update } = writable(storedValue);
+
+    return {
+        subscribe,
+        set: (value) => {
+            if (browser) {
+                localStorage.setItem(key, JSON.stringify(value));
+            }
+            set(value);
+        },
+        update: (fn) => {
+            update(currentValue => {
+                const newValue = fn(currentValue);
+                if (browser) {
+                    localStorage.setItem(key, JSON.stringify(newValue));
+                }
+                return newValue;
+            });
+        }
+    };
+}
 
 export const index_store = writable(undefined);
 export const edit_store = local_writable("edit", undefined);
