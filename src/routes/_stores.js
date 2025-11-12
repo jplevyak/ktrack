@@ -1,4 +1,5 @@
-import { writable as internal, get as get_internal } from "svelte/store";
+import { readable, writable/, get } from "svelte/store";
+import { browser } from '$app/environment';
 import {
   compare_date,
   merge_items,
@@ -10,62 +11,246 @@ import {
   make_history,
   make_historical_day,
   make_profile,
+  date_key,
 } from "./_util.js";
-import { v4 as uuidv4 } from 'uuid';
 
-const check_sync_interval = 0 * 1000; // 0 seconds.
-
-export function local_writable(key, initialValue) {
-  const store = internal(initialValue);
-  const { subscribe, set, update } = store;
-  var json = undefined;
-  if (typeof window != "undefined") json = localStorage.getItem(key);
-  if (json) {
-    try {
-      set(JSON.parse(json));
-    } catch (e) {
-      set(initialValue);
-    }
-  }
-  return {
-    set(value) {
-      if (typeof window != "undefined")
-        localStorage.setItem(key, JSON.stringify(value));
-      set(value);
-    },
-    update(cb) {
-      let v;
-      update(function (x) {
-        v = cb(x);
-        return v;
-      });
-      if (typeof window != "undefined")
-        localStorage.setItem(key, JSON.stringify(v));
-    },
-    subscribe,
+function debounce(func, wait) {
+  let timeout;
+  return function(...args) {
+    const context = this;
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(context, args), wait);
   };
 }
 
-export function save_history(day, profile) {
-  if (day == undefined) return;
-  var h = { updated: day.updated, items: [day, make_historical_day(day, 1)] };
-  history_store.update(function (history) {
-    let new_history = merge_history(history, h);
-    if (new_history.updated != history.updated) {
-      sync_history(new_history, profile, true);
-      return new_history;
+export function synced_store(key, initialValue, sync) {
+  const SYNC_INTERVAL = 1000 * 60 * 5; // 5 minutes
+  const DEBOUNCE_WAIT = 2000; // 2 seconds
+
+  const dirtyKey = `${key}:dirty`;
+
+  let storedValue = initialValue;
+
+  if (browser) {
+    const fromStorage = localStorage.getItem(key);
+    if (fromStorage) {
+      storedValue = JSON.parse(fromStorage);
     }
-    return history;
-  });
+    isDirty = localStorage.getItem(dirtyKey) === 'true';
+  }
+
+  const status = writable(isDirty ? 'dirty' : 'idle');
+
+  const { subscribe, set: svelteSet, update: svelteUpdate } = writable(storedValue);
+
+  async function syncToServer() {
+    if (!browser || !isDirty || !get(online)) {
+      if (isDirty && !get(online)) {
+        status.set('error');
+      }
+      return;
+    }
+
+    console.log('Syncing to server...');
+    status.set('syncing');
+
+    try {
+      const currentValue = get({ subscribe });
+      const ok = await sync(current_value);
+
+      if (!ok) throw new Error('Server sync failed');
+
+      isDirty = false;
+      if (browser) localStorage.setItem(dirtyKey, 'false');
+      status.set('idle');
+      console.log('Sync successful');
+
+    } catch (error) {
+      console.error(error.message);
+      status.set('error');
+    }
+  }
+
+  const debouncedSync = debounce(syncToServer, DEBOUNCE_WAIT);
+
+  const set = (newValue) => {
+    if (browser) {
+      localStorage.setItem(key, JSON.stringify(newValue));
+      localStorage.setItem(dirtyKey, 'true');
+    }
+    isDirty = true;
+    status.set('dirty');
+    svelteSet(newValue);
+    debouncedSync();
+  };
+
+  const update = (updater) => {
+    set(updater(get({ subscribe })));
+  };
+
+  if (browser) {
+    if (isDirty) {
+      syncToServer();
+    }
+    const intervalId = setInterval(syncToServer, SYNC_INTERVAL);
+  }
+
+  return {
+    subscribe,
+    set,
+    update,
+    status: {
+      subscribe: status.subscribe
+    }
+  };
 }
 
-export const today_store = local_writable("today", make_today());
-export const favorites_store = local_writable("favorites", make_favorites());
-export const history_store = local_writable("history", make_history());
-export const profile_store = local_writable("profile", make_profile());
+export async function sync_profile(profile) {
+  if (profile.password == "") {
+    profile_store.set(make_profile());
+    console.log("logout");
+    return;
+  }
+  let data = {
+    username: profile.username,
+    password: profile.password,
+    value: profile,
+  };
+  try {
+    const response = await fetch('/api/' + name, {
+      method: "POST",
+      body: JSON.stringify(data),
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!response.ok) {
+      console.log("profile not-ok", r.status, r.statusText);
+      profile_store.set(profile);
+      return false;
+    }
+    try {
+      const data = aweait r.json();
+      if (data.err) {
+        console.log("profile err", data.err);
+        localStorage.setItem('profile', profile);
+        return false;
+      }
+      let p = data.value;
+      profile.message = p.message;
+      profile.authenticated = p.authenticated;
+      if (p.authenticated) {
+        profile.old_password = "";
+      }
+      localStorage.setItem('profile', profile);
+    } catch((err) => {
+      console.log("JSON error", err.message);
+      localStorage.setItem('profile', profile);
+      return false;
+    }
+  } catch((err) => {
+    console.log("POST error", err.message);
+    localStorage.setItem('profile', profile);
+    return false;
+  }
+  return true;
+}
+
+export const online = readable(browser ? navigator.onLine : true, (set) => {
+  if (!browser) return;
+
+  const updateOnlineStatus = () => set(navigator.onLine);
+
+  window.addEventListener('online', updateOnlineStatus);
+  window.addEventListener('offline', updateOnlineStatus);
+
+  return () => {
+    window.removeEventListener('online', updateOnlineStatus);
+    window.removeEventListener('offline', updateOnlineStatus);
+  };
+};
+
+export const index_store = writable(undefined);
 export const edit_store = local_writable("edit", undefined);
-export const site_id_store = local_writable(uuidv4());
-export const index_store = internal(undefined);
+export const profile_store = synced_store("profile", make_profile(), sync_profile);
+
+async function sync_internal(v, key, get_updates, do_merge) {
+  v.server_checked = Date.now();
+  const profile = get(profile_store);
+  if (profile == undefined || profile.authenticated == undefined) {
+    return false;
+  }
+  var data = {
+    username: profile.username,
+    password: profile.password,
+    updates: get_updates(v),
+  };
+  try {
+    const response = await fetch('/api/' + name, {
+      method: "POST",
+      body: JSON.stringify(data),
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!response.ok) {
+      console.log("not-ok", name, r.status, r.statusText);
+      return false;
+    }
+    try { 
+      const data = await response.json();
+      if (data.err) {
+        console.log("backup err", name, data.err);
+        return false;
+      }
+      let backup = data.value;
+      if (backup == "") {
+        v.server_synced = Date.now();
+        return true;
+      }
+      let merged = do_merge(l, backup);
+        merged.server_checked = v.server_checked;
+        merged.server_synced = Date.now();
+        if (merged.updated != v.updated) {
+          localStorage.setItem(key, merged);
+        }
+      } else {
+        v.server_synced = v.server_synced;
+      }
+    } catch((err) => {
+      console.log(name, "JSON error", err.message);
+      return false;
+    }
+  } catch((err) => {
+    console.log(name, "POST error", err.message);
+    return false;
+  }
+  return true;
+}
+
+function get_simple_updates(v) {
+  return { clock: v.items.clock, ops: v.items.ops };
+}
+
+async function sync_today(today) {
+  return await sync_internal(today, "today", merge_day, get_simple_updates);
+}
+
+async function sync_favorites(favorites) {
+  return await sync_internal(favorites, "favorites", merge_items, get_simple_updates);
+}
+
+function get_history_updates(h) {
+  let updates = [];
+  for (d in h.items) {
+    updates.push({ key: date_key(d), clock: d.items.clock, ops: d.items.ops });
+  }
+  return updates;
+}
+
+export function sync_history(history) {
+  return await sync_internal(history, "history", merge_history, get_history_updates);
+}
+
+export const today_store = synced_store("today", make_today(), sync_today);
+export const favorites_store = synced_store("favorites", make_favorites(), sync_favorites);
+export const history_store = synced_store("history", make_history(), sync_history);
 
 export function add_item(item, today, edit, profile) {
   if (edit != undefined) {
@@ -110,192 +295,23 @@ export function add_item(item, today, edit, profile) {
   });
 }
 
+export function save_history(day, profile) {
+  if (day == undefined) return;
+  var h = { updated: day.updated, items: [day, make_historical_day(day, 1)] };
+  history_store.update(function (history) {
+    let new_history = merge_history(history, h);
+    if (new_history.updated != history.updated) {
+      sync_history(new_history, profile, true);
+      return new_history;
+    }
+    return history;
+  });
+}
+
 export function save_today(today, profile) {
   today_store.set(today);
   sync_today(today, profile, true);
   save_history(today, profile);
-}
-
-function sync_internal(
-  l,
-  name,
-  store,
-  merge,
-  profile,
-  item_limit = undefined,
-  update = false
-) {
-  if (profile == undefined || profile.authenticated == undefined) {
-    return;
-  }
-  var data = {
-    username: profile.username,
-    password: profile.password,
-    updated: l.updated,
-  };
-  if (update) {
-    let ll = l;
-    if (ll.items != undefined && item_limit) {
-      if (item_limit != undefined) {
-        ll = { ...l }; // shallow copy
-        ll.items = ll.items.slice(0, item_limit);
-      }
-    }
-    data.value = ll;
-  }
-  fetch('/api/' + name, {
-    method: "POST",
-    body: JSON.stringify(data),
-    headers: { "Content-Type": "application/json" },
-  })
-    .then((r) => {
-      if (!r.ok) {
-        console.log("not-ok", name, r.status, r.statusText);
-        return;
-      }
-      r.json()
-        .then((data) => {
-          if (data.err) {
-            console.log("backup err", name, data.err);
-            return;
-          }
-          let backup = data.value;
-          if (backup == "") {
-            l.server_synced = Date.now();
-            return;
-          }
-          let merged = merge(l, backup);
-          merged.server_checked = l.server_checked;
-          merged.server_synced = Date.now();
-          if (merged.updated != l.updated) {
-            store.set(merged);
-          } else {
-            l.server_synced = l.server_synced;
-          }
-          if (merged.updated != backup.updated) {
-            sync_internal(
-              merged,
-              name,
-              store,
-              merge,
-              profile,
-              item_limit,
-              true
-            );
-          }
-        })
-        .catch((err) => {
-          console.log(name, "JSON error", err.message);
-        });
-    })
-    .catch((err) => {
-      console.log(name, "POST error", err.message);
-    });
-}
-
-export function sync_today(today, profile, force = false) {
-  if (today.server_checked == undefined)
-    today.server_checked = Date.now() - check_sync_interval;
-  if (!force && Date.now() - today.server_checked < check_sync_interval) {
-    return;
-  }
-  today.server_checked = Date.now();
-  sync_internal(
-    today,
-    "today",
-    today_store,
-    merge_day,
-    profile,
-    undefined,
-    force
-  );
-}
-
-export function sync_favorites(favorites, profile, force = false) {
-  if (favorites.server_checked == undefined)
-    favorites.server_checked = Date.now() - check_sync_interval;
-  if (!force && Date.now() - favorites.server_checked < check_sync_interval)
-    return;
-  favorites.server_checked = Date.now();
-  sync_internal(
-    favorites,
-    "favorites",
-    favorites_store,
-    merge_items,
-    profile,
-    undefined,
-    force
-  );
-}
-
-export function sync_history(history, profile, force = false) {
-  if (history.server_checked == undefined)
-    history.server_checked = Date.now() - check_sync_interval;
-  if (history.items.length > 0) {
-    history.updated = history.items[0].updated;
-  }
-  if (!force && Date.now() - history.server_checked <= check_sync_interval) {
-    return;
-  }
-  history.server_checked = Date.now();
-  sync_internal(
-    history,
-    "history",
-    history_store,
-    merge_history,
-    profile,
-    merge_history_limit,
-    force
-  );
-}
-
-export function save_profile(profile) {
-  if (profile.password == "") {
-    profile_store.set(make_profile());
-    console.log("logout");
-    return;
-  }
-  let name = "profile";
-  let data = {
-    username: profile.username,
-    password: profile.password,
-    value: profile,
-  };
-  fetch('/api/' + name, {
-    method: "POST",
-    body: JSON.stringify(data),
-    headers: { "Content-Type": "application/json" },
-  })
-    .then((r) => {
-      if (!r.ok) {
-        console.log("profile not-ok", r.status, r.statusText);
-        profile_store.set(profile);
-        return;
-      }
-      r.json()
-        .then((data) => {
-          if (data.err) {
-            console.log("profile err", data.err);
-            profile_store.set(profile);
-            return;
-          }
-          let p = data.value;
-          profile.message = p.message;
-          profile.authenticated = p.authenticated;
-          if (p.authenticated) {
-            profile.old_password = "";
-          }
-          profile_store.set(profile);
-        })
-        .catch((err) => {
-          console.log("JSON error", err.message);
-          profile_store.set(profile);
-        });
-    })
-    .catch((err) => {
-      console.log("POST error", err.message);
-      profile_store.set(profile);
-    });
 }
 
 export function save_favorite(item, profile, replace_index) {
@@ -326,19 +342,6 @@ export function save_favorite(item, profile, replace_index) {
   });
 }
 
-export function logout() {
-  profile_store.set(make_profile());
-  today_store.set(make_today());
-  favorites_store.set(make_favorites());
-  history_store.set(make_history());
-}
-
-export function reset_data() {
-  today_store.set(make_today(true));
-  favorites_store.set(make_favorites(true));
-  history_store.set(make_history(true));
-}
-
 export function check_for_new_day(t, profile) {
   let new_day = make_today();
   if (t.year == undefined || compare_date(t, new_day) < 0) {
@@ -347,3 +350,11 @@ export function check_for_new_day(t, profile) {
   }
   return t;
 }
+
+export function logout() {
+  profile_store.set(make_profile());
+  today_store.set(make_today());
+  favorites_store.set(make_favorites());
+  history_store.set(make_history());
+}
+

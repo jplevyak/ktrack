@@ -178,6 +178,9 @@
   <title>KTrack - Day</title>
 </svelte:head>
 
+{#if $today_store.status != 'idle'}
+  <span>🟡 Unsaved changes: {$today_store.status} </span>
+{/if}
 Averages [3, 5, 7] days: [{averages[0].toFixed(1)}, {averages[1].toFixed(1)}, {averages[2].toFixed(
   1
 )}]<br />

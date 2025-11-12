@@ -183,12 +183,12 @@ export function merge_profile(l1, l2) {
 }
 
 // merge d2 ops into d1
-export function merge_items(d1, d2) {
-  for (op in d2.items.ops) {
-    d1.items.applyOp(op);
-    d1.synced = Math.max(d1.synced, op.timestamp);
+export function merge_items(d, ops) {
+  for (op in ops) {
+    d.items.applyOp(op);
+    d.synced = Math.max(d1.synced, op.timestamp);
   }
-  d1.updated = d1.items.clock;
+  d1.updated = d.items.clock;
 }
 
 export function merge_day(d1, d2) {

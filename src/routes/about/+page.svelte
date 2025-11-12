@@ -4,7 +4,7 @@
     logout,
     reset_data,
     profile_store,
-    save_profile,
+    sync_profile,
     today_store,
     sync_today,
     favorites_store,
@@ -60,21 +60,21 @@
     reset_data();
   }
 
-  function force_sync() {
-    sync_today(today, profile, true);
-    sync_favorites(favorites, profile, true);
-    sync_history(history, profile, true);
+  async function force_sync() {
+    await sync_today(today);
+    await sync_favorites(favorites);
+    await sync_history(history);
     today = today;
     favorites = favorites;
     history = history;
   }
 
-  onMount(() => {
+  onMount(async () => {
     let username_input = document.getElementById("username");
     let password_input = document.getElementById("password");
     let old_password_input = document.getElementById("old_password");
     let save = document.getElementById("save");
-    function changed() {
+    function async changed() {
       if (profile == undefined) {
         console.log("profile undefined");
         return;
@@ -91,7 +91,8 @@
         profile.password = password_input.value;
         profile.old_password = old_password_input.value;
         profile.updated = Date.now();
-        save_profile(profile);
+        await sync_profile(profile);
+        profile = profile;
         force_sync();
       }
     }
