@@ -146,6 +146,27 @@ test('getItem', () => {
     assert.deepStrictEqual(doc.getData(), [{ text: 'a' }, [{ val: 1 }]]);
 });
 
+test('getItem, modify, and updateItem', () => {
+    const doc = new CollabJSON();
+    const nested = new CollabJSON();
+    nested.addItem([0], { val: 1 });
+    doc.addItem([0], nested);
+
+    // 1. Extract
+    const extracted = doc.getItem([0]);
+    assert.deepStrictEqual(extracted.getData(), [{ val: 1 }]);
+
+    // 2. Modify
+    extracted.addItem([1], { val: 2 });
+    assert.deepStrictEqual(extracted.getData(), [{ val: 1 }, { val: 2 }]);
+
+    // 3. Update
+    doc.updateItem([0], extracted);
+    
+    // 4. Assert
+    assert.deepStrictEqual(doc.getData(), [[{ val: 1 }, { val: 2 }]]);
+});
+
 
 // --- Synchronization Tests ---
 
