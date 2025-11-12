@@ -5,16 +5,7 @@ import { CollabJSON } from "./_crdt.js";
 
 export var profile = new Level("./profile");
 
-export async function do_post_internal(
-  req,
-  data,
-  username,
-  db,
-  title,
-  merge,
-  make,
-  finalize
-) {
+export async function do_post_internal(req, data, username, db) {
   let db_value_str;
   try {
     db_value_str = await db.get(username);
@@ -51,7 +42,7 @@ export async function do_post_internal(
   return new Response(JSON.stringify(sync_response));
 }
 
-export async function do_post(req, db, title, merge, make, finalize) {
+export async function do_post(req, db) {
   let data = await req.request.json();
   let username = data.username;
   let password = data.password;
@@ -81,14 +72,5 @@ export async function do_post(req, db, title, merge, make, finalize) {
     console.log("incorrect password");
     return new Response(JSON.stringify({ err: "incorrect password" }));
   }
-  return await do_post_internal(
-    req,
-    data,
-    username,
-    db,
-    title,
-    merge,
-    make,
-    finalize
-  );
+  return await do_post_internal(req, data, username, db);
 }
