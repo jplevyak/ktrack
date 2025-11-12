@@ -10,8 +10,6 @@ export class CollabJSON {
     this.items = new Map();
     this.id = options.id || uuidv4();
     this.root = options.root || this;
-    this.checked = undefined;
-    this.synced = undefined;
 
     if (this.root === this) {
       this.clientId = options.clientId || uuidv4();
@@ -129,7 +127,7 @@ export class CollabJSON {
 
   getData() {
     const sortedItems = this._getSortedItems();
-    let data = sortedItems.map(item => {
+    return sortedItems.map(item => {
       if (item.data instanceof CollabJSON) {
         return item.data.getData();
       }
@@ -352,6 +350,10 @@ export class CollabJSON {
     if (this.root !== this) throw new Error('toJSON can only be called on the root document.');
     return {
       id: this.id,
+      year: this.year,
+      month: this.month,
+      date: this.date,
+      day: this.day,
       history: this.history,
       dvv: Object.fromEntries(this.dvv),
       snapshot: this.snapshot,
@@ -362,6 +364,10 @@ export class CollabJSON {
   static fromJSON(state, options = {}) {
     const doc = new CollabJSON({ ...options, id: state ? state.id : undefined });
     if (state) {
+        doc.year = state.year;
+        doc.month = state.month;
+        doc.date = state.date;
+        doc.day = state.day;
         if (state.snapshot) {
             const tempDoc = new CollabJSON({ clientId: doc.clientId });
             function build(d, data) {
@@ -395,7 +401,6 @@ export class CollabJSON {
 
     const lastSeenBySystem = this.dvv.get(this.clientId) || 0;
     const newOps = this.ops.filter(op => op.timestamp > lastSeenBySystem);
-    this.checked = new Date().now();
     
     return {
       dvv: Object.fromEntries(this.dvv),
@@ -432,7 +437,6 @@ export class CollabJSON {
         });
         
         this.dvv = new Map(Object.entries(snapshotDvv));
-        this.synced = new Date().now();
         return;
     }
 
@@ -441,7 +445,6 @@ export class CollabJSON {
 
     // Prune local ops that have been acknowledged by the server
     this.ops = this.ops.filter(op => op.timestamp > (this.dvv.get(this.clientId) || 0));
-    this.synced = new Date().now();
   }
 
   getSyncResponse({ dvv: clientDvv, ops: clientOps, clientId }) {

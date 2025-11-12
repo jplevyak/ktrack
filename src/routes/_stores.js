@@ -3,10 +3,7 @@ import { browser } from '$app/environment';
 import { CollabJSON } from "./_crdt.js";
 import {
   compare_date,
-  merge_items,
-  merge_day,
   merge_history_limit,
-  merge_history,
   make_today,
   make_favorites,
   make_history,

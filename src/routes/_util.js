@@ -1,7 +1,7 @@
 import foods from "./_foods.json";
-import { CollabArray } from './_crdt.js';
+import { CollabJSON } from './_crdt.js';
 
-export const merge_history_limit = 10;
+export const merge_history_limit = 50;
 
 export const weekdays = new Array(7);
 weekdays[0] = "Sunday";
@@ -38,7 +38,8 @@ export function compare_date(d1, d2) {
 
 export function get_total(day) {
   let n = 0.0;
-  for (let f of day.items) {
+  if (!day || !day.getData) return n;
+  for (let f of day.getData()) {
     if (f.del == undefined && f.mcg != undefined) {
       n += f.mcg * f.servings;
     }
@@ -49,7 +50,8 @@ export function get_total(day) {
 export function get_total_fiber(day) {
   let n = 0.0;
   let unknown = false;
-  for (let f of day.items) {
+  if (!day || !day.getData) return [n, unknown];
+  for (let f of day.getData()) {
     if (f.del == undefined && f.mcg != undefined) {
       if (f.hasOwnProperty('fiber') && f.fiber != "") {
           n += f.fiber * f.servings;
@@ -79,41 +81,31 @@ export function load_async(
 
 export function make_today() {
   let the_date = new Date();
-  let items = new CollabArray();
-  return {
-    year: the_date.getFullYear(),
-    month: the_date.getMonth(),
-    date: the_date.getDate(),
-    day: the_date.getDay(),
-    items,
-  };
+  const doc = new CollabJSON();
+  doc.year = the_date.getFullYear();
+  doc.month = the_date.getMonth();
+  doc.date = the_date.getDate();
+  doc.day = the_date.getDay();
+  return doc;
 }
 
 export function make_historical_day(d, days_ago) {
   let the_date = new Date(d.year, d.month, d.date);
   the_date = new Date(the_date.getTime() - days_ago * 24 * 3600 * 1000);
-  let items = new CollabArray();
-  return {
-    year: the_date.getFullYear(),
-    month: the_date.getMonth(),
-    date: the_date.getDate(),
-    day: the_date.getDay(),
-    items,
-  };
+  const doc = new CollabJSON();
+  doc.year = the_date.getFullYear();
+  doc.month = the_date.getMonth();
+  doc.date = the_date.getDate();
+  doc.day = the_date.getDay();
+  return doc;
 }
 
 export function make_favorites() {
-  let items = new CollabArray();
-  return {
-    items,
-  };
+  return new CollabJSON();
 }
 
 export function make_history() {
-  let items = new CollabArray();
-  return {
-    items,
-  };
+  return new CollabJSON();
 }
 
 export function make_profile() {
@@ -158,57 +150,9 @@ export function merge_profile(l1, l2) {
   return l1;
 }
 
-// merge d2 ops into d1
-export function merge_items(d, ops) {
-  for (op in ops) {
-    d.items.applyOp(op);
-    d.synced = Math.max(d1.synced, op.timestamp);
-  }
-}
-
-export function merge_day(d1, d2) {
-  let c = compare_date(d1, d2);
-  if (c > 0) return d1;
-  if (c < 0) return d2;
-  let d = merge_items(d1, d2);
-  d.year = d1.year;
-  d.month = d1.month;
-  d.date = d1.date;
-  d.day = d1.day;
-  return d;
-}
-
-function date_key(i) {
+export function date_key(i) {
+  if (!i || typeof i.year === 'undefined') return 0;
   return new Date(i.year, i.month, i.date).getTime();
-}
-
-// merge only the most recent month.
-export function merge_history(l1, l2) {
-  var updated = l1.updated > l2.updated ? l1.updated : l2.updated;
-  var changed = false;
-  var map = new Map();
-  for (let x of l1.items)
-    map.set(date_key(x), x);
-  for (let y of l2.items.slice(0, merge_history_limit)) {
-    var k = date_key(y);
-    var x = map.get(k);
-    if (x == undefined) {
-      map.set(k, y);
-      changed = true;
-    } else {
-      var m = merge_day(x, y);
-      if (m.items.clock != x.items.clock) {
-        map.set(k, m);
-        changed = true;
-        updated = Math.max(updated, m.items.clock);
-      }
-    }
-  }
-  map = new Map([...map.entries()].sort().reverse()); // sort
-  var l = {
-    items: [...map.values()],
-  };
-  return l;
 }
 
 export function compute_averages(h) {
