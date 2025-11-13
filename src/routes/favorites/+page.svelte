@@ -166,33 +166,27 @@
       let i = index;
       if (results_map != undefined) i = results_map.get(index);
       let j = i - 1;
-      while (j >= 0) {
-        if (favorites.items[j].del == undefined) {
-          let favs = favorites;
-          let f = favorites.items[i];
-          f.updated = Date.now();
-          favs.items.splice(i, 1);
-          favs.items.splice(j, 0, f);
-          save(favs);
-          return;
-        }
-        j = j - 1;
+      if (j >= 0) {
+        let favs = favorites;
+        let f = favorites.items[i];
+        f.updated = Date.now();
+        favs.items.splice(i, 1);
+        favs.items.splice(j, 0, f);
+        save(favs);
+        return;
       }
     } else if (change == "down") {
       let i = index;
       if (results_map != undefined) i = results_map.get(index);
       let j = i + 1;
-      while (j < favorites.items.length) {
-        if (favorites.items[j].del == undefined) {
-          let favs = favorites;
-          let f = favs.items[i];
-          f.updated = Date.now();
-          favs.items.splice(i, 1);
-          favs.items.splice(j, 0, f);
-          save(favs);
-          return;
-        }
-        j = j + 1;
+      if (j < favorites.items.length) {
+        let favs = favorites;
+        let f = favs.items[i];
+        f.updated = Date.now();
+        favs.items.splice(i, 1);
+        favs.items.splice(j, 0, f);
+        save(favs);
+        return;
       }
     } else if (change > 0) {
       add_item(item, today, edit, profile);

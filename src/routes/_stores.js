@@ -298,16 +298,12 @@ export function add_item(item, today, edit, profile) {
     const existing_index = items_array.findIndex(i => i.name == item.name);
 
     if (existing_index !== -1) {
-      const existing_item = items_array[existing_index];
-      if (existing_item.del == undefined) return day; // Already exists and not deleted
-
-      delete existing_item.del;
-      items_doc.updateItem([existing_index], existing_item);
-    } else {
-      item = { ...item };
-      if (item.servings == undefined) item.servings = 1.0;
-      items_doc.addItem([items_array.length], item);
+      return day;
     }
+
+    item = { ...item };
+    if (item.servings == undefined) item.servings = 1.0;
+    items_doc.addItem([items_array.length], item);
 
     if (edit == undefined) {
       save_history(day, profile);

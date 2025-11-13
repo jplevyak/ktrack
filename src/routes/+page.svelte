@@ -197,24 +197,22 @@ Averages [3, 5, 7] days: [{averages[0].toFixed(1)}, {averages[1].toFixed(1)}, {a
 </b><br /><br />
 {#if editing == undefined}
   {#each food_items as f, i}
-    {#if f.del == undefined}
-      <Food
-        name={f.name}
-        notes={f.notes}
-        index={i}
-        mcg={f.mcg}
-        fiber={f.fiber}
-        unit={f.unit}
-        servings={f.servings}
-        source={f.source}
-        use_edit="true"
-        use_fav="true"
-        use_dec="true"
-        use_inc="true"
-        use_del="true"
-        on:message={do_msg}
-      />
-    {/if}
+    <Food
+      name={f.name}
+      notes={f.notes}
+      index={i}
+      mcg={f.mcg}
+      fiber={f.fiber}
+      unit={f.unit}
+      servings={f.servings}
+      source={f.source}
+      use_edit="true"
+      use_fav="true"
+      use_dec="true"
+      use_inc="true"
+      use_del="true"
+      on:message={do_msg}
+    />
   {/each}
   Total: {total.toFixed(2)} Total fiber: {total_fiber.toFixed(2)} {#if fiber_unknown} * some unknown * {/if}
 {:else}
