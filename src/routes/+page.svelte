@@ -10,6 +10,7 @@
     get_total_fiber,
     make_today,
     compute_averages,
+    get_date_info,
   } from "./_util.js";
   import {
     today_store,
@@ -34,13 +35,6 @@
   let resolution = 0.0001;
   let edit = undefined;
   let day = undefined;
-
-  function get_date_info(day_doc) {
-    if (!day_doc || !day_doc.getData) return null;
-    const items = day_doc.getData();
-    if (!items || items.length === 0) return null;
-    return items.find(item => typeof item.year !== 'undefined' && typeof item.mcg === 'undefined');
-  }
 
   // straddle all small moves.
   let stops = [

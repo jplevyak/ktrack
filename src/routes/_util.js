@@ -26,7 +26,7 @@ months[9] = "October";
 months[10] = "November";
 months[11] = "December";
 
-function _get_date_info(day) {
+export function get_date_info(day) {
     if (!day || !day.getData) return null;
     const items = day.getData();
     if (!items || items.length === 0) return null;
@@ -35,8 +35,8 @@ function _get_date_info(day) {
 }
 
 export function compare_date(d1, d2) {
-  const d1_info = _get_date_info(d1);
-  const d2_info = _get_date_info(d2);
+  const d1_info = get_date_info(d1);
+  const d2_info = get_date_info(d2);
 
   if (!d1_info || !d2_info) {
     if (d1_info === d2_info) return 0;
@@ -108,7 +108,7 @@ export function make_today() {
 }
 
 export function make_historical_day(d, days_ago) {
-  const d_info = _get_date_info(d);
+  const d_info = get_date_info(d);
   if (!d_info) {
     // Cannot create a historical day from a document without date info.
     // Return an empty doc as a fallback.
@@ -177,7 +177,7 @@ export function merge_profile(l1, l2) {
 }
 
 export function date_key(i) {
-  const date_info = _get_date_info(i);
+  const date_info = get_date_info(i);
   if (!date_info) return 0;
   return new Date(date_info.year, date_info.month, date_info.date).getTime();
 }
