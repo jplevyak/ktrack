@@ -5,6 +5,9 @@
  */
 import { v4 as uuidv4 } from 'uuid';
 
+const history_prune_limit = 100;
+const history_prune_window = 50;
+
 export class CollabJSON {
   constructor(options = {}) {
     this.items = new Map();
@@ -261,12 +264,15 @@ export class CollabJSON {
 
   prune(pruneFn) {
     if (this.root !== this) throw new Error('Pruning can only be done on the root document.');
+    if (this.history.length < history_prune_limit) {
+      return;
+    }
 
     pruneFn(this);
 
     this.snapshot = this.getData();
     this.snapshotDvv = new Map(this.dvv);
-    this.history = [];
+    this.history = this.history.slice(-history_prune_window);
   }
   
   // --- Sync Function ---

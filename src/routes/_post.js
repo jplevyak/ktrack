@@ -1,7 +1,7 @@
 import LevelPkg from "level";
 const { Level } = LevelPkg;
 import { error } from "@sveltejs/kit";
-import { CollabJSON } from "./_crdt.js";
+import { CollabJSON, history_prune_limit } from "./_crdt.js";
 
 export var profile = new Level("./profile");
 
@@ -22,8 +22,7 @@ export async function do_post_internal(req, data, username, db, prune) {
   
   const server_doc = CollabJSON.fromJSON(server_doc_state, { clientId: 'server' });
 
-  // Prune if a prune function is provided and history is long
-  if (prune && server_doc.history.length > 100) {
+  if (prune) {
     server_doc.prune(prune);
   }
 

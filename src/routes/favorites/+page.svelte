@@ -97,7 +97,6 @@
   }
 
   function save(favs) {
-    favs.updated = Date.now();
     force_sync_favorites = true;
     favorites_store.set(favs);
   }
@@ -126,7 +125,6 @@
       };
       document.getElementById("save").onclick = function () {
         let edited = { ...editing };
-        edited.updated = Date.now();
         save_favorite(edited, profile, editing_replace_index);
         editing_replace_index = undefined;
         editing = undefined;
@@ -145,8 +143,7 @@
     if (change == "del") {
       let y = confirm("Do you want to delete the favorite?");
       if (!y) return;
-      item.updated = Date.now();
-      item.del = true;
+      // Remove item from favorites. (TODO)
       save(favorites);
     } else if (change == "edit") {
       editing_replace_index = index;
@@ -169,7 +166,6 @@
       if (j >= 0) {
         let favs = favorites;
         let f = favorites.items[i];
-        f.updated = Date.now();
         favs.items.splice(i, 1);
         favs.items.splice(j, 0, f);
         save(favs);
@@ -182,7 +178,6 @@
       if (j < favorites.items.length) {
         let favs = favorites;
         let f = favs.items[i];
-        f.updated = Date.now();
         favs.items.splice(i, 1);
         favs.items.splice(j, 0, f);
         save(favs);

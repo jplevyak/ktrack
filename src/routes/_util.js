@@ -134,7 +134,7 @@ export function make_history() {
   return new CollabJSON();
 }
 
-export function prune_day(doc) {
+export function prune_tombstones(doc) {
     // The snapshotting process already filters out deleted items by calling getData().
     // This function can be used to permanently remove tombstones from the items map
     // before the snapshot is taken, making the pruning explicit.
