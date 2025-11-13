@@ -35,6 +35,13 @@
   let edit = undefined;
   let day = undefined;
 
+  function get_date_info(day_doc) {
+    if (!day_doc || !day_doc.getData) return null;
+    const items = day_doc.getData();
+    if (!items || items.length === 0) return null;
+    return items.find(item => typeof item.year !== 'undefined' && typeof item.mcg === 'undefined');
+  }
+
   // straddle all small moves.
   let stops = [
     0.2, 0.25, 0.3, 0.3333333333, 0.4, 0.5, 0.6, 0.6666666666, 0.7, 0.75, 0.8,
@@ -48,18 +55,15 @@
   });
   const unsubscribe_today = today_store.subscribe((t) => {
     let new_day = make_today();
-    if (t.year == undefined || compare_date(t, new_day) < 0) {
+    if (!t || !get_date_info(t) || compare_date(t, new_day) < 0) {
       save_today(new_day, profile);
-      day = new_day;
+      // The store will update, and this callback will re-run with the new day.
     } else {
       today = t;
       if (!server_checked) {
         server_checked = true;
-        sync_today(today, profile);
         save_history(today, profile);
       }
-      if (edit == undefined) day = today;
-      else day = edit;
     }
   });
   const unsubscribe_history = history_store.subscribe((value) => {
@@ -67,25 +71,28 @@
   });
 
   const unsubscribe_edit = edit_store.subscribe((d) => {
-    if (d != undefined) {
+    if (d != undefined && d.start_edit) {
       if (Date.now() - d.start_edit > 10 * 60 * 1000) {
         // 10 min.
-        edit_store.update(function (d) {
-          return undefined;
-        });
+        edit_store.set(undefined);
         d = undefined;
       }
     }
     edit = d;
-    if (edit == undefined) day = today;
-    else day = edit;
   });
   onDestroy(() => {
     unsubscribe_today();
     unsubscribe_profile();
     unsubscribe_edit();
+    unsubscribe_history();
   });
 
+  $: day = edit || today;
+  $: date_info = day ? get_date_info(day) : null;
+  $: all_items = day ? day.getData() : [];
+  $: food_items = all_items.filter(item => typeof item.mcg !== 'undefined');
+  $: total = get_total(day);
+  $: [total_fiber, fiber_unknown] = get_total_fiber(day);
   $: averages = compute_averages(history);
 
   function save_day() {
@@ -102,7 +109,7 @@
         editing = undefined;
       };
       document.getElementById("save").onclick = function () {
-        day.items[editing_index] = editing;
+        day.updateItem([editing_index], editing);
         save_day();
         editing = undefined;
       };
@@ -144,34 +151,37 @@
   }
 
   function do_msg(event) {
-    if (event.status == "completed") return;
-    let index = event.detail.index;
-    if (index < 0 || index >= day.items.length) {
+    if (event.status == "completed" || !day) return;
+    
+    const index_in_food_items = event.detail.index;
+    if (index_in_food_items < 0 || index_in_food_items >= food_items.length) {
       return;
     }
+
+    const item_data = food_items[index_in_food_items];
+    const original_index = all_items.findIndex(item => item === item_data);
+    if (original_index === -1) return;
+
     let change = event.detail.change;
-    let item = day.getData()[index];
+    
     if (change == "del") {
-      day.items.deleteItem(item.itemId);
+      day.deleteItem([original_index]);
       save_day();
-    } else if (event.detail.change == "fav") {
-      save_favorite(item, profile);
-    } else if (event.detail.change == "edit") {
-      editing = { ...item };
-      editing_index = index;
+    } else if (change == "fav") {
+      save_favorite(item_data, profile);
+    } else if (change == "edit") {
+      editing = { ...item_data };
+      editing_index = original_index;
     } else {
-      change = get_change(item.servings, change);
-      let data = { ...item.data };
-      data.servings += change;
+      change = get_change(item_data.servings, change);
+      let new_data = { ...item_data };
+      new_data.servings += change;
       // round to prevent small errors from accumulating.
-      data.servings = parseFloat(item.servings.toFixed(6));
-      day.items.updateItem(item.itemId, data);
+      new_data.servings = parseFloat(new_data.servings.toFixed(6));
+      day.updateItem([original_index], new_data);
       save_day();
     }
   }
-
-  $: total = get_total(day);
-  $: [total_fiber, fiber_unknown] = get_total_fiber(day);
 </script>
 
 <svelte:head>
@@ -185,14 +195,14 @@ Averages [3, 5, 7] days: [{averages[0].toFixed(1)}, {averages[1].toFixed(1)}, {a
   1
 )}]<br />
 <b
-  >Date: {weekdays[day.day]}
-  {months[day.month]}
-  {day.date}, {day.year}
+  >Date: {#if date_info}{weekdays[date_info.day]}
+  {months[date_info.month]}
+  {date_info.date}, {date_info.year}{/if}
   {#if edit != undefined}<span style="color:red">Editing History</span>
     <button type="button" id="done">done</button>{/if}
 </b><br /><br />
 {#if editing == undefined}
-  {#each day.items as f, i}
+  {#each food_items as f, i}
     {#if f.del == undefined}
       <Food
         name={f.name}
