@@ -56,7 +56,7 @@ export function get_total(day) {
   let n = 0.0;
   if (!day || !day.getData) return n;
   for (let f of day.getData()) {
-    if (f.del == undefined && f.mcg != undefined) {
+    if (f.mcg != undefined) {
       n += f.mcg * f.servings;
     }
   }
@@ -68,7 +68,7 @@ export function get_total_fiber(day) {
   let unknown = false;
   if (!day || !day.getData) return [n, unknown];
   for (let f of day.getData()) {
-    if (f.del == undefined && f.mcg != undefined) {
+    if (f.mcg != undefined) {
       if (f.hasOwnProperty('fiber') && f.fiber != "") {
           n += f.fiber * f.servings;
       } else {

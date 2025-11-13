@@ -305,7 +305,6 @@ export function add_item(item, today, edit, profile) {
       items_doc.updateItem([existing_index], existing_item);
     } else {
       item = { ...item };
-      delete item.del;
       if (item.servings == undefined) item.servings = 1.0;
       items_doc.addItem([items_array.length], item);
     }
