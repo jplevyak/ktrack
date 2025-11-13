@@ -134,6 +134,31 @@ export function make_history() {
   return new CollabJSON();
 }
 
+export function prune_day(doc) {
+    // The snapshotting process already filters out deleted items by calling getData().
+    // This function can be used to permanently remove tombstones from the items map
+    // before the snapshot is taken, making the pruning explicit.
+    for (const [key, item] of doc.items.entries()) {
+        if (item._deleted) {
+            doc.items.delete(key);
+        }
+    }
+}
+
+export function prune_history(history_doc) {
+    const limit = merge_history_limit;
+    // getData() returns items sorted by their fractional index, which should reflect date order.
+    const items = history_doc.getData();
+    if (items.length > limit) {
+        // We delete items from the 'limit' index onwards to remove the oldest entries.
+        const to_delete = items.length - limit;
+        for (let i = 0; i < to_delete; i++) {
+            // Always delete the item at the `limit` index because the list shrinks after each deletion.
+            history_doc.deleteItem([limit]);
+        }
+    }
+}
+
 export function make_profile() {
   return {
     username: "",
