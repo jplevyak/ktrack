@@ -61,7 +61,7 @@ export function synced_store(key, initialValue, sync, fromJSON) {
     console.log('Syncing to server...');
     status.set('syncing');
 
-    try {
+    // try {
       const currentValue = get({ subscribe });
       const ok = await sync(currentValue);
 
@@ -74,10 +74,10 @@ export function synced_store(key, initialValue, sync, fromJSON) {
       status.set('idle');
       console.log('Sync successful');
 
-    } catch (error) {
-      console.error(error.message);
-      status.set('error');
-    }
+    // } catch (error) {
+    //   console.error(error.message);
+    //   status.set('error');
+    // }
   }
 
   const debouncedSync = debounce(syncToServer, DEBOUNCE_WAIT);
@@ -255,22 +255,19 @@ async function sync_internal(doc, name) {
 }
 
 async function sync_today(today) {
-  return await sync_internal(today.items, "today");
+  return await sync_internal(today, "today");
 }
 
 async function sync_favorites(favorites) {
-  return await sync_internal(favorites.items, "favorites");
+  return await sync_internal(favorites, "favorites");
 }
 
-export async function sync_history(history) {
-  return await sync_internal(history.items, "history");
+async function sync_history(history) {
+  return await sync_internal(history, "history");
 }
 
 function collab_from_json(parsed) {
-    if (parsed && parsed.items) {
-        parsed.items = CollabJSON.fromJSON(parsed.items);
-    }
-    return parsed;
+    return CollabJSON.fromJSON(parsed);
 }
 
 export const today_store = synced_store("today", make_today(), sync_today, collab_from_json);
@@ -293,9 +290,8 @@ export function add_item(item, today, edit, profile) {
   }
   store.update(function (day) {
     if (day == undefined) day = make_today();
-    const items_doc = day.items;
-    const items_array = items_doc.getData();
-    const existing_index = items_array.findIndex(i => i.name == item.name);
+    const data = day.getData();
+    const existing_index = data.findIndex(i => i.name == item.name);
 
     if (existing_index !== -1) {
       return day;
@@ -303,7 +299,7 @@ export function add_item(item, today, edit, profile) {
 
     item = { ...item };
     if (item.servings == undefined) item.servings = 1.0;
-    items_doc.addItem([items_array.length], item);
+    day.addItem([data.length], item);
 
     if (edit == undefined) {
       save_history(day, profile);
@@ -316,24 +312,23 @@ export function save_history(day, profile) {
   if (day == undefined) return;
   history_store.update(function (history) {
     if (history == undefined) history = make_history();
-    const history_doc = history.items;
-    const history_items = history_doc.getData();
+    const data = history.getData();
     const key = date_key(day);
-    const existing_index = history_items.findIndex(d => d && date_key(d) === key);
+    const existing_index = data.findIndex(d => d && date_key(d) === key);
 
     if (existing_index !== -1) {
-      history_doc.updateItem([existing_index], day);
+      history.updateItem([existing_index], day);
     } else {
-      const insert_index = history_items.findIndex(d => d && date_key(d) < key);
-      history_doc.addItem([insert_index === -1 ? history_items.length : insert_index], day);
+      const insert_index = data.findIndex(d => d && date_key(d) < key);
+      history.addItem([insert_index === -1 ? data.length : insert_index], day);
     }
     
     const limit = merge_history_limit || 50;
-    const current_items = history_doc.getData();
+    const current_items = history.getData();
     if (current_items.length > limit) {
         // Prune oldest items if history exceeds limit
         for (let i = limit; i < current_items.length; i++) {
-            history_doc.deleteItem([limit]); // Always delete item at `limit` index as list shrinks
+            history.deleteItem([limit]); // Always delete item at `limit` index as list shrinks
         }
     }
 
@@ -349,7 +344,6 @@ export function save_today(today, profile) {
 export function save_favorite(item, profile, replace_index) {
   favorites_store.update(function (favorites) {
     if (favorites == undefined) favorites = make_favorites();
-    const favorites_doc = favorites.items;
     
     item = { ...item };
 
@@ -358,18 +352,18 @@ export function save_favorite(item, profile, replace_index) {
         console.log("bad replace_index", replace_index);
         return favorites;
       }
-      favorites_doc.updateItem([replace_index], item);
+      favorites.updateItem([replace_index], item);
       return favorites;
     }
     
-    const items_array = favorites_doc.getData();
+    const items_array = favorites.getData();
     const existing_index = items_array.findIndex(i => i.name == item.name);
 
     if (existing_index !== -1) {
-      favorites_doc.updateItem([existing_index], item);
+      favorites.updateItem([existing_index], item);
     } else {
       if (item.servings == undefined) item.servings = 1.0;
-      favorites_doc.addItem([items_array.length], item);
+      favorites.addItem([items_array.length], item);
     }
     
     return favorites;

@@ -409,7 +409,7 @@ export class CollabJSON {
 
     const lastSeenBySystem = this.dvv.get(this.clientId) || 0;
     const newOps = this.ops.filter(op => op.timestamp > lastSeenBySystem);
-    this.checked = new Data().now();
+    this.checked = Date().now();
     
     return {
       dvv: Object.fromEntries(this.dvv),
@@ -446,7 +446,7 @@ export class CollabJSON {
         });
         
         this.dvv = new Map(Object.entries(snapshotDvv));
-        this.synced = new Data().now();
+        this.synced = Date().now();
         return;
     }
 
@@ -455,7 +455,7 @@ export class CollabJSON {
 
     // Prune local ops that have been acknowledged by the server
     this.ops = this.ops.filter(op => op.timestamp > (this.dvv.get(this.clientId) || 0));
-    this.synced = new Data().now();
+    this.synced = Date().now();
   }
 
   getSyncResponse({ dvv: clientDvv, ops: clientOps, clientId }) {

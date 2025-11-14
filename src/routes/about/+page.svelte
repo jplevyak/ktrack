@@ -2,7 +2,6 @@
   import { onMount, onDestroy } from "svelte";
   import {
     logout,
-    reset_data,
     profile_store,
     sync_profile,
     today_store,
@@ -54,21 +53,6 @@
     unsubscribe_profile();
   });
 
-  function clear_data() {
-    let answer = confirm("Do you really want to delete all the local data? ");
-    if (!answer) return;
-    reset_data();
-  }
-
-  async function force_sync() {
-    await sync_today(today);
-    await sync_favorites(favorites);
-    await sync_history(history);
-    today = today;
-    favorites = favorites;
-    history = history;
-  }
-
   onMount(async () => {
     let username_input = document.getElementById("username");
     let password_input = document.getElementById("password");
@@ -97,8 +81,6 @@
     }
     save.onclick = changed;
     document.getElementById("logout").onclick = logout;
-    document.getElementById("reset").onclick = clear_data;
-    document.getElementById("sync").onclick = force_sync;
   });
 </script>
 
@@ -130,8 +112,6 @@ is lost.
   <button type="button" id="save">Login/Save</button>
 {/if}
 <input type="button" id="logout" value="Logout" />
-<input type="button" id="reset" value="Reset All Data" />
-<input type="button" id="sync" value="Force Sync All Data" />
 <br /><br />
 Today
 <ul>

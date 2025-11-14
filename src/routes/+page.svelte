@@ -20,7 +20,6 @@
     save_today,
     save_favorite,
     save_history,
-    sync_today,
   } from "./_stores.js";
 
   let total = 0;
