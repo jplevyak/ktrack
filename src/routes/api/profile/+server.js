@@ -9,60 +9,62 @@ function finalize_profile(p) {
   return p;
 }
 
-async function do_post(
-  req,
-  data,
-  username,
-  db,
-  title,
-  merge,
-  make,
-  finalize
-) {
-  let value = await db.get(username);
-  var result = ""; // request nothing.
-  if (value != undefined) {
-    value = JSON.parse(value);
-    if (value == undefined) {
+export async function POST(req) {
+  const data = await req.request.json();
+  const username = data.username;
+  const db = profile;
+  const merge = merge_profile;
+  const make = make_profile;
+  const finalize = finalize_profile;
+
+  let value;
+  try {
+    const dbValueStr = await db.get(username);
+    value = JSON.parse(dbValueStr);
+  } catch (err) {
+    if (err.code === 'LEVEL_NOT_FOUND') {
+      value = undefined;
+    } else if (err instanceof SyntaxError) {
       console.log("bad json");
+      value = undefined;
+    } else {
+      // For other DB errors, etc., rethrow.
+      throw err;
     }
   }
-  if (data.value == undefined) {
+
+  let result = ""; // request nothing.
+
+  if (data.value === undefined) {
     // nothing sent and/or status request
-    if (value == undefined) {
+    if (value === undefined) {
       result = make(); // request all
       delete result.updated;
-    } else if (data.updated != value.updated) {
+    } else if (data.updated !== value.updated) {
       result = value; // send what we have
     } else {
       result = ""; // we are up to date, do nothing
     }
-  }  else {
+  } else {
     // update sent
-    if (value != undefined) result = merge(value, data.value);
-    else result = data.value;
+    if (value !== undefined) {
+      result = merge(value, data.value);
+    } else {
+      result = data.value;
+    }
+
     // store if we have nothing or if it is different
-    if (value == undefined || data.updated < result.updated || result.updated != value.updated) {
-      let string_value = JSON.stringify(result);
+    if (value === undefined || data.updated < result.updated || result.updated !== value.updated) {
+      const string_value = JSON.stringify(result);
       await db.put(username, string_value);
     } else {
       result = ""; // we have nothing to add, send nothing
     }
   }
-  if (finalize != undefined) result = finalize(result);
-  return new Response(JSON.stringify({ value: result }));
-}
 
-export async function POST(req) {
-  let data = await req.request.json();
-  return await do_post(
-    req,
-    data,
-    data.username,
-    profile,
-    "profile",
-    merge_profile,
-    make_profile,
-    finalize_profile
-  );
+  if (finalize) {
+    result = finalize(result);
+  }
+
+  return new Response(JSON.stringify({ value: result }));
 }
