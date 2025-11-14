@@ -58,9 +58,8 @@ export async function do_post(req, db, prune) {
     const value = await profile.get(username);
     p = JSON.parse(value);
   } catch (e) {
-    console.log(e);
-    if (e.code === 'LEVEL_NOT_FOUND' || e.code == 'ReferenceError' || e.code == 'SyntaxError' || !value) {
-      // User doesn't exist. Create a profile as requested.
+    if (e.code === 'LEVEL_NOT_FOUND' || e instanceof SyntaxError) {
+      // User doesn't exist or has corrupt data. Create a new profile.
       p = {
         username: username,
         password: password,
@@ -70,9 +69,9 @@ export async function do_post(req, db, prune) {
       };
       await profile.put(username, JSON.stringify(p));
     } else {
-      // Could be a different DB error or a JSON.parse SyntaxError
-      console.log("bad profile data for user:", username, e);
-      return new Response(JSON.stringify({ err: "bad profile" }));
+      // Some other DB error.
+      console.log("Error retrieving profile for user:", username, e);
+      return new Response(JSON.stringify({ err: "Error reading profile" }));
     }
   }
 
