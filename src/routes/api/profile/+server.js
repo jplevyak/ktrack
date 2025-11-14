@@ -1,21 +1,12 @@
 import { merge_profile, make_profile } from "../../_util.js";
 import { profile } from "../../_post.js";
 
-function finalize_profile(p) {
-  if (p != undefined) {
-    p.password = "";
-    p.old_password = "";
-  }
-  return p;
-}
-
 export async function POST(req) {
   const data = await req.request.json();
   const username = data.username;
   const db = profile;
   const merge = merge_profile;
   const make = make_profile;
-  const finalize = finalize_profile;
 
   let value;
   try {
@@ -62,8 +53,10 @@ export async function POST(req) {
     }
   }
 
-  if (finalize) {
-    result = finalize(result);
+  // Remove the passwords from the response.
+  if (result != undefined) {
+    result.password = "";
+    result.old_password = "";
   }
 
   return new Response(JSON.stringify({ value: result }));
