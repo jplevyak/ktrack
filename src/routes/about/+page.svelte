@@ -74,7 +74,7 @@
     let password_input = document.getElementById("password");
     let old_password_input = document.getElementById("old_password");
     let save = document.getElementById("save");
-    function async changed() {
+    async function changed() {
       if (profile == undefined) {
         console.log("profile undefined");
         return;
