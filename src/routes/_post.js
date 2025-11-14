@@ -58,7 +58,8 @@ export async function do_post(req, db, prune) {
     const value = await profile.get(username);
     p = JSON.parse(value);
   } catch (e) {
-    if (e.code === 'LEVEL_NOT_FOUND') {
+    console.log(e);
+    if (e.code === 'LEVEL_NOT_FOUND' || e.code == 'ReferenceError' || e.code == 'SyntaxError' || !value) {
       // User doesn't exist. Create a profile as requested.
       p = {
         username: username,
