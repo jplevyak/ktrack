@@ -1,11 +1,51 @@
 <script>
   import { onDestroy } from "svelte";
   import { page } from "$app/stores";
-  import { swipe } from 'svelte-gestures';
   import Nav from "../components/Nav.svelte";
   import { goto } from "$app/navigation";
 
   export let segment;
+
+  // Custom swipe action to replace svelte-gestures
+  function swipe(node, options = {}) {
+    let touchstartX = 0;
+    let startTime = 0;
+
+    const { timeframe = 300, minSwipeDistance = 100, touchAction = 'pan-y' } = options;
+
+    node.style.touchAction = touchAction;
+
+    function handleTouchStart(event) {
+      touchstartX = event.touches[0].clientX;
+      startTime = new Date().getTime();
+    }
+
+    function handleTouchEnd(event) {
+      const touchendX = event.changedTouches[0].clientX;
+
+      const elapsedTime = new Date().getTime() - startTime;
+      if (elapsedTime > timeframe) {
+        return;
+      }
+
+      const deltaX = touchendX - touchstartX;
+
+      if (Math.abs(deltaX) > minSwipeDistance) {
+        const direction = deltaX < 0 ? 'left' : 'right';
+        node.dispatchEvent(new CustomEvent('swipe', { detail: { direction } }));
+      }
+    }
+
+    node.addEventListener('touchstart', handleTouchStart, { passive: true });
+    node.addEventListener('touchend', handleTouchEnd, { passive: true });
+
+    return {
+      destroy() {
+        node.removeEventListener('touchstart', handleTouchStart);
+        node.removeEventListener('touchend', handleTouchEnd);
+      },
+    };
+  }
 
   const unsubscribe = page.subscribe((value) => {
     segment = value.url.pathname.slice(1).split("/")[0];
@@ -34,7 +74,7 @@
 </script>
 
 <div
-  use:swipe={() => ({ timeframe: 300, minSwipeDistance: 100, touchAction: 'pan-y' })}
+  use:swipe={{ timeframe: 300, minSwipeDistance: 100, touchAction: 'pan-y' }}
   on:swipe={handle_swipe}
   style="height: 100%;"
 >
