@@ -1,16 +1,46 @@
-import { merge_profile, make_profile } from "../../_util.js";
+import { make_profile } from "../../_util.js";
 import { profile } from "../../_post.js";
+
+function merge_profile(p1, p2) {
+  p1 = { ...p1 }; // shallow copy
+  p1.message = "";
+  delete p1.authenticated;
+  p2.username = p1.username;
+  p2.authenticated = Date.now();
+  p2.updated = p2.authenticated;
+  if (p1.username == "" || p1.password == "") {
+    p2.message = "profile created, authenticated";
+    return p2;
+  }
+  if (
+    p2.password != "" &&
+    p2.old_password != "" &&
+    p2.old_password != undefined
+  ) {
+    if (p2.old_password != p1.password) {
+      p1.message = "old password mismatch, not authenticated";
+      p1.updated = Date.now();
+      return p1;
+    }
+    p2.message = "new password saved, authenticated";
+    return p2;
+  }
+  if (p1.password == p2.password) {
+    p2.message = "profile in sync, authenticated";
+    return p2;
+  }
+  p1.message = "incorrect password, not authenticated";
+  p1.updated = Date.now();
+  return p1;
+}
 
 export async function POST(req) {
   const data = await req.request.json();
   const username = data.username;
-  const db = profile;
-  const merge = merge_profile;
-  const make = make_profile;
 
   let value;
   try {
-    const dbValueStr = await db.get(username);
+    const dbValueStr = await profile.get(username);
     value = JSON.parse(dbValueStr);
   } catch (err) {
     if (err.code === 'LEVEL_NOT_FOUND') {
@@ -29,7 +59,7 @@ export async function POST(req) {
   if (data.value === undefined) {
     // nothing sent and/or status request
     if (value === undefined) {
-      result = make(); // request all
+      result = make_profile(); // request all
       delete result.updated;
     } else if (data.updated !== value.updated) {
       result = value; // send what we have
@@ -39,7 +69,7 @@ export async function POST(req) {
   } else {
     // update sent
     if (value !== undefined) {
-      result = merge(value, data.value);
+      result = merge_profile(value, data.value);
     } else {
       result = data.value;
     }
@@ -47,7 +77,7 @@ export async function POST(req) {
     // store if we have nothing or if it is different
     if (value === undefined || data.updated < result.updated || result.updated !== value.updated) {
       const string_value = JSON.stringify(result);
-      await db.put(username, string_value);
+      await profile.put(username, string_value);
     } else {
       result = ""; // we have nothing to add, send nothing
     }

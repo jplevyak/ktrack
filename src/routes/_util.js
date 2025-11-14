@@ -26,6 +26,22 @@ months[9] = "October";
 months[10] = "November";
 months[11] = "December";
 
+export function load_async(
+  url,
+  callback,
+  options = {
+    async: true,
+    defer: true,
+  }
+) {
+  const tag = document.createElement("script");
+  tag.src = url;
+  tag.async = options.async;
+  tag.defer = options.defer;
+  tag.onload = callback;
+  document.body.appendChild(tag);
+}
+
 export function get_date_info(day) {
     if (!day || !day.getData) return null;
     const items = day.getData();
@@ -50,6 +66,28 @@ export function compare_date(d1, d2) {
   if (d1_info.date > d2_info.date) return 1;
   if (d1_info.date < d2_info.date) return -1;
   return 0;
+}
+
+export function date_key(i) {
+  const date_info = get_date_info(i);
+  if (!date_info) return 0;
+  return new Date(date_info.year, date_info.month, date_info.date).getTime();
+}
+
+export function compute_averages(h) {
+  var result = [0, 0, 0];
+  if (h == undefined) return result;
+  var a = 0.0;
+  var n = 0;
+  for (let i in h.items) {
+    a += get_total(h.items[i]);
+    n += 1;
+    if (n > 1 && n % 2 == 1) {
+      result[(n - 3) / 2] = a / n;
+    }
+    if (n >= 7) break;
+  }
+  return result;
 }
 
 export function get_total(day) {
@@ -77,22 +115,6 @@ export function get_total_fiber(day) {
     }
   }
   return [n, unknown];
-}
-
-export function load_async(
-  url,
-  callback,
-  options = {
-    async: true,
-    defer: true,
-  }
-) {
-  const tag = document.createElement("script");
-  tag.src = url;
-  tag.async = options.async;
-  tag.defer = options.defer;
-  tag.onload = callback;
-  document.body.appendChild(tag);
 }
 
 export function make_today() {
@@ -134,6 +156,15 @@ export function make_history() {
   return new CollabJSON();
 }
 
+export function make_profile() {
+  return {
+    username: "",
+    password: "",
+    old_password: "",
+    message: "unauthenticated",
+  };
+}
+
 export function prune_tombstones(doc) {
     // The snapshotting process already filters out deleted items by calling getData().
     // This function can be used to permanently remove tombstones from the items map
@@ -157,68 +188,4 @@ export function prune_history(history_doc) {
             history_doc.deleteItem([limit]);
         }
     }
-}
-
-export function make_profile() {
-  return {
-    username: "",
-    password: "",
-    old_password: "",
-    message: "unauthenticated",
-  };
-}
-
-export function merge_profile(l1, l2) {
-  l1 = { ...l1 }; // shallow copy
-  l1.message = "";
-  delete l1.authenticated;
-  l2.username = l1.username;
-  l2.authenticated = Date.now();
-  l2.updated = l2.authenticated;
-  if (l1.username == "" || l1.password == "") {
-    l2.message = "profile created, authenticated";
-    return l2;
-  }
-  if (
-    l2.password != "" &&
-    l2.old_password != "" &&
-    l2.old_password != undefined
-  ) {
-    if (l2.old_password != l1.password) {
-      l1.message = "old password mismatch, not authenticated";
-      l1.updated = Date.now();
-      return l1;
-    }
-    l2.message = "new password saved, authenticated";
-    return l2;
-  }
-  if (l1.password == l2.password) {
-    l2.message = "profile in sync, authenticated";
-    return l2;
-  }
-  l1.message = "incorrect password, not authenticated";
-  l1.updated = Date.now();
-  return l1;
-}
-
-export function date_key(i) {
-  const date_info = get_date_info(i);
-  if (!date_info) return 0;
-  return new Date(date_info.year, date_info.month, date_info.date).getTime();
-}
-
-export function compute_averages(h) {
-  var result = [0, 0, 0];
-  if (h == undefined) return result;
-  var a = 0.0;
-  var n = 0;
-  for (let i in h.items) {
-    a += get_total(h.items[i]);
-    n += 1;
-    if (n > 1 && n % 2 == 1) {
-      result[(n - 3) / 2] = a / n;
-    }
-    if (n >= 7) break;
-  }
-  return result;
 }
