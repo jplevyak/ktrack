@@ -53,12 +53,28 @@ export async function do_post(req, db, prune) {
     console.log("bad password");
     return new Response(JSON.stringify({ err: "bad password" }));
   }
-  let value = await profile.get(username);
-  let p = JSON.parse(value);
-  if (p == undefined) {
-    console.log("bad profile");
-    return new Response(JSON.stringify({ err: "bad profile" }));
+  let p;
+  try {
+    const value = await profile.get(username);
+    p = JSON.parse(value);
+  } catch (e) {
+    if (e.code === 'LEVEL_NOT_FOUND') {
+      // User doesn't exist. Create a profile as requested.
+      p = {
+        username: username,
+        password: password,
+        old_password: "",
+        message: "profile created, authenticated",
+        authenticated: Date.now()
+      };
+      await profile.put(username, JSON.stringify(p));
+    } else {
+      // Could be a different DB error or a JSON.parse SyntaxError
+      console.log("bad profile data for user:", username, e);
+      return new Response(JSON.stringify({ err: "bad profile" }));
+    }
   }
+
   if (p.username != username || p.password != password) {
     console.log("incorrect password");
     return new Response(JSON.stringify({ err: "incorrect password" }));
