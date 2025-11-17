@@ -272,13 +272,17 @@ export class CollabJSON {
     });
   }
 
-  prune(pruneFn) {
+  prune(pruneFn, clientRequestData) {
     if (this.root !== this) throw new Error('Pruning can only be done on the root document.');
+
+    // Allow custom logic to run, e.g. for comparing 'today' dates.
+    if (pruneFn) {
+        pruneFn(this, clientRequestData);
+    }
+
     if (this.history.length < history_prune_limit) {
       return;
     }
-
-    pruneFn(this);
 
     this.snapshot = this._getSnapshotData();
     this.snapshotDvv = new Map(this.dvv);
@@ -437,7 +441,8 @@ export class CollabJSON {
     return {
       dvv: Object.fromEntries(this.dvv),
       ops: newOps,
-      clientId: this.clientId
+      clientId: this.clientId,
+      docId: this.id
     };
   }
 
@@ -445,30 +450,25 @@ export class CollabJSON {
     if (this.root !== this) throw new Error('Sync methods can only be called on the root document.');
 
     if (reset) {
-        this.ops = []; // Discard local ops, client was too far behind.
+        this.ops = []; // Discard local ops, client was too far behind or had a mismatched doc ID.
         
-        const tempDoc = new CollabJSON({ clientId: this.clientId });
-        function build(doc, data) {
-            data.forEach((item, index) => {
-                if (Array.isArray(item)) {
-                    const nested = new CollabJSON();
-                    doc.addItem([index], nested);
-                    build(nested, item);
-                } else {
-                    doc.addItem([index], item);
-                }
-            });
-        }
-        build(tempDoc, snapshot);
-        
-        this.items = tempDoc.items;
-        this.items.forEach(item => {
+        // Reconstruct the entire document from the server's snapshot.
+        const newDoc = CollabJSON.fromJSON({ snapshot: snapshot, snapshotDvv: snapshotDvv });
+
+        // Transplant the state from the reconstructed document.
+        this.items = newDoc.items;
+        this.snapshot = newDoc.snapshot;
+        this.snapshotDvv = newDoc.snapshotDvv;
+        this.id = newDoc.id; // This is crucial for subsequent syncs to have the right ID.
+
+        // Re-establish the root for nested documents.
+        for (const item of this.items.values()) {
             if (item.data instanceof CollabJSON) {
                 item.data._setRoot(this);
             }
-        });
+        }
         
-        this.dvv = new Map(Object.entries(snapshotDvv));
+        this.dvv = new Map(Object.entries(snapshotDvv || {}));
         this.synced = Date.now();
         return;
     }

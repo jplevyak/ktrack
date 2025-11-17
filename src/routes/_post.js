@@ -22,8 +22,19 @@ export async function do_post_internal(req, data, username, db, prune) {
   
   const server_doc = CollabJSON.fromJSON(server_doc_state, { clientId: 'server' });
 
-  if (prune) {
-    server_doc.prune(prune);
+  // Allow special logic to run (e.g. for 'today' store) and handle pruning.
+  // The 'prune' function is passed from the specific API endpoint.
+  server_doc.prune(prune, data);
+  
+  // If the client's document ID doesn't match the server's, it means the client
+  // has a fresh (e.g., post-login) or stale copy and needs to be reset with the
+  // server's authoritative state.
+  if (server_doc.id && data.docId && server_doc.id !== data.docId) {
+    return new Response(JSON.stringify({
+      snapshot: server_doc._getSnapshotData(),
+      snapshotDvv: Object.fromEntries(server_doc.dvv),
+      reset: true
+    }));
   }
 
   const sync_response = server_doc.getSyncResponse(data);

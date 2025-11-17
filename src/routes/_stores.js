@@ -267,6 +267,8 @@ async function sync_history(history) {
 }
 
 function collab_from_json(parsed) {
+    // Gracefully handle null/undefined if localStorage is empty.
+    if (!parsed) return null;
     return CollabJSON.fromJSON(parsed);
 }
 
@@ -294,6 +296,12 @@ export function add_item(item, today, edit, profile) {
     const existing_index = data.findIndex(i => i.name == item.name);
 
     if (existing_index !== -1) {
+      const existing_item = data[existing_index];
+      // If item exists but was marked as deleted, un-delete it.
+      if (existing_item.del) {
+        delete existing_item.del;
+        day.updateItem([existing_index], existing_item);
+      }
       return day;
     }
 
@@ -352,7 +360,7 @@ export function save_favorite(item, profile, replace_index) {
     item = { ...item };
 
     if (replace_index != undefined) {
-      if (replace_index >= favorites_doc.getData().length) {
+      if (replace_index >= favorites.getData().length) {
         console.log("bad replace_index", replace_index);
         return favorites;
       }
@@ -376,7 +384,8 @@ export function save_favorite(item, profile, replace_index) {
 
 export function check_for_new_day(t, profile) {
   let new_day = make_today();
-  if (t.year == undefined || compare_date(t, new_day) < 0) {
+  // Use get_date_info as the document no longer has date properties directly.
+  if (!t || !get_date_info(t) || compare_date(t, new_day) < 0) {
     save_today(new_day, profile);
     return new_day;
   }
