@@ -128,6 +128,16 @@ export class CollabJSON {
     return { container, index: finalIndex };
   }
 
+  _getSnapshotData() {
+    const sortedItems = this._getSortedItems();
+    return sortedItems.map(item => {
+      if (item.data instanceof CollabJSON) {
+        return item.data.toJSON();
+      }
+      return item.data;
+    });
+  }
+
   // --- Public View Functions ---
 
   getData() {
@@ -270,7 +280,7 @@ export class CollabJSON {
 
     pruneFn(this);
 
-    this.snapshot = this.getData();
+    this.snapshot = this._getSnapshotData();
     this.snapshotDvv = new Map(this.dvv);
     this.history = this.history.slice(-history_prune_window);
   }
@@ -376,7 +386,7 @@ export class CollabJSON {
         month: this.month,
         date: this.date,
         day: this.day,
-        snapshot: this.getData(),
+        snapshot: this._getSnapshotData(),
       };
     }
 
@@ -402,20 +412,17 @@ export class CollabJSON {
         doc.date = state.date;
         doc.day = state.day;
         if (state.snapshot) {
-            const tempDoc = new CollabJSON({ clientId: doc.clientId });
             function build(d, data) {
                 data.forEach((item, index) => {
-                    if (Array.isArray(item)) {
-                        const nested = new CollabJSON();
-                        d.addItem([index], nested);
-                        build(nested, item);
-                    } else {
-                        d.addItem([index], item);
+                    let item_to_add = item;
+                    if (item && item._isCollabJSON) {
+                        // Pass the root down during reconstruction
+                        item_to_add = CollabJSON.fromJSON(item, { root: d.root });
                     }
+                    d.addItem([index], item_to_add);
                 });
             }
-            build(tempDoc, state.snapshot);
-            doc.items = tempDoc.items;
+            build(doc, state.snapshot);
             doc.snapshot = state.snapshot;
             doc.snapshotDvv = new Map(Object.entries(state.snapshotDvv || {}));
         }
