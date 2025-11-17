@@ -310,12 +310,16 @@ export class CollabJSON {
         }
         item = container.items.get(op.itemId);
         if (op.timestamp >= item.updated) {
-            if (op.data instanceof CollabJSON) {
-              item.data = new CollabJSON({ root: this.root, id: op.data.id });
-              op.data.ops.forEach(childOp => item.data.applyOp(childOp));
-            } else {
-              item.data = op.data;
+            let data = op.data;
+            if (data && data._isCollabJSON) {
+                data = CollabJSON.fromJSON(data, { root: this.root });
             }
+
+            if (data instanceof CollabJSON) {
+                data._setRoot(this.root);
+            }
+
+            item.data = data;
             item.sortKey = op.sortKey;
             item.updated = op.timestamp;
             item._deleted = false;
@@ -335,7 +339,15 @@ export class CollabJSON {
         item = this.root._findItem(op.itemId);
         if (!item) break;
         if (op.timestamp > item.updated) {
-          item.data = op.data;
+          let data = op.data;
+          if (data && data._isCollabJSON) {
+            data = CollabJSON.fromJSON(data, { root: this.root });
+          }
+
+          if (data instanceof CollabJSON) {
+            data._setRoot(this.root);
+          }
+          item.data = data;
           item.updated = op.timestamp;
           item._deleted = false;
         }
@@ -355,8 +367,20 @@ export class CollabJSON {
   // --- Persistence Methods ---
 
   toJSON() {
-    if (this.root !== this)
-      throw new Error('toJSON can only be called on the root document.');
+    if (this.root !== this) {
+      // This is a nested document. Return a serializable snapshot of its state.
+      return {
+        _isCollabJSON: true,
+        id: this.id,
+        year: this.year,
+        month: this.month,
+        date: this.date,
+        day: this.day,
+        snapshot: this.getData(),
+      };
+    }
+
+    // This is a root document. Return the full state for persistence.
     return {
       id: this.id,
       year: this.year,
@@ -396,9 +420,12 @@ export class CollabJSON {
             doc.snapshotDvv = new Map(Object.entries(state.snapshotDvv || {}));
         }
         
-        doc.history = state.history || [];
-        doc.dvv = new Map(Object.entries(state.dvv || {}));
-        doc.history.forEach(op => doc.applyOp(op));
+        // Only replay history if it exists (i.e., for root documents)
+        if (state.history) {
+            doc.history = state.history || [];
+            doc.dvv = new Map(Object.entries(state.dvv || {}));
+            doc.history.forEach(op => doc.applyOp(op));
+        }
     }
     return doc;
   }

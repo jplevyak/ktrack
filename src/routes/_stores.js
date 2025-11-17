@@ -312,15 +312,19 @@ export function save_history(day, profile) {
   if (day == undefined) return;
   history_store.update(function (history) {
     if (history == undefined) history = make_history();
-    const data = history.getData();
+    const day_docs = Array.from(history.items.values())
+      .filter(item => !item._deleted)
+      .sort((a, b) => a.sortKey - b.sortKey)
+      .map(item => item.data);
+
     const key = date_key(day);
-    const existing_index = data.findIndex(d => d && date_key(d) === key);
+    const existing_index = day_docs.findIndex(d => d && date_key(d) === key);
 
     if (existing_index !== -1) {
       history.updateItem([existing_index], day);
     } else {
-      const insert_index = data.findIndex(d => d && date_key(d) < key);
-      history.addItem([insert_index === -1 ? data.length : insert_index], day);
+      const insert_index = day_docs.findIndex(d => d && date_key(d) < key);
+      history.addItem([insert_index === -1 ? day_docs.length : insert_index], day);
     }
     
     const limit = merge_history_limit || 50;
