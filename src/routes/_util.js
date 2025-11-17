@@ -165,6 +165,49 @@ export function make_profile() {
   };
 }
 
+export function prune_today(server_doc, clientRequestData) {
+    // First, perform the standard tombstone pruning.
+    prune_tombstones(server_doc);
+
+    if (!clientRequestData || !clientRequestData.ops || clientRequestData.ops.length === 0) {
+        return;
+    }
+
+    // Create a temporary document from the client's operations to inspect its state.
+    const client_day_temp = new CollabJSON();
+    clientRequestData.ops.forEach(op => client_day_temp.applyOp(op));
+
+    const client_has_date = get_date_info(client_day_temp);
+    if (!client_has_date) {
+        return; // Client ops don't contain a valid day, so do nothing.
+    }
+
+    const server_has_date = get_date_info(server_doc);
+
+    // If server has no date, or client's date is newer, overwrite server state.
+    if (!server_has_date || compare_date(client_day_temp, server_doc) > 0) {
+        // Reset the server document's state
+        server_doc.items.clear();
+        server_doc.history = [];
+        server_doc.dvv.clear();
+
+        // Apply all client ops to build the new state.
+        clientRequestData.ops.forEach(op => {
+            server_doc.applyOp(op);
+            server_doc.history.push(op); // Rebuild history with client's ops
+        });
+
+        // Manually update the DVV on the server to acknowledge these ops.
+        const maxTs = clientRequestData.ops.reduce((max, op) => op.clientId === clientRequestData.clientId ? Math.max(max, op.timestamp) : max, 0);
+        if (maxTs > 0) {
+            server_doc.dvv.set(clientRequestData.clientId, maxTs);
+        }
+
+        // Prevent these ops from being applied again in getSyncResponse
+        clientRequestData.ops = [];
+    }
+}
+
 export function prune_tombstones(doc) {
     // The snapshotting process already filters out deleted items by calling getData().
     // This function can be used to permanently remove tombstones from the items map
