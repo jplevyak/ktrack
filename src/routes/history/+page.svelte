@@ -19,7 +19,6 @@
     edit_store,
     add_item,
     save_favorite,
-    sync_history,
     check_for_new_day,
   } from "../_stores.js";
 
@@ -31,7 +30,6 @@
   let limit = 30;
   let results = [];
   let added_count = 0;
-  let server_checked = false;
 
   const unsubscribe_profile = profile_store.subscribe((p) => {
     profile = p;
@@ -52,10 +50,6 @@
       history_store.set(value);
     }
     history = value;
-    if (!server_checked) {
-      server_checked = true;
-      sync_history(history, profile);
-    }
   });
   onDestroy(() => {
     unsubscribe_profile();

@@ -5,11 +5,8 @@
     profile_store,
     sync_profile,
     today_store,
-    sync_today,
     favorites_store,
-    sync_favorites,
     history_store,
-    sync_history,
   } from "../_stores.js";
   import { make_profile } from "../_util.js";
 
@@ -76,7 +73,6 @@
         profile.old_password = old_password_input.value;
         await sync_profile(profile);
         profile = profile;
-        force_sync();
       }
     }
     save.onclick = changed;
