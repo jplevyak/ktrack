@@ -61,7 +61,7 @@ export function synced_store(key, initialValue, sync, fromJSON) {
     console.log('Syncing to server...');
     status.set('syncing');
 
-    // try {
+    try {
       const currentValue = get({ subscribe });
       const ok = await sync(currentValue);
 
@@ -74,10 +74,10 @@ export function synced_store(key, initialValue, sync, fromJSON) {
       status.set('idle');
       console.log('Sync successful');
 
-    // } catch (error) {
-    //   console.error(error.message);
-    //   status.set('error');
-    // }
+    } catch (error) {
+      console.error(error.message);
+      status.set('error');
+    }
   }
 
   const debouncedSync = debounce(syncToServer, DEBOUNCE_WAIT);

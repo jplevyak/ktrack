@@ -355,7 +355,8 @@ export class CollabJSON {
   // --- Persistence Methods ---
 
   toJSON() {
-    if (this.root !== this) throw new Error('toJSON can only be called on the root document.');
+    if (this.root !== this)
+      throw new Error('toJSON can only be called on the root document.');
     return {
       id: this.id,
       year: this.year,
