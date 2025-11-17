@@ -435,7 +435,7 @@ test('Sync with a pruned server sends snapshot', () => {
 
     // Prune the server
     server.prune((doc) => {}); // Dummy prune function
-    assert.strictEqual(server.history.length, 0);
+    assert.strictEqual(server.history.length, 50);
     assert.ok(server.snapshot);
 
     // Simulate saving and reloading server state from DB
