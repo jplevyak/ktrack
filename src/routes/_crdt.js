@@ -129,13 +129,16 @@ export class CollabJSON {
   }
 
   _getSnapshotData() {
-    const sortedItems = this._getSortedItems();
-    return sortedItems.map(item => {
-      if (item.data instanceof CollabJSON) {
-        return item.data.toJSON();
-      }
-      return item.data;
-    });
+    // Get a serializable array of the full item objects, not just their data.
+    const snapshotItems = [];
+    for (const item of this._getSortedItems()) {
+        const itemClone = { ...item };
+        if (itemClone.data instanceof CollabJSON) {
+            itemClone.data = itemClone.data.toJSON();
+        }
+        snapshotItems.push(itemClone);
+    }
+    return snapshotItems;
   }
 
   // --- Public View Functions ---
@@ -404,17 +407,16 @@ export class CollabJSON {
     const doc = new CollabJSON({ ...options, id: state ? state.id : undefined });
     if (state) {
         if (state.snapshot) {
-            function build(d, data) {
-                data.forEach((item, index) => {
-                    let item_to_add = item;
-                    if (item && item._isCollabJSON) {
-                        // Pass the root down during reconstruction
-                        item_to_add = CollabJSON.fromJSON(item, { root: d.root });
-                    }
-                    d.addItem([index], item_to_add);
-                });
-            }
-            build(doc, state.snapshot);
+            // Reconstruct the items map directly from the snapshot data.
+            state.snapshot.forEach(item => {
+                let itemData = item.data;
+                if (itemData && itemData._isCollabJSON) {
+                    itemData = CollabJSON.fromJSON(itemData, { root: doc.root });
+                }
+                const newItem = { ...item, data: itemData };
+                doc.items.set(newItem.id, newItem);
+            });
+
             doc.snapshot = state.snapshot;
             doc.snapshotDvv = new Map(Object.entries(state.snapshotDvv || {}));
         }
