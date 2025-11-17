@@ -382,10 +382,6 @@ export class CollabJSON {
       return {
         _isCollabJSON: true,
         id: this.id,
-        year: this.year,
-        month: this.month,
-        date: this.date,
-        day: this.day,
         snapshot: this._getSnapshotData(),
       };
     }
@@ -393,10 +389,6 @@ export class CollabJSON {
     // This is a root document. Return the full state for persistence.
     return {
       id: this.id,
-      year: this.year,
-      month: this.month,
-      date: this.date,
-      day: this.day,
       history: this.history,
       dvv: Object.fromEntries(this.dvv),
       snapshot: this.snapshot,
@@ -407,10 +399,6 @@ export class CollabJSON {
   static fromJSON(state, options = {}) {
     const doc = new CollabJSON({ ...options, id: state ? state.id : undefined });
     if (state) {
-        doc.year = state.year;
-        doc.month = state.month;
-        doc.date = state.date;
-        doc.day = state.day;
         if (state.snapshot) {
             function build(d, data) {
                 data.forEach((item, index) => {
