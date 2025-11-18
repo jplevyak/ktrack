@@ -142,6 +142,22 @@ test('Successive nested updates are compressed', () => {
     assert.strictEqual(doc.ops.length, 3, 'Should not compress updates to different path');
 });
 
+test('Can create and update a nested map object', () => {
+    const doc = new CollabJSON();
+
+    // Add a nested map as an item
+    doc.addItem([0], { "a": { "b": 1, "c": 2 }, "d": 3 });
+    assert.deepStrictEqual(doc.getData(), [{ "a": { "b": 1, "c": 2 }, "d": 3 }]);
+
+    // Update a deeply nested value
+    doc.updateItem([0, 'a', 'b'], 10);
+    assert.deepStrictEqual(doc.getData(), [{ "a": { "b": 10, "c": 2 }, "d": 3 }]);
+
+    // Update a top-level value in the item
+    doc.updateItem([0, 'd'], 30);
+    assert.deepStrictEqual(doc.getData(), [{ "a": { "b": 10, "c": 2 }, "d": 30 }]);
+});
+
 // --- Nested Structure Tests (Removed) ---
 
 test('getItem', () => {
