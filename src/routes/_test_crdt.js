@@ -27,14 +27,28 @@ function runTests() {
 // --- Basic Tests ---
 
 test('Initialization', () => {
-    const doc = new CollabJSON();
+    const doc = new CollabJSON("{}");
     assert.deepStrictEqual(doc.getData(), {});
-    const arrDoc = new CollabJSON({ type: 'array' });
+    const arrDoc = new CollabJSON("[]");
     assert.deepStrictEqual(arrDoc.getData(), []);
+    const indDoc = new CollabJSON();
+    assert.strictEqual(indDoc.getData(), undefined);
+});
+
+test('Indeterminate type resolution', () => {
+    const arrDoc = new CollabJSON();
+    arrDoc.addItem(0, { text: 'a' });
+    assert.strictEqual(arrDoc.type, 'array');
+    assert.deepStrictEqual(arrDoc.getData(), [{ text: 'a' }]);
+
+    const objDoc = new CollabJSON();
+    objDoc.setItem('a', { text: 'value a' });
+    assert.strictEqual(objDoc.type, 'object');
+    assert.deepStrictEqual(objDoc.getData(), { a: { text: 'value a' } });
 });
 
 test('Array: addItem at beginning, middle, and end', () => {
-    const doc = new CollabJSON({ type: 'array' });
+    const doc = new CollabJSON("[]");
     doc.addItem(0, { text: 'a' });
     assert.deepStrictEqual(doc.getData(), [{ text: 'a' }]);
     doc.addItem(1, { text: 'c' });
@@ -44,7 +58,7 @@ test('Array: addItem at beginning, middle, and end', () => {
 });
 
 test('Array: deleteItem', () => {
-    const doc = new CollabJSON({ type: 'array' });
+    const doc = new CollabJSON("[]");
     doc.addItem(0, { text: 'a' });
     doc.addItem(1, { text: 'b' });
     doc.addItem(2, { text: 'c' });
@@ -53,7 +67,7 @@ test('Array: deleteItem', () => {
 });
 
 test('Array: moveItem', () => {
-    const doc = new CollabJSON({ type: 'array' });
+    const doc = new CollabJSON("[]");
     doc.addItem(0, { text: 'a' });
     doc.addItem(1, { text: 'b' });
     doc.addItem(2, { text: 'c' });
@@ -64,7 +78,7 @@ test('Array: moveItem', () => {
 });
 
 test('Object: setItem can add and overwrite keys', () => {
-    const doc = new CollabJSON();
+    const doc = new CollabJSON("{}");
     doc.setItem('a', { text: 'value a' });
     assert.deepStrictEqual(doc.getData(), { a: { text: 'value a' } });
     doc.setItem('b', { text: 'value b' });
@@ -74,7 +88,7 @@ test('Object: setItem can add and overwrite keys', () => {
 });
 
 test('Array: updateItem', () => {
-    const doc = new CollabJSON({ type: 'array' });
+    const doc = new CollabJSON("[]");
     doc.addItem(0, { text: 'a' });
     doc.addItem(1, { text: 'b' });
     doc.updateItem([0], { text: 'A' });
@@ -82,7 +96,7 @@ test('Array: updateItem', () => {
 });
 
 test('Object: updateItem', () => {
-    const doc = new CollabJSON();
+    const doc = new CollabJSON("{}");
     doc.setItem('a', { text: 'value a' });
     doc.setItem('b', { text: 'value b' });
     doc.updateItem(['a'], { text: 'new value a' });
@@ -90,7 +104,7 @@ test('Object: updateItem', () => {
 });
 
 test('Object: removeItem', () => {
-    const doc = new CollabJSON();
+    const doc = new CollabJSON("{}");
     doc.setItem('a', 1);
     doc.setItem('b', 2);
     doc.setItem('c', 3);
@@ -99,7 +113,7 @@ test('Object: removeItem', () => {
 });
 
 test('Successive updates to the same item are compressed', () => {
-    const doc = new CollabJSON();
+    const doc = new CollabJSON("{}");
     doc.setItem('item1', { text: 'initial' });
     assert.strictEqual(doc.ops.length, 1);
     assert.strictEqual(doc.ops[0].type, 'SET_ITEM');
@@ -125,7 +139,7 @@ test('Successive updates to the same item are compressed', () => {
 });
 
 test('updateItem can update nested properties', () => {
-    const doc = new CollabJSON();
+    const doc = new CollabJSON("{}");
     doc.setItem('item1', {
         text: 'top level',
         details: {
@@ -156,7 +170,7 @@ test('updateItem can update nested properties', () => {
 });
 
 test('Successive nested updates are compressed', () => {
-    const doc = new CollabJSON();
+    const doc = new CollabJSON("{}");
     doc.setItem('item1', { details: { author: 'John' } });
     
     doc.updateItem(['item1', 'details', 'author'], 'Jane');
@@ -172,7 +186,7 @@ test('Successive nested updates are compressed', () => {
 });
 
 test('Can create and update a nested map object', () => {
-    const doc = new CollabJSON();
+    const doc = new CollabJSON("{}");
 
     // Add a nested map as an item
     doc.setItem('map1', { "a": { "b": 1, "c": 2 }, "d": 3 });
@@ -190,7 +204,7 @@ test('Can create and update a nested map object', () => {
 // --- Nested Structure Tests (Removed) ---
 
 test('findPath finds path to object containing a key, with optional basePath', () => {
-    const doc = new CollabJSON();
+    const doc = new CollabJSON("{}");
     doc.setItem('item1', {
         id: 1,
         details: {
@@ -241,8 +255,8 @@ test('findPath finds path to object containing a key, with optional basePath', (
 // --- Synchronization Tests ---
 
 test('Basic sync: one-way propagation', () => {
-    const doc1 = new CollabJSON({ type: 'array' });
-    const doc2 = new CollabJSON({id: doc1.id, type: 'array'});
+    const doc1 = new CollabJSON("[]");
+    const doc2 = new CollabJSON("[]", {id: doc1.id});
 
     doc1.addItem(0, { text: 'a' });
     doc1.addItem(1, { text: 'b' });
@@ -254,9 +268,9 @@ test('Basic sync: one-way propagation', () => {
 });
 
 test('Concurrent array adds converge', () => {
-    const doc1 = new CollabJSON({clientId: 'c1', type: 'array'});
+    const doc1 = new CollabJSON("[]", {clientId: 'c1'});
     doc1.addItem(0, { text: 'common' });
-    const doc2 = new CollabJSON({id: doc1.id, clientId: 'c2', type: 'array'});
+    const doc2 = new CollabJSON("[]", {id: doc1.id, clientId: 'c2'});
     doc2.applyOp(doc1.ops[0]);
 
     // Concurrent adds
@@ -274,7 +288,7 @@ test('Concurrent array adds converge', () => {
 });
 
 test('Concurrent sets converge', () => {
-    const doc1 = new CollabJSON({clientId: 'c1'});
+    const doc1 = new CollabJSON("{}", {clientId: 'c1'});
     doc1.setItem('common', { text: 'value' });
     const doc2 = new CollabJSON({id: doc1.id, clientId: 'c2'});
     doc2.applyOp(doc1.ops[0]);
@@ -294,7 +308,7 @@ test('Concurrent sets converge', () => {
 });
 
 test('Concurrent update (LWW)', () => {
-    const doc1 = new CollabJSON({clientId: 'c1'});
+    const doc1 = new CollabJSON("{}", {clientId: 'c1'});
     doc1.setItem('item1', { text: 'original' });
     const doc2 = new CollabJSON({id: doc1.id, clientId: 'c2'});
     doc2.applyOp(doc1.ops[0]);
@@ -316,7 +330,7 @@ test('Concurrent update (LWW)', () => {
 });
 
 test('Concurrent delete and update converge', () => {
-    const doc1 = new CollabJSON({clientId: 'c1'});
+    const doc1 = new CollabJSON("{}", {clientId: 'c1'});
     doc1.setItem('item1', { text: 'original' });
     const doc2 = new CollabJSON({id: doc1.id, clientId: 'c2'});
     doc2.applyOp(doc1.ops[0]);
@@ -340,13 +354,13 @@ test('Concurrent delete and update converge', () => {
 // --- Boundary and Error Tests ---
 
 test('Throws error on invalid path for update (Object)', () => {
-    const doc = new CollabJSON();
+    const doc = new CollabJSON("{}");
     doc.setItem('a', { text: 'value a' });
     assert.throws(() => doc.updateItem(['b'], { text: 'value b' }), /Item not found/);
 });
 
 test('Throws error on invalid path for update (Array)', () => {
-    const doc = new CollabJSON({ type: 'array' });
+    const doc = new CollabJSON("[]");
     doc.addItem(0, { text: 'a' });
     assert.throws(() => doc.updateItem([1], { text: 'b' }), /Item not found/);
 });
@@ -354,7 +368,7 @@ test('Throws error on invalid path for update (Array)', () => {
 // --- DVV Sync Tests ---
 
 test('getSyncRequest is repeatable', () => {
-    const client = new CollabJSON();
+    const client = new CollabJSON("{}");
     client.setItem('a', { text: 'value a' });
     const req1 = client.getSyncRequest();
     const req2 = client.getSyncRequest();
@@ -364,8 +378,8 @@ test('getSyncRequest is repeatable', () => {
 
 test('applySyncResponse is idempotent', () => {
     const docId = 'doc1';
-    const client = new CollabJSON({ id: docId });
-    const server = new CollabJSON({ clientId: 'server', id: docId });
+    const client = new CollabJSON("{}", { id: docId });
+    const server = new CollabJSON("{}", { clientId: 'server', id: docId });
 
     client.setItem('a', { text: 'value a' });
     const request = client.getSyncRequest();
@@ -385,9 +399,9 @@ test('applySyncResponse is idempotent', () => {
 
 test('Full client-server-client sync cycle', () => {
     const docId = 'doc1';
-    const server = new CollabJSON({ clientId: 'server', id: docId });
-    const client1 = new CollabJSON({ clientId: 'c1', id: docId });
-    const client2 = new CollabJSON({ clientId: 'c2', id: docId });
+    const server = new CollabJSON("{}", { clientId: 'server', id: docId });
+    const client1 = new CollabJSON("{}", { clientId: 'c1', id: docId });
+    const client2 = new CollabJSON("{}", { clientId: 'c2', id: docId });
 
     // C1 adds item, syncs with server
     client1.setItem('c1_item', { text: 'from c1' });
@@ -422,9 +436,9 @@ test('Full client-server-client sync cycle', () => {
 
 test('Concurrent setItem (LWW)', () => {
     const docId = 'doc1';
-    const server = new CollabJSON({ clientId: 'server', id: docId });
-    const client1 = new CollabJSON({ clientId: 'c1', id: docId });
-    const client2 = new CollabJSON({ clientId: 'c2', id: docId });
+    const server = new CollabJSON("{}", { clientId: 'server', id: docId });
+    const client1 = new CollabJSON("{}", { clientId: 'c1', id: docId });
+    const client2 = new CollabJSON("{}", { clientId: 'c2', id: docId });
 
     // C1 and C2 both set the same key. C2 has a higher clock, so it should win.
     client1.clock = 5;
@@ -457,8 +471,8 @@ test('Concurrent setItem (LWW)', () => {
 
 test('Client ops are pruned after successful sync', () => {
     const docId = 'prune-ops-doc';
-    const server = new CollabJSON({ clientId: 'server', id: docId });
-    const client = new CollabJSON({ clientId: 'c1', id: docId });
+    const server = new CollabJSON("{}", { clientId: 'server', id: docId });
+    const client = new CollabJSON("{}", { clientId: 'c1', id: docId });
 
     // 1. Client creates an operation
     client.setItem('op1', { text: 'value1' });
@@ -486,9 +500,9 @@ test('Client ops are pruned after successful sync', () => {
 
 test('Sync with a pruned server sends snapshot', () => {
     const docId = 'prune-doc';
-    let server = new CollabJSON({ clientId: 'server', id: docId });
-    const client1 = new CollabJSON({ clientId: 'c1', id: docId });
-    const client2 = new CollabJSON({ clientId: 'c2', id: docId }); // New client
+    let server = new CollabJSON("{}", { clientId: 'server', id: docId });
+    const client1 = new CollabJSON("{}", { clientId: 'c1', id: docId });
+    const client2 = new CollabJSON("{}", { clientId: 'c2', id: docId }); // New client
 
     // Make > 100 ops from client1
     for (let i = 0; i < 101; i++) {

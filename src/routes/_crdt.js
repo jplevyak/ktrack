@@ -9,13 +9,18 @@ const history_prune_limit = 100;
 const history_prune_window = 50;
 
 export class CollabJSON {
-  constructor(options = {}) {
-    this.type = options.type || 'object'; // 'object' or 'array'
-    if (this.type === 'array') {
-        this.items = new Map();
-    } else {
-        this.data = {};
-        this.metadata = {};
+  constructor(jsonString, options = {}) {
+    this.type = null;
+    if (jsonString) {
+        const data = JSON.parse(jsonString);
+        if (Array.isArray(data)) {
+            this.type = 'array';
+            this.items = new Map();
+        } else {
+            this.type = 'object';
+            this.data = {};
+            this.metadata = {};
+        }
     }
     this.id = options.id || uuidv4();
     this.checked = undefined;
@@ -123,7 +128,7 @@ export class CollabJSON {
     if (this.type === 'array') {
         const sortedItems = this._getSortedItems();
         return sortedItems.map(item => item.data);
-    } else {
+    } else if (this.type === 'object') {
         const result = {};
         for (const key in this.data) {
             if (!this.metadata[key] || !this.metadata[key]._deleted) {
@@ -132,6 +137,7 @@ export class CollabJSON {
         }
         return result;
     }
+    return undefined;
   }
 
   findPath(key, basePath = null) {
@@ -167,6 +173,7 @@ export class CollabJSON {
 
     if (basePath === null) {
         const topLevelData = this.getData();
+        if (topLevelData === undefined) return null;
         if (Array.isArray(topLevelData)) {
             for (let i = 0; i < topLevelData.length; i++) {
                 const result = search(topLevelData[i], [i]);
@@ -203,7 +210,11 @@ export class CollabJSON {
 
   // For array type
   addItem(index, data) {
-    if (this.type !== 'array') throw new Error('addItem can only be used on array-type CollabJSON.');
+    if (this.type === 'object') throw new Error('addItem can only be used on array-type CollabJSON.');
+    if (this.type === null) {
+        this.type = 'array';
+        this.items = new Map();
+    }
     const sortedItems = this._getSortedItems();
     const { prevKey, nextKey } = this._findSortKeys(sortedItems, index);
     const newSortKey = this._generateSortKey(prevKey, nextKey);
@@ -249,7 +260,12 @@ export class CollabJSON {
 
   // For object type
   setItem(key, value) {
-    if (this.type !== 'object') throw new Error('setItem can only be used on object-type CollabJSON.');
+    if (this.type === 'array') throw new Error('setItem can only be used on object-type CollabJSON.');
+    if (this.type === null) {
+        this.type = 'object';
+        this.data = {};
+        this.metadata = {};
+    }
     this._applyAndStore({
       type: 'SET_ITEM',
       key: key,
@@ -259,8 +275,8 @@ export class CollabJSON {
   }
 
   removeItem(key) {
-    if (this.type !== 'object') throw new Error('removeItem can only be used on object-type CollabJSON.');
-    if (!this.data[key]) return;
+    if (this.type === null || this.type === 'array') throw new Error('removeItem can only be used on object-type CollabJSON.');
+    if (!this.data || !this.data[key]) return;
 
     this._applyAndStore({
       type: 'REMOVE_ITEM',
@@ -288,7 +304,7 @@ export class CollabJSON {
     } else {
         const key = path[0];
         const subPath = path.slice(1);
-        if (!this.data[key]) throw new Error('Item not found for update');
+        if (this.type === null || !this.data || !this.data[key]) throw new Error('Item not found for update');
         this._applyAndStore({
             type: 'UPDATE_ITEM',
             key: key,
@@ -429,9 +445,9 @@ export class CollabJSON {
     return {
       type: this.type,
       id: this.id,
-      data: this.data,
+      data: this.data || undefined,
       items: this.type === 'array' ? Array.from(this.items.entries()) : undefined,
-      metadata: this.metadata,
+      metadata: this.metadata || undefined,
       history: this.history,
       dvv: Object.fromEntries(this.dvv),
       snapshot: this.snapshot,
@@ -440,8 +456,10 @@ export class CollabJSON {
   }
 
   static fromJSON(state, options = {}) {
-    const doc = new CollabJSON({ ...options, type: state ? state.type : 'object', id: state ? state.id : undefined });
+    // Pass undefined for jsonString, as we are hydrating from a state object.
+    const doc = new CollabJSON(undefined, { ...options, id: state ? state.id : undefined });
     if (state) {
+        doc.type = state.type || 'object';
         if (state.snapshot) {
             if (doc.type === 'array') {
                 doc.items = new Map();
