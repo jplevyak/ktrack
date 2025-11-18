@@ -3,6 +3,7 @@
   import { onMount, onDestroy } from "svelte";
   import Food from "../_food.svelte";
   import {
+    get_date_info,
     weekdays,
     months,
     make_history,
@@ -31,25 +32,10 @@
   let results = [];
   let added_count = 0;
 
-  const unsubscribe_profile = profile_store.subscribe((p) => {
-    profile = p;
-  });
-  const unsubscribe_today = today_store.subscribe((t) => {
-    today = check_for_new_day(t, profile);
-  });
-  const unsubscribe_edit = edit_store.subscribe((value) => {
-    edit = value;
-  });
-  const unsubscribe_history = history_store.subscribe((value) => {
-    if (value == undefined || value.items.length == 0) {
-      value = make_history();
-      if (today != undefined) {
-        value.items.push(today);
-        value.items.push(make_historical_day(today, 1));
-      }
-      history_store.set(value);
-    }
-    history = value;
+  const unsubscribe_profile = profile_store.subscribe((p) => { profile = p; });
+  const unsubscribe_today = today_store.subscribe((t) => { today = t; });
+  const unsubscribe_edit = edit_store.subscribe((value) => { edit = value; });
+  const unsubscribe_history = history_store.subscribe((value) => { history = value;
   });
   onDestroy(() => {
     unsubscribe_profile();

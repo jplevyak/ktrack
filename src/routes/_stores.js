@@ -279,12 +279,12 @@ export const history_store = synced_store("history", make_history(), sync_histor
 
 export function add_item(item, today, edit, profile) {
   if (edit != undefined) {
-    if (Date.now() - edit.start_edit > 10 * 60 * 1000) {
-      // 10 min.
+    let edit_data = edit.toData();
+    if (Date.now() - edit_data.start_edit > 10 * 60 * 1000) { // 10 min.
       edit_store.set(undefined);
       edit = undefined;
     } else {
-      edit.start_edit = Date.now();
+      edit.updateItem(edit.findPath('start_edit'), Date.now());
     }
   }
   let store = edit != undefined ? edit_store : today_store;
@@ -292,22 +292,18 @@ export function add_item(item, today, edit, profile) {
     today = check_for_new_day(today, profile);
   }
   store.update(function (day) {
-    if (day == undefined) day = make_today();
+    if (day == undefined)
+      day = make_today();
+
     const data = day.getData();
     const existing_index = data.findIndex(i => i.name == item.name);
-
     if (existing_index !== -1) {
-      const existing_item = data[existing_index];
-      // If item exists but was marked as deleted, un-delete it.
-      if (existing_item.del) {
-        delete existing_item.del;
-        day.updateItem([existing_index], existing_item);
-      }
       return day;
     }
 
     item = { ...item };
-    if (item.servings == undefined) item.servings = 1.0;
+    if (item.servings == undefined)
+      item.servings = 1.0;
     day.addItem([data.length], item);
 
     if (edit == undefined) {
@@ -320,7 +316,9 @@ export function add_item(item, today, edit, profile) {
 export function save_history(day, profile) {
   if (day == undefined) return;
   history_store.update(function (history) {
-    if (history == undefined) history = make_history();
+    if (history == undefined)
+      history = make_history();
+
     const day_docs = Array.from(history.items.values())
       .filter(item => !item._deleted)
       .sort((a, b) => a.sortKey - b.sortKey)
@@ -330,10 +328,10 @@ export function save_history(day, profile) {
     const existing_index = day_docs.findIndex(d => d && date_key(d) === key);
 
     if (existing_index !== -1) {
-      history.updateItem([existing_index], day);
+      history.updateItem([existing_index], day.getData());
     } else {
       const insert_index = day_docs.findIndex(d => d && date_key(d) < key);
-      history.addItem([insert_index === -1 ? day_docs.length : insert_index], day);
+      history.addItem([insert_index === -1 ? day_docs.length : insert_index], day.getData());
     }
     
     const limit = merge_history_limit || 50;
@@ -356,7 +354,8 @@ export function save_today(today, profile) {
 
 export function save_favorite(item, profile, replace_index) {
   favorites_store.update(function (favorites) {
-    if (favorites == undefined) favorites = make_favorites();
+    if (favorites == undefined)
+      favorites = make_favorites();
     
     item = { ...item };
 

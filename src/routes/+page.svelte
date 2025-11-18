@@ -30,7 +30,6 @@
   let profile = undefined;
   let editing = undefined;
   let editing_index = undefined;
-  let server_checked = false;
   let resolution = 0.0001;
   let edit = undefined;
   let day = undefined;
@@ -43,29 +42,13 @@
   let small_stops = [0.0, 0.015625, 0.03125, 0.0625, 0.1, 0.125, 0.2];
   let rsmall_stops = [...small_stops].sort((x, y) => y - x);
 
-  const unsubscribe_profile = profile_store.subscribe((p) => {
-    profile = p;
-  });
-  const unsubscribe_today = today_store.subscribe((t) => {
-    let new_day = make_today();
-    if (!t || !get_date_info(t) || compare_date(t, new_day) < 0) {
-      save_today(new_day, profile);
-      // The store will update, and this callback will re-run with the new day.
-    } else {
-      today = t;
-      if (!server_checked) {
-        server_checked = true;
-        save_history(today, profile);
-      }
-    }
-  });
-  const unsubscribe_history = history_store.subscribe((value) => {
-    history = value;
-  });
+  const unsubscribe_profile = profile_store.subscribe((p) => { profile = p; });
+  const unsubscribe_today = today_store.subscribe((t) => { today = t; });
+  const unsubscribe_history = history_store.subscribe((value) => { history = value; });
 
   const unsubscribe_edit = edit_store.subscribe((d) => {
     if (d != undefined && d.start_edit) {
-      if (Date.now() - d.start_edit > 10 * 60 * 1000) {
+      if (Date.now() - d.toData().start_edit > 10 * 60 * 1000) {
         // 10 min.
         edit_store.set(undefined);
         d = undefined;
@@ -80,6 +63,7 @@
     unsubscribe_history();
   });
 
+  $: day, handle_new_day();
   $: day = edit || today;
   $: date_info = day ? get_date_info(day) : null;
   $: all_items = day ? day.getData() : [];
@@ -87,6 +71,13 @@
   $: total = get_total(day);
   $: [total_fiber, fiber_unknown] = get_total_fiber(day);
   $: averages = compute_averages(history);
+
+  function handle_new_day() {
+    let new_day = make_today();
+    if (today && compare_date(t, new_day) < 0) {
+      save_today(new_day, profile);
+    }
+  }
 
   function save_day() {
     if (compare_date(day, today) == 0) {
