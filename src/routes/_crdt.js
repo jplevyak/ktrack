@@ -80,52 +80,21 @@ export class CollabJSON {
     this.root.ops.push(op);
   }
 
-  _setRoot(root) {
-    this.root = root;
-    for (const item of this.items.values()) {
-      if (item.data instanceof CollabJSON) {
-        item.data._setRoot(root);
-      }
-    }
-  }
-
   _findItem(itemId) {
-    if (this.items.has(itemId)) return this.items.get(itemId);
-    for (const i of this.items.values()) {
-        if (i.data instanceof CollabJSON) {
-            const found = i.data._findItem(itemId);
-            if (found) return found;
-        }
-    }
-    return null;
+    return this.items.get(itemId) || null;
   }
 
   _findContainer(containerId) {
     if (this.id === containerId) return this;
-    for (const i of this.items.values()) {
-        if (i.data instanceof CollabJSON) {
-            const found = i.data._findContainer(containerId);
-            if (found) return found;
-        }
-    }
     return null;
   }
 
   _resolvePath(path) {
-    let container = this;
-    const containerPath = path.slice(0, -1);
-    const finalIndex = path[path.length - 1];
-
-    for (const index of containerPath) {
-      if (!(container instanceof CollabJSON)) throw new Error('Invalid path: part of path is not a CollabJSON container.');
-      const sortedItems = container._getSortedItems();
-      const item = sortedItems[index];
-      if (!item) throw new Error(`Invalid path: index ${index} out of bounds.`);
-      container = item.data;
+    if (path.length > 1) {
+        throw new Error('Nested paths are not supported.');
     }
-
-    if (!(container instanceof CollabJSON)) throw new Error('Invalid path: target container is not a CollabJSON.');
-    return { container, index: finalIndex };
+    const finalIndex = path[path.length - 1];
+    return { container: this, index: finalIndex };
   }
 
   _getSnapshotData() {
@@ -133,9 +102,6 @@ export class CollabJSON {
     const snapshotItems = [];
     for (const item of this._getSortedItems()) {
         const itemClone = { ...item };
-        if (itemClone.data instanceof CollabJSON) {
-            itemClone.data = itemClone.data.toJSON();
-        }
         snapshotItems.push(itemClone);
     }
     return snapshotItems;
@@ -145,52 +111,20 @@ export class CollabJSON {
 
   getData() {
     const sortedItems = this._getSortedItems();
-    return sortedItems.map(item => {
-      if (item.data instanceof CollabJSON) {
-        return item.data.getData();
-      }
-      return item.data;
-    });
+    return sortedItems.map(item => item.data);
   }
 
   getItem(path) {
     const { container, index } = this._resolvePath(path);
     const item = container._getSortedItems()[index];
     if (!item) throw new Error('Item not found for getItem');
-    const itemData = item.data;
-
-    if (itemData instanceof CollabJSON) {
-        const newDoc = new CollabJSON({ id: itemData.id });
-        const data = itemData.getData();
-
-        function build(doc, data) {
-            data.forEach((item, index) => {
-                if (Array.isArray(item)) {
-                    const nested = new CollabJSON();
-                    doc.addItem([index], nested);
-                    build(nested, item);
-                } else {
-                    doc.addItem([index], item);
-                }
-            });
-        }
-        build(newDoc, data);
-        return newDoc;
-    }
-    return itemData;
+    return item.data;
   }
   
   // --- Operation Generators (Public API) ---
 
   addItem(path, data) {
     const { container, index } = this._resolvePath(path);
-
-    if (data instanceof CollabJSON) {
-      data._setRoot(this.root);
-      this._mergeClock(data.root.clock);
-      // When adding a doc, its ops become part of the history of this doc.
-      data.ops.forEach(op => this.root.ops.push(op));
-    }
 
     const sortedItems = container._getSortedItems();
     const { prevKey, nextKey } = container._findSortKeys(sortedItems, index);
@@ -312,10 +246,6 @@ export class CollabJSON {
             break;
         }
 
-        if (op.data instanceof CollabJSON) {
-          op.data._setRoot(this.root);
-        }
-
         if (!container.items.has(op.itemId)) {
           container.items.set(op.itemId, {
             id: op.itemId,
@@ -327,16 +257,7 @@ export class CollabJSON {
         }
         item = container.items.get(op.itemId);
         if (op.timestamp >= item.updated) {
-            let data = op.data;
-            if (data && data._isCollabJSON) {
-                data = CollabJSON.fromJSON(data, { root: this.root });
-            }
-
-            if (data instanceof CollabJSON) {
-                data._setRoot(this.root);
-            }
-
-            item.data = data;
+            item.data = op.data;
             item.sortKey = op.sortKey;
             item.updated = op.timestamp;
             item._deleted = false;
@@ -356,15 +277,7 @@ export class CollabJSON {
         item = this.root._findItem(op.itemId);
         if (!item) break;
         if (op.timestamp > item.updated) {
-          let data = op.data;
-          if (data && data._isCollabJSON) {
-            data = CollabJSON.fromJSON(data, { root: this.root });
-          }
-
-          if (data instanceof CollabJSON) {
-            data._setRoot(this.root);
-          }
-          item.data = data;
+          item.data = op.data;
           item.updated = op.timestamp;
           item._deleted = false;
         }
@@ -384,15 +297,6 @@ export class CollabJSON {
   // --- Persistence Methods ---
 
   toJSON() {
-    if (this.root !== this) {
-      // This is a nested document. Return a serializable snapshot of its state.
-      return {
-        _isCollabJSON: true,
-        id: this.id,
-        snapshot: this._getSnapshotData(),
-      };
-    }
-
     // This is a root document. Return the full state for persistence.
     return {
       id: this.id,
@@ -409,11 +313,7 @@ export class CollabJSON {
         if (state.snapshot) {
             // Reconstruct the items map directly from the snapshot data.
             state.snapshot.forEach(item => {
-                let itemData = item.data;
-                if (itemData && itemData._isCollabJSON) {
-                    itemData = CollabJSON.fromJSON(itemData, { root: doc.root });
-                }
-                const newItem = { ...item, data: itemData };
+                const newItem = { ...item };
                 doc.items.set(newItem.id, newItem);
             });
 

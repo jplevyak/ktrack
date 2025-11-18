@@ -69,103 +69,14 @@ test('moveItem', () => {
     assert.deepStrictEqual(doc.getData(), [{ text: 'a' }, { text: 'b' }, { text: 'c' }]);
 });
 
-// --- Nested Structure Tests ---
-
-test('addItem with nested CollabJSON', () => {
-    const doc = new CollabJSON();
-    const nestedDoc = new CollabJSON();
-    nestedDoc.addItem([0], { val: 1 });
-    doc.addItem([0], nestedDoc);
-    doc.addItem([1], { text: 'item 2' });
-    assert.deepStrictEqual(doc.getData(), [[{ val: 1 }], { text: 'item 2' }]);
-});
-
-test('addItem into a nested structure', () => {
-    const doc = new CollabJSON();
-    doc.addItem([0], new CollabJSON());
-    doc.addItem([0, 0], { text: 'nested' });
-    assert.deepStrictEqual(doc.getData(), [[{ text: 'nested' }]]);
-});
-
-test('updateItem in a nested structure', () => {
-    const doc = new CollabJSON();
-    doc.addItem([0], new CollabJSON());
-    doc.addItem([0, 0], { text: 'nested' });
-    doc.updateItem([0, 0], { text: 'updated nested' });
-    assert.deepStrictEqual(doc.getData(), [[{ text: 'updated nested' }]]);
-});
-
-test('deleteItem from a nested structure', () => {
-    const doc = new CollabJSON();
-    doc.addItem([0], new CollabJSON());
-    doc.addItem([0, 0], { text: 'a' });
-    doc.addItem([0, 1], { text: 'b' });
-    doc.deleteItem([0, 0]);
-    assert.deepStrictEqual(doc.getData(), [[{ text: 'b' }]]);
-});
-
-test('moveItem within a nested structure', () => {
-    const doc = new CollabJSON();
-    doc.addItem([0], new CollabJSON());
-    doc.addItem([0, 0], { text: 'a' });
-    doc.addItem([0, 1], { text: 'b' });
-    doc.moveItem([0, 0], [0, 2]); // move 'a' after 'b'
-    assert.deepStrictEqual(doc.getData(), [[{ text: 'b' }, { text: 'a' }]]);
-});
-
-test('moveItem between nested and root structures', () => {
-    const doc = new CollabJSON();
-    doc.addItem([0], { text: 'root a' });
-    doc.addItem([1], new CollabJSON());
-    doc.addItem([1, 0], { text: 'nested b' });
-    doc.addItem([1, 1], { text: 'nested c' });
-
-    // move 'nested b' to root at index 1
-    doc.moveItem([1, 0], [1]);
-    assert.deepStrictEqual(doc.getData(), [{ text: 'root a' }, { text: 'nested b' }, [{ text: 'nested c' }]]);
-
-    // move 'root a' into nested doc at index 0
-    doc.moveItem([0], [2, 0]);
-    assert.deepStrictEqual(doc.getData(), [{ text: 'nested b' }, [{ text: 'root a' }, { text: 'nested c' }]]);
-});
+// --- Nested Structure Tests (Removed) ---
 
 test('getItem', () => {
     const doc = new CollabJSON();
     doc.addItem([0], { text: 'a' });
     assert.deepStrictEqual(doc.getItem([0]), { text: 'a' });
-
-    const nested = new CollabJSON();
-    nested.addItem([0], { val: 1 });
-    doc.addItem([1], nested);
-    
-    const extracted = doc.getItem([1]);
-    assert.ok(extracted instanceof CollabJSON);
-    assert.deepStrictEqual(extracted.getData(), [{ val: 1 }]);
-    // ensure it's a copy
-    extracted.addItem([1], { val: 2 });
-    assert.deepStrictEqual(doc.getData(), [{ text: 'a' }, [{ val: 1 }]]);
 });
 
-test('getItem, modify, and updateItem', () => {
-    const doc = new CollabJSON();
-    const nested = new CollabJSON();
-    nested.addItem([0], { val: 1 });
-    doc.addItem([0], nested);
-
-    // 1. Extract
-    const extracted = doc.getItem([0]);
-    assert.deepStrictEqual(extracted.getData(), [{ val: 1 }]);
-
-    // 2. Modify
-    extracted.addItem([1], { val: 2 });
-    assert.deepStrictEqual(extracted.getData(), [{ val: 1 }, { val: 2 }]);
-
-    // 3. Update
-    doc.updateItem([0], extracted);
-    
-    // 4. Assert
-    assert.deepStrictEqual(doc.getData(), [[{ val: 1 }, { val: 2 }]]);
-});
 
 
 // --- Synchronization Tests ---
@@ -257,8 +168,8 @@ test('Throws error on invalid path for update', () => {
 
 test('Throws error on invalid path for resolving', () => {
     const doc = new CollabJSON();
-    doc.addItem([0], { text: 'a' }); // Not a CollabJSON
-    assert.throws(() => doc.addItem([0, 0], { text: 'b' }), /not a CollabJSON/);
+    doc.addItem([0], { text: 'a' });
+    assert.throws(() => doc.addItem([0, 0], { text: 'b' }), /Nested paths are not supported/);
 });
 
 // --- DVV Sync Tests ---
@@ -360,30 +271,6 @@ test('Concurrent changes from two clients converge', () => {
     assert.deepStrictEqual(client1.getData(), server.getData());
 });
 
-test('addItem with nested CollabJSON syncs correctly', () => {
-    const docId = 'doc1';
-    const server = new CollabJSON({ clientId: 'server', id: docId });
-    const client1 = new CollabJSON({ clientId: 'c1', id: docId });
-    const client2 = new CollabJSON({ clientId: 'c2', id: docId });
-
-    // C1 adds a nested doc
-    const nested = new CollabJSON();
-    nested.addItem([0], { val: 1 });
-    client1.addItem([0], nested);
-    client1.addItem([0, 1], { val: 2 });
-    
-    // Sync C1 to server
-    const req1 = client1.getSyncRequest();
-    const res1 = server.getSyncResponse(req1);
-    client1.applySyncResponse(res1);
-
-    // Sync server to C2
-    const req2 = client2.getSyncRequest();
-    const res2 = server.getSyncResponse(req2);
-    client2.applySyncResponse(res2);
-    
-    assert.deepStrictEqual(client2.getData(), [[{ val: 1 }, { val: 2 }]]);
-});
 
 
 test('Client ops are pruned after successful sync', () => {
