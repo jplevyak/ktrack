@@ -10,8 +10,13 @@ const history_prune_window = 50;
 
 export class CollabJSON {
   constructor(options = {}) {
-    this.data = {};
-    this.metadata = {};
+    this.type = options.type || 'object'; // 'object' or 'array'
+    if (this.type === 'array') {
+        this.items = new Map();
+    } else {
+        this.data = {};
+        this.metadata = {};
+    }
     this.id = options.id || uuidv4();
     this.checked = undefined;
     this.synced = undefined;
@@ -42,16 +47,49 @@ export class CollabJSON {
     return uuidv4();
   }
 
+  _generateSortKey(prevKey, nextKey) {
+    if (prevKey === null && nextKey === null) return 1.0;
+    if (prevKey === null) return nextKey - 1.0;
+    if (nextKey === null) return prevKey + 1.0;
+    return (prevKey + nextKey) / 2.0;
+  }
+  
+  _getSortedItems() {
+    if (this.type !== 'array') return [];
+    return Array.from(this.items.values())
+      .filter(item => !item._deleted)
+      .sort((a, b) => {
+        if (a.sortKey !== b.sortKey) {
+          return a.sortKey - b.sortKey;
+        }
+        // Tie-break with item ID for deterministic ordering
+        return a.id < b.id ? -1 : 1;
+      });
+  }
+
+  _findSortKeys(list, index) {
+    if (index > list.length) index = list.length;
+    const prevItem = list[index - 1] || null;
+    const nextItem = list[index] || null;
+
+    const prevKey = prevItem ? prevItem.sortKey : null;
+    const nextKey = nextItem ? nextItem.sortKey : null;
+
+    return { prevKey, nextKey };
+  }
 
   _applyAndStore(op) {
     op.clientId = this.clientId;
 
     if (op.type === 'UPDATE_ITEM') {
       const lastOp = this.ops.length > 0 ? this.ops[this.ops.length - 1] : null;
-      if (lastOp && lastOp.type === 'UPDATE_ITEM' && lastOp.key === op.key && JSON.stringify(lastOp.path) === JSON.stringify(op.path)) {
-        // The new op shadows the previous one for the same path.
-        lastOp.data = op.data;
-        lastOp.timestamp = op.timestamp;
+      if (lastOp && lastOp.type === 'UPDATE_ITEM' && JSON.stringify(lastOp.path) === JSON.stringify(op.path)) {
+        const opKey = op.key || op.itemId;
+        const lastOpKey = lastOp.key || lastOp.itemId;
+        if (opKey === lastOpKey) {
+            // The new op shadows the previous one for the same path.
+            lastOp.data = op.data;
+            lastOp.timestamp = op.timestamp;
         this.applyOp(op);
         return;
       }
@@ -63,22 +101,36 @@ export class CollabJSON {
 
 
   _getSnapshotData() {
-    return {
-        data: this.data,
-        metadata: this.metadata
-    };
+    if (this.type === 'array') {
+        const snapshotItems = [];
+        for (const item of this._getSortedItems()) {
+            const itemClone = { ...item };
+            snapshotItems.push(itemClone);
+        }
+        return snapshotItems;
+    } else {
+        return {
+            data: this.data,
+            metadata: this.metadata
+        };
+    }
   }
 
   // --- Public View Functions ---
 
   getData() {
-    const result = {};
-    for (const key in this.data) {
-        if (!this.metadata[key] || !this.metadata[key]._deleted) {
-            result[key] = this.data[key];
+    if (this.type === 'array') {
+        const sortedItems = this._getSortedItems();
+        return sortedItems.map(item => item.data);
+    } else {
+        const result = {};
+        for (const key in this.data) {
+            if (!this.metadata[key] || !this.metadata[key]._deleted) {
+                result[key] = this.data[key];
+            }
         }
+        return result;
     }
-    return result;
   }
 
   findPath(key, basePath = null) {
@@ -113,17 +165,27 @@ export class CollabJSON {
     };
 
     if (basePath === null) {
-        const topLevelObject = this.getData();
-        for (const topKey in topLevelObject) {
-            const result = search(topLevelObject[topKey], [topKey]);
-            if (result) {
-                return result;
+        const topLevelData = this.getData();
+        if (Array.isArray(topLevelData)) {
+            for (let i = 0; i < topLevelData.length; i++) {
+                const result = search(topLevelData[i], [i]);
+                if (result) {
+                    return result;
+                }
+            }
+        } else {
+            for (const topKey in topLevelData) {
+                const result = search(topLevelData[topKey], [topKey]);
+                if (result) {
+                    return result;
+                }
             }
         }
         return null;
     }
 
-    const topLevelItem = this.getData()[basePath[0]];
+    const topLevelData = this.getData();
+    const topLevelItem = topLevelData[basePath[0]];
     if (topLevelItem === undefined) {
         return null;
     }
@@ -138,7 +200,55 @@ export class CollabJSON {
   
   // --- Operation Generators (Public API) ---
 
+  // For array type
+  addItem(index, data) {
+    if (this.type !== 'array') throw new Error('addItem can only be used on array-type CollabJSON.');
+    const sortedItems = this._getSortedItems();
+    const { prevKey, nextKey } = this._findSortKeys(sortedItems, index);
+    const newSortKey = this._generateSortKey(prevKey, nextKey);
+    const newItemId = this._generateId();
+
+    this._applyAndStore({
+      type: 'ADD_ITEM',
+      itemId: newItemId,
+      data: data,
+      sortKey: newSortKey,
+      timestamp: this._tick(),
+    });
+  }
+
+  deleteItem(index) {
+    if (this.type !== 'array') throw new Error('deleteItem can only be used on array-type CollabJSON.');
+    const item = this._getSortedItems()[index];
+    if (!item) return;
+
+    this._applyAndStore({
+      type: 'DELETE_ITEM',
+      itemId: item.id,
+      timestamp: this._tick(),
+    });
+  }
+
+  moveItem(fromIndex, toIndex) {
+    if (this.type !== 'array') throw new Error('moveItem can only be used on array-type CollabJSON.');
+    const itemToMove = this._getSortedItems()[fromIndex];
+    if (!itemToMove) throw new Error('Item to move not found');
+    
+    const targetSortedItems = this._getSortedItems().filter(item => item.id !== itemToMove.id);
+    const { prevKey, nextKey } = this._findSortKeys(targetSortedItems, toIndex);
+    const newSortKey = this._generateSortKey(prevKey, nextKey);
+
+    this._applyAndStore({
+        type: 'MOVE_ITEM',
+        itemId: itemToMove.id,
+        newSortKey: newSortKey,
+        timestamp: this._tick(),
+    });
+  }
+
+  // For object type
   setItem(key, value) {
+    if (this.type !== 'object') throw new Error('setItem can only be used on object-type CollabJSON.');
     this._applyAndStore({
       type: 'SET_ITEM',
       key: key,
@@ -147,23 +257,8 @@ export class CollabJSON {
     });
   }
 
-  updateItem(path, newData) {
-    if (!path || path.length === 0) throw new Error('Invalid path for updateItem');
-    const key = path[0];
-    const subPath = path.slice(1);
-
-    if (!this.data[key]) throw new Error('Item not found for update');
-
-    this._applyAndStore({
-      type: 'UPDATE_ITEM',
-      key: key,
-      path: subPath,
-      data: newData,
-      timestamp: this._tick(),
-    });
-  }
-
   removeItem(key) {
+    if (this.type !== 'object') throw new Error('removeItem can only be used on object-type CollabJSON.');
     if (!this.data[key]) return;
 
     this._applyAndStore({
@@ -171,6 +266,36 @@ export class CollabJSON {
       key: key,
       timestamp: this._tick(),
     });
+  }
+
+  // For both types
+  updateItem(path, newData) {
+    if (!path || path.length === 0) throw new Error('Invalid path for updateItem');
+    
+    if (this.type === 'array') {
+        const itemIndex = path[0];
+        const subPath = path.slice(1);
+        const item = this._getSortedItems()[itemIndex];
+        if (!item) throw new Error('Item not found for update');
+        this._applyAndStore({
+            type: 'UPDATE_ITEM',
+            itemId: item.id,
+            path: subPath,
+            data: newData,
+            timestamp: this._tick(),
+        });
+    } else {
+        const key = path[0];
+        const subPath = path.slice(1);
+        if (!this.data[key]) throw new Error('Item not found for update');
+        this._applyAndStore({
+            type: 'UPDATE_ITEM',
+            key: key,
+            path: subPath,
+            data: newData,
+            timestamp: this._tick(),
+        });
+    }
   }
 
   prune(pruneFn, clientRequestData) {
@@ -198,10 +323,49 @@ export class CollabJSON {
   applyOp(op) {
     this._mergeClock(op.timestamp);
 
-    let meta;
+    let meta, item;
 
     switch (op.type) {
+      // Array operations
+      case 'ADD_ITEM':
+        if (this.type !== 'array') break;
+        if (!this.items.has(op.itemId)) {
+          this.items.set(op.itemId, {
+            id: op.itemId,
+            data: op.data,
+            sortKey: op.sortKey,
+            updated: op.timestamp,
+            _deleted: false,
+          });
+        }
+        item = this.items.get(op.itemId);
+        if (op.timestamp >= item.updated) {
+            item.data = op.data;
+            item.sortKey = op.sortKey;
+            item.updated = op.timestamp;
+            item._deleted = false;
+        }
+        break;
+      case 'DELETE_ITEM':
+        if (this.type !== 'array') break;
+        item = this.items.get(op.itemId);
+        if (item && op.timestamp > item.updated) {
+          item._deleted = true;
+          item.updated = op.timestamp;
+        }
+        break;
+      case 'MOVE_ITEM':
+        if (this.type !== 'array') break;
+        item = this.items.get(op.itemId);
+        if (item && op.timestamp > item.updated) {
+          item.sortKey = op.newSortKey;
+          item.updated = op.timestamp;
+        }
+        break;
+
+      // Object operations
       case 'SET_ITEM':
+        if (this.type !== 'object') break;
         meta = this.metadata[op.key];
         if (!meta || op.timestamp >= meta.updated) {
             this.data[op.key] = op.value;
@@ -211,34 +375,48 @@ export class CollabJSON {
             };
         }
         break;
-
-      case 'UPDATE_ITEM':
-        meta = this.metadata[op.key];
-        if (!meta || op.timestamp <= meta.updated) break;
-
-        if (op.path && op.path.length > 0) {
-          const newData = structuredClone(this.data[op.key]);
-          let current = newData;
-          for (let i = 0; i < op.path.length - 1; i++) {
-              if (typeof current !== 'object' || current === null) return; // Path is invalid, ignore op.
-              current = current[op.path[i]];
-          }
-          if (typeof current !== 'object' || current === null) return; // Path is invalid, ignore op.
-          const finalKey = op.path[op.path.length - 1];
-          current[finalKey] = op.data;
-          this.data[op.key] = newData;
-        } else {
-          this.data[op.key] = op.data;
-        }
-        meta.updated = op.timestamp;
-        meta._deleted = false;
-        break;
-
       case 'REMOVE_ITEM':
+        if (this.type !== 'object') break;
         meta = this.metadata[op.key];
         if (meta && op.timestamp > meta.updated) {
           meta._deleted = true;
           meta.updated = op.timestamp;
+        }
+        break;
+
+      // Shared operation
+      case 'UPDATE_ITEM':
+        if (this.type === 'array') {
+            item = this.items.get(op.itemId);
+            if (!item || op.timestamp <= item.updated) break;
+        } else {
+            meta = this.metadata[op.key];
+            if (!meta || op.timestamp <= meta.updated) break;
+            item = { data: this.data[op.key] }; // create a compatible structure for logic below
+        }
+        
+        if (op.path && op.path.length > 0) {
+            const newData = structuredClone(item.data);
+            let current = newData;
+            for (let i = 0; i < op.path.length - 1; i++) {
+                if (typeof current !== 'object' || current === null) return;
+                current = current[op.path[i]];
+            }
+            if (typeof current !== 'object' || current === null) return;
+            const finalKey = op.path[op.path.length - 1];
+            current[finalKey] = op.data;
+            item.data = newData;
+        } else {
+            item.data = op.data;
+        }
+        
+        if (this.type === 'array') {
+            item.updated = op.timestamp;
+            item._deleted = false;
+        } else {
+            this.data[op.key] = item.data;
+            meta.updated = op.timestamp;
+            meta._deleted = false;
         }
         break;
     }
@@ -248,8 +426,10 @@ export class CollabJSON {
 
   toJSON() {
     return {
+      type: this.type,
       id: this.id,
       data: this.data,
+      items: this.type === 'array' ? Array.from(this.items.entries()) : undefined,
       metadata: this.metadata,
       history: this.history,
       dvv: Object.fromEntries(this.dvv),
@@ -259,17 +439,25 @@ export class CollabJSON {
   }
 
   static fromJSON(state, options = {}) {
-    const doc = new CollabJSON({ ...options, id: state ? state.id : undefined });
+    const doc = new CollabJSON({ ...options, type: state ? state.type : 'object', id: state ? state.id : undefined });
     if (state) {
         if (state.snapshot) {
-            // Reconstruct the state directly from the snapshot data.
-            doc.data = state.snapshot.data || {};
-            doc.metadata = state.snapshot.metadata || {};
+            if (doc.type === 'array') {
+                doc.items = new Map();
+                (state.snapshot || []).forEach(item => doc.items.set(item.id, item));
+            } else {
+                doc.data = state.snapshot.data || {};
+                doc.metadata = state.snapshot.metadata || {};
+            }
             doc.snapshot = state.snapshot;
             doc.snapshotDvv = new Map(Object.entries(state.snapshotDvv || {}));
         } else {
-            doc.data = state.data || {};
-            doc.metadata = state.metadata || {};
+            if (doc.type === 'array') {
+                doc.items = new Map(state.items || []);
+            } else {
+                doc.data = state.data || {};
+                doc.metadata = state.metadata || {};
+            }
         }
         
         if (state.history) {

@@ -28,10 +28,42 @@ function runTests() {
 
 test('Initialization', () => {
     const doc = new CollabJSON();
-    assert.deepStrictEqual(doc.getData(), []);
+    assert.deepStrictEqual(doc.getData(), {});
+    const arrDoc = new CollabJSON({ type: 'array' });
+    assert.deepStrictEqual(arrDoc.getData(), []);
 });
 
-test('setItem can add and overwrite keys', () => {
+test('Array: addItem at beginning, middle, and end', () => {
+    const doc = new CollabJSON({ type: 'array' });
+    doc.addItem(0, { text: 'a' });
+    assert.deepStrictEqual(doc.getData(), [{ text: 'a' }]);
+    doc.addItem(1, { text: 'c' });
+    assert.deepStrictEqual(doc.getData(), [{ text: 'a' }, { text: 'c' }]);
+    doc.addItem(1, { text: 'b' });
+    assert.deepStrictEqual(doc.getData(), [{ text: 'a' }, { text: 'b' }, { text: 'c' }]);
+});
+
+test('Array: deleteItem', () => {
+    const doc = new CollabJSON({ type: 'array' });
+    doc.addItem(0, { text: 'a' });
+    doc.addItem(1, { text: 'b' });
+    doc.addItem(2, { text: 'c' });
+    doc.deleteItem(1);
+    assert.deepStrictEqual(doc.getData(), [{ text: 'a' }, { text: 'c' }]);
+});
+
+test('Array: moveItem', () => {
+    const doc = new CollabJSON({ type: 'array' });
+    doc.addItem(0, { text: 'a' });
+    doc.addItem(1, { text: 'b' });
+    doc.addItem(2, { text: 'c' });
+    doc.moveItem(0, 2);
+    assert.deepStrictEqual(doc.getData(), [{ text: 'b' }, { text: 'c' }, { text: 'a' }]);
+    doc.moveItem(2, 0); // move 'a' back to index 0
+    assert.deepStrictEqual(doc.getData(), [{ text: 'a' }, { text: 'b' }, { text: 'c' }]);
+});
+
+test('Object: setItem can add and overwrite keys', () => {
     const doc = new CollabJSON();
     doc.setItem('a', { text: 'value a' });
     assert.deepStrictEqual(doc.getData(), { a: { text: 'value a' } });
@@ -41,7 +73,15 @@ test('setItem can add and overwrite keys', () => {
     assert.deepStrictEqual(doc.getData(), { a: { text: 'new value a' }, b: { text: 'value b' } });
 });
 
-test('updateItem', () => {
+test('Array: updateItem', () => {
+    const doc = new CollabJSON({ type: 'array' });
+    doc.addItem(0, { text: 'a' });
+    doc.addItem(1, { text: 'b' });
+    doc.updateItem([0], { text: 'A' });
+    assert.deepStrictEqual(doc.getData(), [{ text: 'A' }, { text: 'b' }]);
+});
+
+test('Object: updateItem', () => {
     const doc = new CollabJSON();
     doc.setItem('a', { text: 'value a' });
     doc.setItem('b', { text: 'value b' });
@@ -49,7 +89,7 @@ test('updateItem', () => {
     assert.deepStrictEqual(doc.getData(), { a: { text: 'new value a' }, b: { text: 'value b' } });
 });
 
-test('removeItem', () => {
+test('Object: removeItem', () => {
     const doc = new CollabJSON();
     doc.setItem('a', 1);
     doc.setItem('b', 2);
@@ -201,16 +241,36 @@ test('findPath finds path to object containing a key, with optional basePath', (
 // --- Synchronization Tests ---
 
 test('Basic sync: one-way propagation', () => {
-    const doc1 = new CollabJSON();
-    const doc2 = new CollabJSON({id: doc1.id});
+    const doc1 = new CollabJSON({ type: 'array' });
+    const doc2 = new CollabJSON({id: doc1.id, type: 'array'});
 
-    doc1.addItem([0], { text: 'a' });
-    doc1.addItem([1], { text: 'b' });
+    doc1.addItem(0, { text: 'a' });
+    doc1.addItem(1, { text: 'b' });
 
     // Sync ops from 1 to 2
     doc1.ops.forEach(op => doc2.applyOp(op));
 
     assert.deepStrictEqual(doc1.getData(), doc2.getData());
+});
+
+test('Concurrent array adds converge', () => {
+    const doc1 = new CollabJSON({clientId: 'c1', type: 'array'});
+    doc1.addItem(0, { text: 'common' });
+    const doc2 = new CollabJSON({id: doc1.id, clientId: 'c2', type: 'array'});
+    doc2.applyOp(doc1.ops[0]);
+
+    // Concurrent adds
+    doc1.addItem(1, { text: 'from 1' });
+    const op1 = doc1.ops[doc1.ops.length - 1];
+    doc2.addItem(1, { text: 'from 2' });
+    const op2 = doc2.ops[doc2.ops.length - 1];
+
+    // Sync
+    doc2.applyOp(op1);
+    doc1.applyOp(op2);
+
+    assert.deepStrictEqual(doc1.getData(), doc2.getData());
+    assert.strictEqual(doc1.getData().length, 3);
 });
 
 test('Concurrent sets converge', () => {
@@ -279,10 +339,16 @@ test('Concurrent delete and update converge', () => {
 
 // --- Boundary and Error Tests ---
 
-test('Throws error on invalid path for update', () => {
+test('Throws error on invalid path for update (Object)', () => {
     const doc = new CollabJSON();
     doc.setItem('a', { text: 'value a' });
     assert.throws(() => doc.updateItem(['b'], { text: 'value b' }), /Item not found/);
+});
+
+test('Throws error on invalid path for update (Array)', () => {
+    const doc = new CollabJSON({ type: 'array' });
+    doc.addItem(0, { text: 'a' });
+    assert.throws(() => doc.updateItem([1], { text: 'b' }), /Item not found/);
 });
 
 // --- DVV Sync Tests ---
