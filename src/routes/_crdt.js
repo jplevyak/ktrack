@@ -12,31 +12,28 @@ export class CollabJSON {
   constructor(options = {}) {
     this.items = new Map();
     this.id = options.id || uuidv4();
-    this.root = options.root || this;
     this.checked = undefined;
     this.synced = undefined;
 
-    if (this.root === this) {
-      this.clientId = options.clientId || uuidv4();
-      this.clock = 0;
-      this.dvv = new Map();
-      this.ops = []; // local ops for the whole document
-      this.history = []; // all ops on server
-      this.snapshot = null;
-      this.snapshotDvv = new Map();
-    }
+    this.clientId = options.clientId || uuidv4();
+    this.clock = 0;
+    this.dvv = new Map();
+    this.ops = []; // local ops for the whole document
+    this.history = []; // all ops on server
+    this.snapshot = null;
+    this.snapshotDvv = new Map();
   }
 
   // --- Private Helper Functions ---
 
   _tick() {
-    this.root.clock = Math.round(this.root.clock) + 1.0 + Math.random();
-    return this.root.clock;
+    this.clock = Math.round(this.clock) + 1.0 + Math.random();
+    return this.clock;
   }
 
   _mergeClock(remoteTimestamp) {
     if (remoteTimestamp) {
-      this.root.clock = Math.round(Math.max(this.root.clock, remoteTimestamp)) + 1.0 + Math.random();
+      this.clock = Math.round(Math.max(this.clock, remoteTimestamp)) + 1.0 + Math.random();
     }
   }
 
@@ -75,9 +72,9 @@ export class CollabJSON {
   }
 
   _applyAndStore(op) {
-    op.clientId = this.root.clientId;
-    this.root.applyOp(op);
-    this.root.ops.push(op);
+    op.clientId = this.clientId;
+    this.applyOp(op);
+    this.ops.push(op);
   }
 
   _findItem(itemId) {
@@ -210,8 +207,6 @@ export class CollabJSON {
   }
 
   prune(pruneFn, clientRequestData) {
-    if (this.root !== this) throw new Error('Pruning can only be done on the root document.');
-
     // Allow custom logic to run, e.g. for comparing 'today' dates.
     if (pruneFn) {
         pruneFn(this, clientRequestData);
@@ -240,7 +235,7 @@ export class CollabJSON {
 
     switch (op.type) {
       case 'ADD_ITEM':
-        const container = this.root._findContainer(op.containerId);
+        const container = this._findContainer(op.containerId);
         if (!container) {
             console.warn(`Container ${op.containerId} not found for ADD_ITEM.`);
             break;
@@ -265,7 +260,7 @@ export class CollabJSON {
         break;
 
       case 'MOVE_ITEM':
-        item = this.root._findItem(op.itemId);
+        item = this._findItem(op.itemId);
         if (!item) break;
         if (op.timestamp > item.updated) {
           item.sortKey = op.newSortKey;
@@ -274,7 +269,7 @@ export class CollabJSON {
         break;
 
       case 'UPDATE_ITEM':
-        item = this.root._findItem(op.itemId);
+        item = this._findItem(op.itemId);
         if (!item) break;
         if (op.timestamp > item.updated) {
           item.data = op.data;
@@ -284,7 +279,7 @@ export class CollabJSON {
         break;
 
       case 'DELETE_ITEM':
-        item = this.root._findItem(op.itemId);
+        item = this._findItem(op.itemId);
         if (!item) break;
         if (op.timestamp > item.updated) {
           item._deleted = true;
@@ -334,8 +329,6 @@ export class CollabJSON {
   // --- DVV Sync Methods ---
 
   getSyncRequest() {
-    if (this.root !== this) throw new Error('Sync methods can only be called on the root document.');
-
     const lastSeenBySystem = this.dvv.get(this.clientId) || 0;
     const newOps = this.ops.filter(op => op.timestamp > lastSeenBySystem);
     this.checked = Date.now();
@@ -349,8 +342,6 @@ export class CollabJSON {
   }
 
   applySyncResponse({ ops, dvv, snapshot, snapshotDvv, reset }) {
-    if (this.root !== this) throw new Error('Sync methods can only be called on the root document.');
-
     if (reset) {
         this.ops = []; // Discard local ops, client was too far behind or had a mismatched doc ID.
         
@@ -362,13 +353,6 @@ export class CollabJSON {
         this.snapshot = newDoc.snapshot;
         this.snapshotDvv = newDoc.snapshotDvv;
         this.id = newDoc.id; // This is crucial for subsequent syncs to have the right ID.
-
-        // Re-establish the root for nested documents.
-        for (const item of this.items.values()) {
-            if (item.data instanceof CollabJSON) {
-                item.data._setRoot(this);
-            }
-        }
         
         this.dvv = new Map(Object.entries(snapshotDvv || {}));
         this.synced = Date.now();
@@ -384,7 +368,6 @@ export class CollabJSON {
   }
 
   getSyncResponse({ dvv: clientDvv, ops: clientOps, clientId }) {
-    if (this.root !== this) throw new Error('Sync methods can only be called on the root document.');
     const clientDvvMap = new Map(Object.entries(clientDvv));
 
     // Check if client is too far behind and needs a snapshot

@@ -121,10 +121,10 @@ test('Concurrent update (LWW)', () => {
     doc2.applyOp(doc1.ops[0]);
 
     // Concurrent updates. Force clock to determine winner.
-    doc1.root.clock = 10;
+    doc1.clock = 10;
     doc1.updateItem([0], { text: 'update from 1' }); // This one is later
     const op1 = doc1.ops[doc1.ops.length - 1];
-    doc2.root.clock = 5;
+    doc2.clock = 5;
     doc2.updateItem([0], { text: 'update from 2' }); // This one is earlier
     const op2 = doc2.ops[doc2.ops.length - 1];
 
@@ -143,10 +143,10 @@ test('Concurrent delete and update converge', () => {
     doc2.applyOp(doc1.ops[0]);
 
     // Concurrent update and delete
-    doc1.root.clock = 10;
+    doc1.clock = 10;
     doc1.deleteItem([0]); // delete wins (later timestamp)
     const op1 = doc1.ops[doc1.ops.length - 1];
-    doc2.root.clock = 5;
+    doc2.clock = 5;
     doc2.updateItem([0], { text: 'update from 2' });
     const op2 = doc2.ops[doc2.ops.length - 1];
 
