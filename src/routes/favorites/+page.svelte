@@ -56,8 +56,9 @@
       this.saveDocument(false);
     });
     if (favorites != undefined) {
-      for (var i in favorites.items) {
-        index.addDoc({ i: i, name: favorites.items[i].name });
+      let favorites_data = favorites.getData();
+      for (var i in favorites_data) {
+        index.addDoc({ i: i, name: favorites_data[i].name });
       }
     }
   }
@@ -75,9 +76,10 @@
   }
 
   function update_results() {
+    let favorites_data = favorites.getData();
     results_map = undefined;
     if (search_value == undefined || search_value == "") {
-      results = [...favorites.items];
+      results = [...favorites_data];
       return;
     }
     results_map = new Map();
@@ -86,7 +88,7 @@
     results = [];
     for (let f in found) {
       results_map.set(f, found[f].ref);
-      results.push(favorites.items[found[f].ref]);
+      results.push(favorites_data.get[found[f].ref]);
     }
   }
 
@@ -157,11 +159,8 @@
       if (results_map != undefined) i = results_map.get(index);
       let j = i - 1;
       if (j >= 0) {
-        let favs = favorites;
-        let f = favorites.items[i];
-        favs.items.splice(i, 1);
-        favs.items.splice(j, 0, f);
-        save(favs);
+        favorites.moveItem([i], [i-1]);
+        save(favorites);
         return;
       }
     } else if (change == "down") {
@@ -169,10 +168,7 @@
       if (results_map != undefined) i = results_map.get(index);
       let j = i + 1;
       if (j < favorites.items.length) {
-        let favs = favorites;
-        let f = favs.items[i];
-        favs.items.splice(i, 1);
-        favs.items.splice(j, 0, f);
+        favorites.moveItem([i], [i+1]);
         save(favs);
         return;
       }
@@ -196,24 +192,22 @@
   <br /><br />
   {#if favorites != undefined}
     {#each results as f, i}
-      {#if f.del == undefined}
-        <Food
-          name={f.name}
-          notes={f.notes}
-          index={i}
-          mcg={f.mcg}
-          fiber={f.fiber}
-          unit={f.unit}
-          servings={f.servings}
-          source={f.source}
-          use_edit="true"
-          use_dup="true"
-          use_add="true"
-          use_del="true"
-          use_move="true"
-          on:message={do_msg}
-        />
-      {/if}
+      <Food
+        name={f.name}
+        notes={f.notes}
+        index={i}
+        mcg={f.mcg}
+        fiber={f.fiber}
+        unit={f.unit}
+        servings={f.servings}
+        source={f.source}
+        use_edit="true"
+        use_dup="true"
+        use_add="true"
+        use_del="true"
+        use_move="true"
+        on:message={do_msg}
+      />
     {/each}
   {/if}
 {:else}

@@ -43,12 +43,17 @@
   let rsmall_stops = [...small_stops].sort((x, y) => y - x);
 
   const unsubscribe_profile = profile_store.subscribe((p) => { profile = p; });
-  const unsubscribe_today = today_store.subscribe((t) => { today = t; });
+  const unsubscribe_today = today_store.subscribe((t) => {
+    console.log('subscribed today', t);
+    today = t;
+  });
   const unsubscribe_history = history_store.subscribe((value) => { history = value; });
 
   const unsubscribe_edit = edit_store.subscribe((d) => {
-    if (d != undefined && d.start_edit) {
-      if (Date.now() - d.toData().start_edit > 10 * 60 * 1000) {
+    console.log('unsubscribe_edit', d);
+    let edit_data = d ? d.getData() : undefined;
+    if (edit_data != undefined && edit_data.start_edit) {
+      if (Date.now() - edit_data.start_edit > 10 * 60 * 1000) {
         // 10 min.
         edit_store.set(undefined);
         d = undefined;
@@ -66,15 +71,22 @@
   $: day, handle_new_day();
   $: day = edit || today;
   $: date_info = day ? get_date_info(day) : null;
-  $: all_items = day ? day.getData() : [];
+  $: all_items = day ? doGetData(day) : [];
   $: food_items = all_items.filter(item => typeof item.mcg !== 'undefined');
   $: total = get_total(day);
   $: [total_fiber, fiber_unknown] = get_total_fiber(day);
-  $: averages = compute_averages(history);
+  $: averages = compute_averages(history.getData());
+
+  function doGetData(d) {
+    console.log('dogetdata edit', edit);
+    console.log('dogetdata today', today);
+    console.log('dogetData', d);
+    return d.getData();
+  }
 
   function handle_new_day() {
     let new_day = make_today();
-    if (today && compare_date(t, new_day) < 0) {
+    if (today && compare_date(today, new_day) < 0) {
       save_today(new_day, profile);
     }
   }
@@ -187,6 +199,7 @@ Averages [3, 5, 7] days: [{averages[0].toFixed(1)}, {averages[1].toFixed(1)}, {a
 </b><br /><br />
 {#if editing == undefined}
   {#each food_items as f, i}
+    {#if i != 0}
     <Food
       name={f.name}
       notes={f.notes}
@@ -203,6 +216,7 @@ Averages [3, 5, 7] days: [{averages[0].toFixed(1)}, {averages[1].toFixed(1)}, {a
       use_del="true"
       on:message={do_msg}
     />
+    {/if}
   {/each}
   Total: {total.toFixed(2)} Total fiber: {total_fiber.toFixed(2)} {#if fiber_unknown} * some unknown * {/if}
 {:else}

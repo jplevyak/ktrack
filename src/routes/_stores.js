@@ -285,6 +285,7 @@ export function add_item(item, today, edit, profile) {
       edit = undefined;
     } else {
       edit.updateItem(edit.findPath('start_edit'), Date.now());
+      edit_store.set(edit);
     }
   }
   let store = edit != undefined ? edit_store : today_store;
@@ -327,6 +328,7 @@ export function save_history(day, profile) {
     const key = date_key(day);
     const existing_index = day_docs.findIndex(d => d && date_key(d) === key);
 
+    console.log('existing index', existing_index);
     if (existing_index !== -1) {
       history.updateItem([existing_index], day.getData());
     } else {
@@ -348,6 +350,7 @@ export function save_history(day, profile) {
 }
 
 export function save_today(today, profile) {
+  console.log('save2', today);
   today_store.set(today);
   save_history(today, profile);
 }

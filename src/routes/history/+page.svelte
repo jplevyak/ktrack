@@ -6,8 +6,6 @@
     get_date_info,
     weekdays,
     months,
-    make_history,
-    make_historical_day,
     get_total,
     get_total_fiber,
     compute_averages,
@@ -44,12 +42,8 @@
     unsubscribe_history();
   });
 
-  function get_results() {
-    return history.items.slice(0, limit);
-  }
-
   $: results = history.getData().slice(0, limit);
-  $: averages = compute_averages(history);
+  $: averages = compute_averages(history.getData());
 
   onMount(() => {
     let box = document.getElementById("limit");
@@ -106,12 +100,12 @@ Number of days to view <input type="number" id="limit" value={limit} />
 
 {#each results as day, e}
   <b
-    >Date: {weekdays[day.day]}
-    {months[day.month]}
-    {day.date}, {day.year} <button on:click={() => edit_day(day)}>edit</button>
+    >Date: {weekdays[day[0].day]}
+    {months[day[0].month]}
+    {day[0].date}, {day[0].year} <button on:click={() => edit_day(day)}>edit</button>
   </b><br /><br />
-  {#each day.items as f, i}
-    {#if f.del == undefined}
+  {#each day as f, i}
+    {#if i != 0}
       <Food
         name={f.name}
         notes={f.notes}
