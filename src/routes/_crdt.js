@@ -10,7 +10,8 @@ const history_prune_window = 50;
 
 export class CollabJSON {
   constructor(options = {}) {
-    this.items = new Map();
+    this.data = {};
+    this.metadata = {};
     this.id = options.id || uuidv4();
     this.checked = undefined;
     this.synced = undefined;
@@ -41,42 +42,13 @@ export class CollabJSON {
     return uuidv4();
   }
 
-  _generateSortKey(prevKey, nextKey) {
-    if (prevKey === null && nextKey === null) return 1.0;
-    if (prevKey === null) return nextKey - 1.0;
-    if (nextKey === null) return prevKey + 1.0;
-    return (prevKey + nextKey) / 2.0;
-  }
-  
-  _getSortedItems() {
-    return Array.from(this.items.values())
-      .filter(item => !item._deleted)
-      .sort((a, b) => {
-        if (a.sortKey !== b.sortKey) {
-          return a.sortKey - b.sortKey;
-        }
-        // Tie-break with item ID for deterministic ordering
-        return a.id < b.id ? -1 : 1;
-      });
-  }
-
-  _findSortKeys(list, index) {
-    if (index > list.length) index = list.length;
-    const prevItem = list[index - 1] || null;
-    const nextItem = list[index] || null;
-
-    const prevKey = prevItem ? prevItem.sortKey : null;
-    const nextKey = nextItem ? nextItem.sortKey : null;
-
-    return { prevKey, nextKey };
-  }
 
   _applyAndStore(op) {
     op.clientId = this.clientId;
 
     if (op.type === 'UPDATE_ITEM') {
       const lastOp = this.ops.length > 0 ? this.ops[this.ops.length - 1] : null;
-      if (lastOp && lastOp.type === 'UPDATE_ITEM' && lastOp.itemId === op.itemId && JSON.stringify(lastOp.path) === JSON.stringify(op.path)) {
+      if (lastOp && lastOp.type === 'UPDATE_ITEM' && lastOp.key === op.key && JSON.stringify(lastOp.path) === JSON.stringify(op.path)) {
         // The new op shadows the previous one for the same path.
         lastOp.data = op.data;
         lastOp.timestamp = op.timestamp;
@@ -89,45 +61,24 @@ export class CollabJSON {
     this.ops.push(op);
   }
 
-  _findItem(itemId) {
-    return this.items.get(itemId) || null;
-  }
-
-  _findContainer(containerId) {
-    if (this.id === containerId) return this;
-    return null;
-  }
-
-  _resolvePath(path) {
-    if (path.length > 1) {
-        throw new Error('Nested paths are not supported.');
-    }
-    const finalIndex = path[path.length - 1];
-    return { container: this, index: finalIndex };
-  }
 
   _getSnapshotData() {
-    // Get a serializable array of the full item objects, not just their data.
-    const snapshotItems = [];
-    for (const item of this._getSortedItems()) {
-        const itemClone = { ...item };
-        snapshotItems.push(itemClone);
-    }
-    return snapshotItems;
+    return {
+        data: this.data,
+        metadata: this.metadata
+    };
   }
 
   // --- Public View Functions ---
 
   getData() {
-    const sortedItems = this._getSortedItems();
-    return sortedItems.map(item => item.data);
-  }
-
-  getItem(path) {
-    const { container, index } = this._resolvePath(path);
-    const item = container._getSortedItems()[index];
-    if (!item) throw new Error('Item not found for getItem');
-    return item.data;
+    const result = {};
+    for (const key in this.data) {
+        if (!this.metadata[key] || !this.metadata[key]._deleted) {
+            result[key] = this.data[key];
+        }
+    }
+    return result;
   }
 
   findPath(key, basePath = null) {
@@ -162,9 +113,9 @@ export class CollabJSON {
     };
 
     if (basePath === null) {
-        const topLevelItems = this.getData();
-        for (let i = 0; i < topLevelItems.length; i++) {
-            const result = search(topLevelItems[i], [i]);
+        const topLevelObject = this.getData();
+        for (const topKey in topLevelObject) {
+            const result = search(topLevelObject[topKey], [topKey]);
             if (result) {
                 return result;
             }
@@ -187,92 +138,37 @@ export class CollabJSON {
   
   // --- Operation Generators (Public API) ---
 
-  addItem(path, data) {
-    const { container, index } = this._resolvePath(path);
-
-    const sortedItems = container._getSortedItems();
-    const { prevKey, nextKey } = container._findSortKeys(sortedItems, index);
-    const newSortKey = this._generateSortKey(prevKey, nextKey);
-    const newItemId = this._generateId();
-
-    const op = {
-      type: 'ADD_ITEM',
-      itemId: newItemId,
-      containerId: container.id,
-      data: data,
-      sortKey: newSortKey,
+  setItem(key, value) {
+    this._applyAndStore({
+      type: 'SET_ITEM',
+      key: key,
+      value: value,
       timestamp: this._tick(),
-    };
-    container._applyAndStore(op);
+    });
   }
 
   updateItem(path, newData) {
     if (!path || path.length === 0) throw new Error('Invalid path for updateItem');
-    const itemIndex = path[0];
+    const key = path[0];
     const subPath = path.slice(1);
 
-    const item = this._getSortedItems()[itemIndex];
-    if (!item) throw new Error('Item not found for update');
+    if (!this.data[key]) throw new Error('Item not found for update');
 
     this._applyAndStore({
       type: 'UPDATE_ITEM',
-      itemId: item.id,
+      key: key,
       path: subPath,
       data: newData,
       timestamp: this._tick(),
     });
   }
 
-  moveItem(fromPath, toPath) {
-    const { container: fromContainer, index: fromIndex } = this._resolvePath(fromPath);
-    const itemToMove = fromContainer._getSortedItems()[fromIndex];
-    if (!itemToMove) throw new Error('Item to move not found');
-    
-    const { container: toContainer, index: toIndex } = this._resolvePath(toPath);
-
-    if (fromContainer !== toContainer) {
-        // Cross-container move is a delete then an add to preserve item identity.
-        this._applyAndStore({
-            type: 'DELETE_ITEM',
-            itemId: itemToMove.id,
-            timestamp: this._tick(),
-        });
-
-        const targetSortedItems = toContainer._getSortedItems();
-        const { prevKey, nextKey } = toContainer._findSortKeys(targetSortedItems, toIndex);
-        const newSortKey = this._generateSortKey(prevKey, nextKey);
-        
-        toContainer._applyAndStore({
-            type: 'ADD_ITEM',
-            itemId: itemToMove.id,
-            containerId: toContainer.id,
-            data: itemToMove.data,
-            sortKey: newSortKey,
-            timestamp: this._tick(),
-        });
-    } else {
-        // Same-container move just needs a sortKey update.
-        const targetSortedItems = toContainer._getSortedItems().filter(item => item.id !== itemToMove.id);
-        const { prevKey, nextKey } = toContainer._findSortKeys(targetSortedItems, toIndex);
-        const newSortKey = this._generateSortKey(prevKey, nextKey);
-
-        this._applyAndStore({
-            type: 'MOVE_ITEM',
-            itemId: itemToMove.id,
-            newSortKey: newSortKey,
-            timestamp: this._tick(),
-        });
-    }
-  }
-
-  deleteItem(path) {
-    const { container, index } = this._resolvePath(path);
-    const item = container._getSortedItems()[index];
-    if (!item) return;
+  removeItem(key) {
+    if (!this.data[key]) return;
 
     this._applyAndStore({
-      type: 'DELETE_ITEM',
-      itemId: item.id,
+      type: 'REMOVE_ITEM',
+      key: key,
       timestamp: this._tick(),
     });
   }
@@ -302,72 +198,47 @@ export class CollabJSON {
   applyOp(op) {
     this._mergeClock(op.timestamp);
 
-    let item;
+    let meta;
 
     switch (op.type) {
-      case 'ADD_ITEM':
-        const container = this._findContainer(op.containerId);
-        if (!container) {
-            console.warn(`Container ${op.containerId} not found for ADD_ITEM.`);
-            break;
-        }
-
-        if (!container.items.has(op.itemId)) {
-          container.items.set(op.itemId, {
-            id: op.itemId,
-            data: op.data,
-            sortKey: op.sortKey,
-            updated: op.timestamp,
-            _deleted: false,
-          });
-        }
-        item = container.items.get(op.itemId);
-        if (op.timestamp >= item.updated) {
-            item.data = op.data;
-            item.sortKey = op.sortKey;
-            item.updated = op.timestamp;
-            item._deleted = false;
-        }
-        break;
-
-      case 'MOVE_ITEM':
-        item = this._findItem(op.itemId);
-        if (!item) break;
-        if (op.timestamp > item.updated) {
-          item.sortKey = op.newSortKey;
-          item.updated = op.timestamp;
+      case 'SET_ITEM':
+        meta = this.metadata[op.key];
+        if (!meta || op.timestamp >= meta.updated) {
+            this.data[op.key] = op.value;
+            this.metadata[op.key] = {
+                updated: op.timestamp,
+                _deleted: false,
+            };
         }
         break;
 
       case 'UPDATE_ITEM':
-        item = this._findItem(op.itemId);
-        if (!item) break;
-        if (op.timestamp > item.updated) {
-          if (op.path && op.path.length > 0) {
-            const newData = structuredClone(item.data);
-            let current = newData;
-            for (let i = 0; i < op.path.length - 1; i++) {
-                if (typeof current !== 'object' || current === null) return; // Path is invalid, ignore op.
-                current = current[op.path[i]];
-            }
-            if (typeof current !== 'object' || current === null) return; // Path is invalid, ignore op.
-            const finalKey = op.path[op.path.length - 1];
-            current[finalKey] = op.data;
-            item.data = newData;
-          } else {
-            item.data = op.data;
+        meta = this.metadata[op.key];
+        if (!meta || op.timestamp <= meta.updated) break;
+
+        if (op.path && op.path.length > 0) {
+          const newData = structuredClone(this.data[op.key]);
+          let current = newData;
+          for (let i = 0; i < op.path.length - 1; i++) {
+              if (typeof current !== 'object' || current === null) return; // Path is invalid, ignore op.
+              current = current[op.path[i]];
           }
-          item.updated = op.timestamp;
-          item._deleted = false;
+          if (typeof current !== 'object' || current === null) return; // Path is invalid, ignore op.
+          const finalKey = op.path[op.path.length - 1];
+          current[finalKey] = op.data;
+          this.data[op.key] = newData;
+        } else {
+          this.data[op.key] = op.data;
         }
+        meta.updated = op.timestamp;
+        meta._deleted = false;
         break;
 
-      case 'DELETE_ITEM':
-        item = this._findItem(op.itemId);
-        if (!item) break;
-        if (op.timestamp > item.updated) {
-          item._deleted = true;
-          item.updated = op.timestamp;
+      case 'REMOVE_ITEM':
+        meta = this.metadata[op.key];
+        if (meta && op.timestamp > meta.updated) {
+          meta._deleted = true;
+          meta.updated = op.timestamp;
         }
         break;
     }
@@ -376,9 +247,10 @@ export class CollabJSON {
   // --- Persistence Methods ---
 
   toJSON() {
-    // This is a root document. Return the full state for persistence.
     return {
       id: this.id,
+      data: this.data,
+      metadata: this.metadata,
       history: this.history,
       dvv: Object.fromEntries(this.dvv),
       snapshot: this.snapshot,
@@ -390,17 +262,16 @@ export class CollabJSON {
     const doc = new CollabJSON({ ...options, id: state ? state.id : undefined });
     if (state) {
         if (state.snapshot) {
-            // Reconstruct the items map directly from the snapshot data.
-            state.snapshot.forEach(item => {
-                const newItem = { ...item };
-                doc.items.set(newItem.id, newItem);
-            });
-
+            // Reconstruct the state directly from the snapshot data.
+            doc.data = state.snapshot.data || {};
+            doc.metadata = state.snapshot.metadata || {};
             doc.snapshot = state.snapshot;
             doc.snapshotDvv = new Map(Object.entries(state.snapshotDvv || {}));
+        } else {
+            doc.data = state.data || {};
+            doc.metadata = state.metadata || {};
         }
         
-        // Only replay history if it exists (i.e., for root documents)
         if (state.history) {
             doc.history = state.history || [];
             doc.dvv = new Map(Object.entries(state.dvv || {}));
