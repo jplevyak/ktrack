@@ -47,6 +47,16 @@ test('Indeterminate type resolution', () => {
     assert.deepStrictEqual(objDoc.getData(), { a: { text: 'value a' } });
 });
 
+test('Constructor initializes with data from JSON string', () => {
+    const objDoc = new CollabJSON('{"a": 1, "b": {"c": 2}}');
+    assert.strictEqual(objDoc.type, 'object');
+    assert.deepStrictEqual(objDoc.getData(), {"a": 1, "b": {"c": 2}});
+
+    const arrDoc = new CollabJSON('[{"a": 1}, {"b": 2}]');
+    assert.strictEqual(arrDoc.type, 'array');
+    assert.deepStrictEqual(arrDoc.getData(), [{"a": 1}, {"b": 2}]);
+});
+
 test('Array: addItem at beginning, middle, and end', () => {
     const doc = new CollabJSON("[]");
     doc.addItem(0, { text: 'a' });

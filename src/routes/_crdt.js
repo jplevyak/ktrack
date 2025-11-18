@@ -11,21 +11,11 @@ const history_prune_window = 50;
 export class CollabJSON {
   constructor(jsonString, options = {}) {
     this.type = null;
-    if (jsonString) {
-        const data = JSON.parse(jsonString);
-        if (Array.isArray(data)) {
-            this.type = 'array';
-            this.items = new Map();
-        } else {
-            this.type = 'object';
-            this.data = {};
-            this.metadata = {};
-        }
-    }
+    
     this.id = options.id || uuidv4();
     this.checked = undefined;
     this.synced = undefined;
-
+    
     this.clientId = options.clientId || uuidv4();
     this.clock = 0;
     this.dvv = new Map();
@@ -33,6 +23,38 @@ export class CollabJSON {
     this.history = []; // all ops on server
     this.snapshot = null;
     this.snapshotDvv = new Map();
+
+    if (jsonString) {
+        const data = JSON.parse(jsonString);
+        if (Array.isArray(data)) {
+            this.type = 'array';
+            this.items = new Map();
+            let sortKey = 1.0;
+            data.forEach(itemData => {
+                const itemId = this._generateId();
+                this.items.set(itemId, {
+                    id: itemId,
+                    data: itemData,
+                    sortKey: sortKey,
+                    updated: 0,
+                    _deleted: false
+                });
+                sortKey += 1.0;
+            });
+        } else {
+            this.type = 'object';
+            this.data = data;
+            this.metadata = {};
+            for (const key in data) {
+                if (Object.prototype.hasOwnProperty.call(data, key)) {
+                    this.metadata[key] = {
+                        updated: 0,
+                        _deleted: false
+                    };
+                }
+            }
+        }
+    }
   }
 
   // --- Private Helper Functions ---
