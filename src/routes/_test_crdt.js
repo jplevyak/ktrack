@@ -300,7 +300,7 @@ test('Concurrent array adds converge', () => {
 test('Concurrent sets converge', () => {
     const doc1 = new CollabJSON("{}", {clientId: 'c1'});
     doc1.setItem('common', { text: 'value' });
-    const doc2 = new CollabJSON({id: doc1.id, clientId: 'c2'});
+    const doc2 = new CollabJSON("{}", {id: doc1.id, clientId: 'c2'});
     doc2.applyOp(doc1.ops[0]);
 
     // Concurrent adds
@@ -320,7 +320,7 @@ test('Concurrent sets converge', () => {
 test('Concurrent update (LWW)', () => {
     const doc1 = new CollabJSON("{}", {clientId: 'c1'});
     doc1.setItem('item1', { text: 'original' });
-    const doc2 = new CollabJSON({id: doc1.id, clientId: 'c2'});
+    const doc2 = new CollabJSON("{}", {id: doc1.id, clientId: 'c2'});
     doc2.applyOp(doc1.ops[0]);
 
     // Concurrent updates. Force clock to determine winner.
@@ -342,7 +342,7 @@ test('Concurrent update (LWW)', () => {
 test('Concurrent delete and update converge', () => {
     const doc1 = new CollabJSON("{}", {clientId: 'c1'});
     doc1.setItem('item1', { text: 'original' });
-    const doc2 = new CollabJSON({id: doc1.id, clientId: 'c2'});
+    const doc2 = new CollabJSON("{}", {id: doc1.id, clientId: 'c2'});
     doc2.applyOp(doc1.ops[0]);
 
     // Concurrent update and delete
