@@ -62,7 +62,7 @@
     return history.items.slice(0, limit);
   }
 
-  $: results = history.items.slice(0, limit);
+  $: results = history.getData().slice(0, limit);
   $: averages = compute_averages(history);
 
   onMount(() => {
