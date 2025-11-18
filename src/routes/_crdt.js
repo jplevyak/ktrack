@@ -130,10 +130,59 @@ export class CollabJSON {
     return item.data;
   }
 
-  findPath(key) {
-    const items = this.getData();
-    const index = items.findIndex(item => item && typeof item[key] !== 'undefined');
-    return index > -1 ? [index] : null;
+  findPath(key, basePath = null) {
+    const getDeep = (obj, path) => {
+        let current = obj;
+        for (const segment of path) {
+            if (current === null || typeof current !== 'object' || !Object.prototype.hasOwnProperty.call(current, segment)) {
+                return undefined;
+            }
+            current = current[segment];
+        }
+        return current;
+    };
+
+    const search = (current, path) => {
+        if (current === null || typeof current !== 'object') {
+            return null;
+        }
+
+        if (Object.prototype.hasOwnProperty.call(current, key)) {
+            return path;
+        }
+
+        for (const prop of Object.keys(current)) {
+            const newPath = [...path, Array.isArray(current) ? parseInt(prop, 10) : prop];
+            const result = search(current[prop], newPath);
+            if (result) {
+                return result;
+            }
+        }
+        return null;
+    };
+
+    if (basePath === null) {
+        const topLevelItems = this.getData();
+        for (let i = 0; i < topLevelItems.length; i++) {
+            const result = search(topLevelItems[i], [i]);
+            if (result) {
+                return result;
+            }
+        }
+        return null;
+    }
+
+    const topLevelItem = this.getData()[basePath[0]];
+    if (topLevelItem === undefined) {
+        return null;
+    }
+    const searchContext = getDeep(topLevelItem, basePath.slice(1));
+    if (searchContext === undefined) {
+        return null;
+    }
+    
+    const relativePath = search(searchContext, []);
+    return relativePath ? [...basePath, ...relativePath] : null;
   }
   
   // --- Operation Generators (Public API) ---

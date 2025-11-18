@@ -150,15 +150,42 @@ test('getItem', () => {
     assert.deepStrictEqual(doc.getItem([0]), { text: 'a' });
 });
 
-test('findPath finds an item by key', () => {
+test('findPath finds path to object containing a key, with optional basePath', () => {
     const doc = new CollabJSON();
-    doc.addItem([0], { id: 1, text: 'a' });
-    doc.addItem([1], { name: 'item b' });
-    doc.addItem([2], { id: 3, text: 'c' });
+    doc.addItem([0], {
+        id: 1,
+        details: {
+            author: 'John',
+            meta: {
+                year: 2024
+            }
+        }
+    });
+    doc.addItem([1], {
+        id: 2,
+        details: {
+            author: 'Jane',
+            meta: {
+                year: 2025
+            }
+        }
+    });
 
-    assert.deepStrictEqual(doc.findPath('name'), [1]);
-    assert.deepStrictEqual(doc.findPath('id'), [0]); // findFirst
-    assert.strictEqual(doc.findPath('value'), null);
+    // Search from root
+    assert.deepStrictEqual(doc.findPath('year'), [0, 'details', 'meta'], 'Should find first nested key from root');
+
+    // Search with basePath for top-level item
+    assert.deepStrictEqual(doc.findPath('author', [1]), [1, 'details'], 'Should find key within specified top-level item');
+    
+    // Search with nested basePath
+    assert.deepStrictEqual(doc.findPath('year', [1, 'details']), [1, 'details', 'meta'], 'Should find key within nested path');
+
+    // Search for key in the base path object itself
+    assert.deepStrictEqual(doc.findPath('year', [0, 'details', 'meta']), [0, 'details', 'meta'], 'Should return base path if key is in the base object');
+
+    // Search for non-existent key
+    assert.strictEqual(doc.findPath('title'), null, 'Should return null for non-existent key from root');
+    assert.strictEqual(doc.findPath('nonexistent', [0]), null, 'Should return null for non-existent key within a path');
 });
 
 
