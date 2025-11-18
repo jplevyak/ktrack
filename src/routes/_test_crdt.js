@@ -170,6 +170,13 @@ test('findPath finds path to object containing a key, with optional basePath', (
             }
         }
     });
+    doc.addItem([2], {
+        id: 3,
+        tags: [
+            { name: 'tagA' },
+            { name: 'tagB', info: { deepKey: true } }
+        ]
+    });
 
     // Search from root
     assert.deepStrictEqual(doc.findPath('year'), [0, 'details', 'meta'], 'Should find first nested key from root');
@@ -186,6 +193,9 @@ test('findPath finds path to object containing a key, with optional basePath', (
     // Search for non-existent key
     assert.strictEqual(doc.findPath('title'), null, 'Should return null for non-existent key from root');
     assert.strictEqual(doc.findPath('nonexistent', [0]), null, 'Should return null for non-existent key within a path');
+
+    // Search within a nested array
+    assert.deepStrictEqual(doc.findPath('deepKey'), [2, 'tags', 1, 'info'], 'Should find key within a nested array');
 });
 
 
