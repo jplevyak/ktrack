@@ -131,9 +131,9 @@ export class CollabJSON {
     return item.data;
   }
 
-  findPath(key, value) {
+  findPath(key) {
     const items = this.getData();
-    const index = items.findIndex(item => item && item[key] === value);
+    const index = items.findIndex(item => item && typeof item[key] !== 'undefined');
     return index > -1 ? [index] : null;
   }
   
