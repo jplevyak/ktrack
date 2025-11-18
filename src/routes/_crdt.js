@@ -130,6 +130,12 @@ export class CollabJSON {
     if (!item) throw new Error('Item not found for getItem');
     return item.data;
   }
+
+  findPath(key, value) {
+    const items = this.getData();
+    const index = items.findIndex(item => item && item[key] === value);
+    return index > -1 ? [index] : null;
+  }
   
   // --- Operation Generators (Public API) ---
 

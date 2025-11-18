@@ -102,6 +102,16 @@ test('getItem', () => {
     assert.deepStrictEqual(doc.getItem([0]), { text: 'a' });
 });
 
+test('findPath finds an item by key-value pair', () => {
+    const doc = new CollabJSON();
+    doc.addItem([0], { id: 1, text: 'a' });
+    doc.addItem([1], { id: 2, text: 'b' });
+    doc.addItem([2], { id: 3, text: 'c' });
+
+    assert.deepStrictEqual(doc.findPath('text', 'b'), [1]);
+    assert.deepStrictEqual(doc.findPath('id', 3), [2]);
+    assert.strictEqual(doc.findPath('text', 'd'), null);
+});
 
 
 // --- Synchronization Tests ---
