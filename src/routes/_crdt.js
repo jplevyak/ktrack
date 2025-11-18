@@ -90,8 +90,9 @@ export class CollabJSON {
             // The new op shadows the previous one for the same path.
             lastOp.data = op.data;
             lastOp.timestamp = op.timestamp;
-        this.applyOp(op);
-        return;
+            this.applyOp(op);
+            return;
+        }
       }
     }
 
@@ -484,20 +485,29 @@ export class CollabJSON {
     };
   }
 
-  applySyncResponse({ ops, dvv, snapshot, snapshotDvv, reset }) {
+  applySyncResponse({ ops, dvv, snapshot, snapshotDvv, reset, type, id }) {
     if (reset) {
         this.ops = []; // Discard local ops, client was too far behind or had a mismatched doc ID.
         
-        // Reconstruct the entire document from the server's snapshot.
-        const newDoc = CollabJSON.fromJSON({ snapshot: snapshot, snapshotDvv: snapshotDvv });
-
-        // Transplant the state from the reconstructed document.
-        this.items = newDoc.items;
-        this.snapshot = newDoc.snapshot;
-        this.snapshotDvv = newDoc.snapshotDvv;
-        this.id = newDoc.id; // This is crucial for subsequent syncs to have the right ID.
-        
+        // Re-initialize this object to match the server state.
+        this.type = type;
+        this.id = id;
+        this.snapshot = snapshot;
+        this.snapshotDvv = new Map(Object.entries(snapshotDvv || {}));
         this.dvv = new Map(Object.entries(snapshotDvv || {}));
+
+        // Clear existing state and rebuild from snapshot
+        if (type === 'array') {
+            this.items = new Map();
+            (snapshot || []).forEach(item => this.items.set(item.id, item));
+            this.data = undefined;
+            this.metadata = undefined;
+        } else {
+            this.data = snapshot ? snapshot.data || {} : {};
+            this.metadata = snapshot ? snapshot.metadata || {} : {};
+            this.items = undefined;
+        }
+        
         this.synced = Date.now();
         return;
     }
@@ -526,6 +536,8 @@ export class CollabJSON {
 
         if (needsReset) {
             return {
+                id: this.id,
+                type: this.type,
                 snapshot: this.snapshot,
                 snapshotDvv: Object.fromEntries(this.snapshotDvv),
                 reset: true
