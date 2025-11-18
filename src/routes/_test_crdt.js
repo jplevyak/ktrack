@@ -80,6 +80,7 @@ test('Successive updates to the same item are compressed', () => {
     assert.strictEqual(doc.ops.length, 2, 'Should have ADD and one UPDATE op');
     assert.strictEqual(doc.ops[1].type, 'UPDATE_ITEM');
     assert.deepStrictEqual(doc.ops[1].data, { text: 'update 1' });
+    assert.deepStrictEqual(doc.ops[1].path, [], 'Path should be empty for top-level update');
     const firstUpdateTimestamp = doc.ops[1].timestamp;
 
     // Second update (should compress)
@@ -92,6 +93,53 @@ test('Successive updates to the same item are compressed', () => {
 
     // Check final state
     assert.deepStrictEqual(doc.getData(), [{ text: 'update 2' }]);
+});
+
+test('updateItem can update nested properties', () => {
+    const doc = new CollabJSON();
+    doc.addItem([0], {
+        text: 'top level',
+        details: {
+            author: 'John',
+            tags: ['a', 'b']
+        }
+    });
+
+    // Update a nested property
+    doc.updateItem([0, 'details', 'author'], 'Jane');
+    let data = doc.getData();
+    assert.deepStrictEqual(data[0].details.author, 'Jane');
+
+    // Update a nested array element
+    doc.updateItem([0, 'details', 'tags', 1], 'B');
+    data = doc.getData();
+    assert.deepStrictEqual(data[0].details.tags, ['a', 'B']);
+
+    // Add a new property
+    doc.updateItem([0, 'details', 'year'], 2024);
+    data = doc.getData();
+    assert.deepStrictEqual(data[0].details.year, 2024);
+
+    // Update the whole top-level item
+    doc.updateItem([0], { text: 'new top level' });
+    data = doc.getData();
+    assert.deepStrictEqual(data[0], { text: 'new top level' });
+});
+
+test('Successive nested updates are compressed', () => {
+    const doc = new CollabJSON();
+    doc.addItem([0], { details: { author: 'John' } });
+    
+    doc.updateItem([0, 'details', 'author'], 'Jane');
+    assert.strictEqual(doc.ops.length, 2);
+    
+    doc.updateItem([0, 'details', 'author'], 'Joan');
+    assert.strictEqual(doc.ops.length, 2, 'Should compress updates to same nested path');
+    assert.deepStrictEqual(doc.ops[1].data, 'Joan');
+    assert.deepStrictEqual(doc.getData(), [{ details: { author: 'Joan' } }]);
+    
+    doc.updateItem([0, 'details'], { author: 'James' });
+    assert.strictEqual(doc.ops.length, 3, 'Should not compress updates to different path');
 });
 
 // --- Nested Structure Tests (Removed) ---

@@ -76,9 +76,8 @@ export class CollabJSON {
 
     if (op.type === 'UPDATE_ITEM') {
       const lastOp = this.ops.length > 0 ? this.ops[this.ops.length - 1] : null;
-      if (lastOp && lastOp.type === 'UPDATE_ITEM' && lastOp.itemId === op.itemId) {
-        // The new op shadows the previous one. Instead of pushing a new op,
-        // update the last one to merge consecutive updates to the same item.
+      if (lastOp && lastOp.type === 'UPDATE_ITEM' && lastOp.itemId === op.itemId && JSON.stringify(lastOp.path) === JSON.stringify(op.path)) {
+        // The new op shadows the previous one for the same path.
         lastOp.data = op.data;
         lastOp.timestamp = op.timestamp;
         this.applyOp(op);
@@ -159,13 +158,17 @@ export class CollabJSON {
   }
 
   updateItem(path, newData) {
-    const { container, index } = this._resolvePath(path);
-    const item = container._getSortedItems()[index];
+    if (!path || path.length === 0) throw new Error('Invalid path for updateItem');
+    const itemIndex = path[0];
+    const subPath = path.slice(1);
+
+    const item = this._getSortedItems()[itemIndex];
     if (!item) throw new Error('Item not found for update');
 
     this._applyAndStore({
       type: 'UPDATE_ITEM',
       itemId: item.id,
+      path: subPath,
       data: newData,
       timestamp: this._tick(),
     });
@@ -291,7 +294,20 @@ export class CollabJSON {
         item = this._findItem(op.itemId);
         if (!item) break;
         if (op.timestamp > item.updated) {
-          item.data = op.data;
+          if (op.path && op.path.length > 0) {
+            const newData = structuredClone(item.data);
+            let current = newData;
+            for (let i = 0; i < op.path.length - 1; i++) {
+                if (typeof current !== 'object' || current === null) return; // Path is invalid, ignore op.
+                current = current[op.path[i]];
+            }
+            if (typeof current !== 'object' || current === null) return; // Path is invalid, ignore op.
+            const finalKey = op.path[op.path.length - 1];
+            current[finalKey] = op.data;
+            item.data = newData;
+          } else {
+            item.data = op.data;
+          }
           item.updated = op.timestamp;
           item._deleted = false;
         }
