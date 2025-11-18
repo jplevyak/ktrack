@@ -73,6 +73,19 @@ export class CollabJSON {
 
   _applyAndStore(op) {
     op.clientId = this.clientId;
+
+    if (op.type === 'UPDATE_ITEM') {
+      const lastOp = this.ops.length > 0 ? this.ops[this.ops.length - 1] : null;
+      if (lastOp && lastOp.type === 'UPDATE_ITEM' && lastOp.itemId === op.itemId) {
+        // The new op shadows the previous one. Instead of pushing a new op,
+        // update the last one to merge consecutive updates to the same item.
+        lastOp.data = op.data;
+        lastOp.timestamp = op.timestamp;
+        this.applyOp(op);
+        return;
+      }
+    }
+
     this.applyOp(op);
     this.ops.push(op);
   }

@@ -69,6 +69,31 @@ test('moveItem', () => {
     assert.deepStrictEqual(doc.getData(), [{ text: 'a' }, { text: 'b' }, { text: 'c' }]);
 });
 
+test('Successive updates to the same item are compressed', () => {
+    const doc = new CollabJSON();
+    doc.addItem([0], { text: 'initial' });
+    assert.strictEqual(doc.ops.length, 1);
+    assert.strictEqual(doc.ops[0].type, 'ADD_ITEM');
+
+    // First update
+    doc.updateItem([0], { text: 'update 1' });
+    assert.strictEqual(doc.ops.length, 2, 'Should have ADD and one UPDATE op');
+    assert.strictEqual(doc.ops[1].type, 'UPDATE_ITEM');
+    assert.deepStrictEqual(doc.ops[1].data, { text: 'update 1' });
+    const firstUpdateTimestamp = doc.ops[1].timestamp;
+
+    // Second update (should compress)
+    doc.updateItem([0], { text: 'update 2' });
+    assert.strictEqual(doc.ops.length, 2, 'Should still have 2 ops after compression');
+    const lastOp = doc.ops[1];
+    assert.strictEqual(lastOp.type, 'UPDATE_ITEM');
+    assert.deepStrictEqual(lastOp.data, { text: 'update 2' }, 'Last op should contain data from second update');
+    assert.ok(lastOp.timestamp > firstUpdateTimestamp, 'Timestamp should be updated');
+
+    // Check final state
+    assert.deepStrictEqual(doc.getData(), [{ text: 'update 2' }]);
+});
+
 // --- Nested Structure Tests (Removed) ---
 
 test('getItem', () => {
