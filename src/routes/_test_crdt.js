@@ -101,6 +101,31 @@ test('updateItem can add or update', () => {
     assert.deepStrictEqual(doc.getData(), { a: { b: { c: 3 } } });
 });
 
+test('getData can retrieve a subtree by path', () => {
+    const doc = new CollabJSON('{"a": {"b": [10, {"c": 20}]}, "d": 30}');
+    
+    // Get a nested object
+    assert.deepStrictEqual(doc.getData(['a']), { b: [10, { c: 20 }] });
+    
+    // Get a nested array
+    assert.deepStrictEqual(doc.getData(['a', 'b']), [10, { c: 20 }]);
+    
+    // Get a nested value from within an array
+    assert.deepStrictEqual(doc.getData(['a', 'b', 1]), { c: 20 });
+    assert.deepStrictEqual(doc.getData(['a', 'b', 1, 'c']), 20);
+
+    // Get a top-level value
+    assert.strictEqual(doc.getData(['d']), 30);
+
+    // Get non-existent path
+    assert.strictEqual(doc.getData(['a', 'x']), undefined);
+    assert.strictEqual(doc.getData(['a', 'b', 5]), undefined);
+
+    // Get root with empty path or no path
+    assert.deepStrictEqual(doc.getData([]), { a: { b: [10, { c: 20 }] }, d: 30 });
+    assert.deepStrictEqual(doc.getData(), { a: { b: [10, { c: 20 }] }, d: 30 });
+});
+
 test('Successive updates to the same item are compressed', () => {
     const doc = new CollabJSON("{}");
     doc.updateItem(['item1'], { text: 'initial' });

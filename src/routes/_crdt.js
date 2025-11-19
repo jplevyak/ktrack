@@ -148,7 +148,21 @@ export class CollabJSON {
 
   // --- Public View Functions ---
 
-  getData() { return this._crdtToPlain(this.root); }
+  getData(path) {
+    if (!path || path.length === 0) {
+        return this._crdtToPlain(this.root);
+    }
+    const result = this._traverse(path);
+    if (!result) return undefined;
+
+    let nodeToConvert = result.node;
+    // If the traversed node is an item from a CRDT array, we want to convert its `data` property.
+    if (nodeToConvert && nodeToConvert.hasOwnProperty('sortKey') && nodeToConvert.hasOwnProperty('data')) {
+        nodeToConvert = nodeToConvert.data;
+    }
+
+    return this._crdtToPlain(nodeToConvert);
+  }
   
   findPath(key, basePath = null) { return null; /* TODO: Re-implement if needed */ }
 
