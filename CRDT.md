@@ -4,62 +4,57 @@
 
 Conflict-free Replicated Data Types (CRDTs) are data structures that allow for concurrent modifications across multiple replicas (e.g., clients and servers) and can be merged without conflicts.
 
-This repository contains a specific CRDT implementation named `CollabJSON`. It is designed to handle JSON-like documents, specifically nested arrays of objects. Its key features are:
+This repository contains a specific CRDT implementation named `CollabJSON`. It is designed to handle general JSON-like documents (objects and arrays). Its key features are:
 
+*   **Unified Data Model**: Every array, no matter how deeply nested, is a CRDT-native array, allowing for conflict-free concurrent insertions.
 *   **Operation-based CRDT**: It works by replicating operations between replicas rather than entire states.
 *   **Lamport Timestamps**: Each operation is assigned a causally-ordered timestamp to ensure that effects are applied in a logical order.
-*   **Last-Write-Wins (LWW)**: Conflicts (e.g., two clients updating the same item concurrently) are resolved by giving precedence to the operation with the higher timestamp.
-*   **Fractional Indexing**: List items are ordered using fractional numbers (`sortKey`), which allows for inserting items between any two existing items without re-indexing.
+*   **Last-Write-Wins (LWW)**: Conflicts on object properties (e.g., two clients updating the same field concurrently) are resolved by giving precedence to the operation with the higher timestamp.
+*   **Fractional Indexing**: Items within CRDT-native arrays are ordered using fractional numbers (`sortKey`), which allows for inserting items between any two existing items without re-indexing.
 *   **Client-Server Architecture**: The synchronization mechanism is designed for a star-schema topology where multiple clients communicate with a single central server and not directly with each other.
 *   **Dotted Version Vectors (DVV)**: Synchronization is made efficient by using DVVs. Each replica tracks the latest timestamp it has seen from every other replica, allowing it to request only the operations it hasn't seen yet.
 *   **Snapshotting and Compaction**: To prevent the operation history from growing indefinitely, the server can compact its history into a snapshot. Clients that are too far behind will receive this snapshot instead of a long list of operations.
 
 ## 2. API Reference
 
-### `new CollabJSON(options)`
+### `new CollabJSON(jsonString, options)`
 
 Creates a new `CollabJSON` document.
 
+*   `jsonString` (String, optional): A string of a JSON object or array to initialize the document with.
 *   `options` (Object):
     *   `id` (String): A unique identifier for the document. If two instances share an `id`, they are considered replicas of the same document. Defaults to a new UUID.
     *   `clientId` (String): A unique identifier for the current replica (client or server). Defaults to a new UUID.
 
 ### `getData()`
 
-Returns the current state of the document as a plain, nested JavaScript array. This is useful for rendering the data in a UI.
-
-### `getItem(path)`
-
-Retrieves an item from the document at a specified path. If the item is a nested `CollabJSON` document, it returns a *new, independent copy* of that document.
-
-*   `path` (Array of numbers): An array of indices specifying the location of the item.
+Returns the current state of the document as a plain JavaScript object or array. This is useful for rendering the data in a UI.
 
 ### `addItem(path, data)`
 
-Adds a new item to the document at a specified path.
+Adds a new item to the document. This function is polymorphic:
 
-*   `path` (Array of numbers): The path to the container array and the index at which to insert the new item.
-*   `data` (Object | CollabJSON): The data to insert. This can be a plain object or another `CollabJSON` instance to create a nested structure.
+*   If the last segment of the `path` is a **number**, it performs a CRDT-native insertion into the array specified by the preceding path segments.
+*   If the last segment of the `path` is a **string**, it acts as an alias for `updateItem`, setting a property on an object.
+
+*   `path` (Array of strings and numbers): The path to the location for the new item.
+*   `data` (any): The data to insert. This must be JSON-serializable.
 
 ### `updateItem(path, newData)`
 
-Updates an existing item with new data.
+Updates or inserts a value at a specified path. This is an "upsert" operation:
 
-*   `path` (Array of numbers): The path to the item to be updated.
-*   `newData` (Object | CollabJSON): The new data for the item.
+*   If the path already exists, the value is updated.
+*   If the path does not exist, any necessary nested objects are created automatically.
 
-### `moveItem(fromPath, toPath)`
-
-Moves an item from one location to another, potentially between different nested arrays.
-
-*   `fromPath` (Array of numbers): The current path of the item to move.
-*   `toPath` (Array of numbers): The target path for the item.
+*   `path` (Array of strings and numbers): The path to the item to be updated or created.
+*   `newData` (any): The new data for the item. This must be JSON-serializable.
 
 ### `deleteItem(path)`
 
-Marks an item as deleted.
+Marks an item in an array or a property on an object as deleted.
 
-*   `path` (Array of numbers): The path to the item to be deleted.
+*   `path` (Array of strings and numbers): The path to the item to be deleted.
 
 ### `prune(pruneFn)`
 
@@ -101,31 +96,31 @@ Marks an item as deleted.
 ```javascript
 import { CollabJSON } from './_crdt.js';
 
-// Create a new document
-const doc = new CollabJSON();
+// Create a new document, initializing with an object
+const doc = new CollabJSON('{}');
 
-// Add items
-doc.addItem([0], { task: 'Buy milk', done: false });
-doc.addItem([1], { task: 'Read book', done: false });
-console.log(doc.getData());
-// Output: [{ task: 'Buy milk', done: false }, { task: 'Read book', done: false }]
+// Use updateItem to create a nested structure
+doc.updateItem(['project', 'name'], 'CRDT Implementation');
+doc.updateItem(['project', 'tasks'], []); // Create a nested array
 
-// Update an item
-doc.updateItem([0], { task: 'Buy milk', done: true });
 console.log(doc.getData());
-// Output: [{ task: 'Buy milk', done: true }, { task: 'Read book', false }]
+// Output: { project: { name: 'CRDT Implementation', tasks: [] } }
 
-// Create and add a nested list
-const nestedList = new CollabJSON();
-nestedList.addItem([0], { subtask: 'Chapter 1' });
-doc.addItem([2], nestedList);
-console.log(doc.getData());
-// Output:
-// [
-//   { task: 'Buy milk', done: true },
-//   { task: 'Read book', done: false },
-//   [ { subtask: 'Chapter 1' } ]
-// ]
+// Use addItem to insert into the nested array (CRDT-native)
+doc.addItem(['project', 'tasks', 0], { text: 'Write docs', done: false });
+doc.addItem(['project', 'tasks', 1], { text: 'Write tests', done: false });
+console.log(doc.getData().project.tasks);
+// Output: [ { text: 'Write docs', done: false }, { text: 'Write tests', done: false } ]
+
+// Update a nested item
+doc.updateItem(['project', 'tasks', 0, 'done'], true);
+console.log(doc.getData().project.tasks[0]);
+// Output: { text: 'Write docs', done: true }
+
+// Use addItem with a string key (alias for updateItem) to add a property
+doc.addItem(['project', 'status'], 'in-progress');
+console.log(doc.getData().project.status);
+// Output: 'in-progress'
 ```
 
 ### Client-Server Synchronization
@@ -135,9 +130,9 @@ import { CollabJSON } from './_crdt.js';
 
 // --- Setup ---
 const docId = 'shared-document-1';
-const server = new CollabJSON({ clientId: 'server', id: docId });
-const client1 = new CollabJSON({ clientId: 'client1', id: docId });
-const client2 = new CollabJSON({ clientId: 'client2', id: docId });
+const server = new CollabJSON('[]', { clientId: 'server', id: docId });
+const client1 = new CollabJSON('[]', { clientId: 'client1', id: docId });
+const client2 = new CollabJSON('[]', { clientId: 'client2', id: docId });
 
 // --- Client 1 works offline ---
 client1.addItem([0], { text: 'Hello from client 1' });
