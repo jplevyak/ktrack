@@ -69,9 +69,10 @@ export class CollabJSON {
         });
         return crdtArray;
     } else if (typeof data === 'object' && data !== null) {
-        const newObj = {};
+        const newObj = { metadata: {} };
         for (const key in data) {
             newObj[key] = this._plainToCrdt(data[key]);
+            newObj.metadata[key] = { updated: 0, _deleted: false };
         }
         return newObj;
     }
@@ -85,9 +86,9 @@ export class CollabJSON {
       }
       const newObj = {};
       for (const key in data) {
-        if (key !== 'metadata') {
-          newObj[key] = this._crdtToPlain(data[key]);
-        }
+        if (key === 'metadata') continue;
+        if (data.metadata && data.metadata[key] && data.metadata[key]._deleted) continue;
+        newObj[key] = this._crdtToPlain(data[key]);
       }
       return newObj;
     }
@@ -107,17 +108,22 @@ export class CollabJSON {
     let finalKey = null;
 
     for (const segment of path) {
-      parent = current;
+      let container = current;
+      if (container && container.hasOwnProperty('data') && container.hasOwnProperty('sortKey')) {
+        container = container.data;
+      }
+      
+      parent = container;
       finalKey = segment;
-      if (current === null || typeof current !== 'object') return null;
+      if (container === null || typeof container !== 'object') return null;
 
-      if (current[CRDT_ARRAY_MARKER]) {
-        const sorted = this._getSortedItems(current);
+      if (container[CRDT_ARRAY_MARKER]) {
+        const sorted = this._getSortedItems(container);
         if (typeof segment !== 'number' || segment < 0 || segment >= sorted.length) return null;
-        current = current.items[sorted[segment].id];
+        current = container.items[sorted[segment].id];
       } else {
-        if (!Object.prototype.hasOwnProperty.call(current, segment)) return null;
-        current = current[segment];
+        if (!Object.prototype.hasOwnProperty.call(container, segment)) return null;
+        current = container[segment];
       }
     }
     return { parent, key: finalKey, node: current };
