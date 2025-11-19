@@ -189,6 +189,16 @@ test('Can create and update a nested map object', () => {
     assert.deepStrictEqual(doc.getData(), { map1: { "a": { "b": 10, "c": 2 }, "d": 30 } });
 });
 
+test('addItem can add to a nested array', () => {
+    const doc = new CollabJSON("{}");
+    doc.updateItem(['list'], [{ text: 'a' }, { text: 'c' }]);
+    assert.deepStrictEqual(doc.getData(), { list: [{ text: 'a' }, { text: 'c' }] });
+
+    // Add item to nested list
+    doc.addItem(['list', 1], { text: 'b' });
+    assert.deepStrictEqual(doc.getData(), { list: [{ text: 'a' }, { text: 'b' }, { text: 'c' }] });
+});
+
 // --- Nested Structure Tests (Removed) ---
 
 test('findPath finds path to object containing a key, with optional basePath', () => {

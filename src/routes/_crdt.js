@@ -82,6 +82,17 @@ export class CollabJSON {
     return (prevKey + nextKey) / 2.0;
   }
   
+  _getDeep(obj, path) {
+    let current = obj;
+    for (const segment of path) {
+        if (current === null || typeof current !== 'object' || !Object.prototype.hasOwnProperty.call(current, segment)) {
+            return undefined;
+        }
+        current = current[segment];
+    }
+    return current;
+  }
+
   _getSortedItems() {
     if (this.type !== 'array') return [];
     return Array.from(this.items.values())
@@ -203,14 +214,34 @@ export class CollabJSON {
   // --- Operation Generators (Public API) ---
 
   addItem(path, data) {
-    if (this.type === 'object') throw new Error('addItem can only be used on array-type CollabJSON.');
+    if (this.type === 'object') {
+        const parentPath = path.slice(0, -1);
+        const index = path[path.length - 1];
+
+        if (typeof index !== 'number') {
+            throw new Error("Index for addItem must be a number.");
+        }
+
+        const docData = this.getData();
+        const array = this._getDeep(docData, parentPath);
+
+        if (array !== undefined && !Array.isArray(array)) {
+            throw new Error("addItem target is not an array.");
+        }
+
+        const newArray = array ? [...array] : [];
+        newArray.splice(index, 0, data);
+        this.updateItem(parentPath, newArray);
+        return;
+    }
+
     if (this.type === null) {
         this.type = 'array';
     }
     const index = path[0];
     const subPath = path.slice(1);
     
-    if (subPath.length > 0) throw new Error("Nested addItem is not supported yet.");
+    if (subPath.length > 0) throw new Error("Nested addItem is not supported yet for array-type documents.");
 
     const sortedItems = this._getSortedItems();
     const { prevKey, nextKey } = this._findSortKeys(sortedItems, index);
