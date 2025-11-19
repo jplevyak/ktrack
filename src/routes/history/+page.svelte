@@ -99,7 +99,7 @@ Number of days to view <input type="number" id="limit" value={limit} />
 <br /><br />
 
 {#each results as day, e}
-  {@const day_info = get_day_info(day)}
+  {@const day_info = get_date_info(day)}
   <b
     >Date: {weekdays[day_info.day]}
     {months[day_info.month]}

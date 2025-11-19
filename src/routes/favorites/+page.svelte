@@ -77,7 +77,6 @@
 
   function update_results() {
     let favorites_data = favorites.getData();
-    console.log(favorites_data, favorites);
     results_map = undefined;
     if (search_value == undefined || search_value == "") {
       results = [...favorites_data];
