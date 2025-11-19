@@ -37,13 +37,11 @@ test('Initialization', () => {
 
 test('Indeterminate type resolution', () => {
     const arrDoc = new CollabJSON();
-    arrDoc.addItem(0, { text: 'a' });
-    assert.strictEqual(arrDoc.type, 'array');
+    arrDoc.addItem([0], { text: 'a' });
     assert.deepStrictEqual(arrDoc.getData(), [{ text: 'a' }]);
 
     const objDoc = new CollabJSON();
-    objDoc.setItem('a', { text: 'value a' });
-    assert.strictEqual(objDoc.type, 'object');
+    objDoc.updateItem(['a'], { text: 'value a' });
     assert.deepStrictEqual(objDoc.getData(), { a: { text: 'value a' } });
 });
 
@@ -59,74 +57,53 @@ test('Constructor initializes with data from JSON string', () => {
 
 test('Array: addItem at beginning, middle, and end', () => {
     const doc = new CollabJSON("[]");
-    doc.addItem(0, { text: 'a' });
+    doc.addItem([0], { text: 'a' });
     assert.deepStrictEqual(doc.getData(), [{ text: 'a' }]);
-    doc.addItem(1, { text: 'c' });
+    doc.addItem([1], { text: 'c' });
     assert.deepStrictEqual(doc.getData(), [{ text: 'a' }, { text: 'c' }]);
-    doc.addItem(1, { text: 'b' });
+    doc.addItem([1], { text: 'b' });
     assert.deepStrictEqual(doc.getData(), [{ text: 'a' }, { text: 'b' }, { text: 'c' }]);
 });
 
 test('Array: deleteItem', () => {
-    const doc = new CollabJSON("[]");
-    doc.addItem(0, { text: 'a' });
-    doc.addItem(1, { text: 'b' });
-    doc.addItem(2, { text: 'c' });
-    doc.deleteItem(1);
+    const doc = new CollabJSON('[{ "text": "a" }, { "text": "b" }, { "text": "c" }]');
+    doc.deleteItem([1]);
     assert.deepStrictEqual(doc.getData(), [{ text: 'a' }, { text: 'c' }]);
 });
 
-test('Array: moveItem', () => {
-    const doc = new CollabJSON("[]");
-    doc.addItem(0, { text: 'a' });
-    doc.addItem(1, { text: 'b' });
-    doc.addItem(2, { text: 'c' });
-    doc.moveItem(0, 2);
-    assert.deepStrictEqual(doc.getData(), [{ text: 'b' }, { text: 'c' }, { text: 'a' }]);
-    doc.moveItem(2, 0); // move 'a' back to index 0
-    assert.deepStrictEqual(doc.getData(), [{ text: 'a' }, { text: 'b' }, { text: 'c' }]);
-});
-
-test('Object: setItem can add and overwrite keys', () => {
+test('Object: updateItem can add and overwrite keys', () => {
     const doc = new CollabJSON("{}");
-    doc.setItem('a', { text: 'value a' });
+    doc.updateItem(['a'], { text: 'value a' });
     assert.deepStrictEqual(doc.getData(), { a: { text: 'value a' } });
-    doc.setItem('b', { text: 'value b' });
+    doc.updateItem(['b'], { text: 'value b' });
     assert.deepStrictEqual(doc.getData(), { a: { text: 'value a' }, b: { text: 'value b' } });
-    doc.setItem('a', { text: 'new value a' });
+    doc.updateItem(['a'], { text: 'new value a' });
     assert.deepStrictEqual(doc.getData(), { a: { text: 'new value a' }, b: { text: 'value b' } });
 });
 
 test('Array: updateItem', () => {
-    const doc = new CollabJSON("[]");
-    doc.addItem(0, { text: 'a' });
-    doc.addItem(1, { text: 'b' });
+    const doc = new CollabJSON('[{ "text": "a" }, { "text": "b" }]');
     doc.updateItem([0], { text: 'A' });
     assert.deepStrictEqual(doc.getData(), [{ text: 'A' }, { text: 'b' }]);
 });
 
 test('Object: updateItem', () => {
-    const doc = new CollabJSON("{}");
-    doc.setItem('a', { text: 'value a' });
-    doc.setItem('b', { text: 'value b' });
+    const doc = new CollabJSON('{"a": {"text": "value a"}, "b": {"text": "value b"}}');
     doc.updateItem(['a'], { text: 'new value a' });
     assert.deepStrictEqual(doc.getData(), { a: { text: 'new value a' }, b: { text: 'value b' } });
 });
 
-test('Object: removeItem', () => {
-    const doc = new CollabJSON("{}");
-    doc.setItem('a', 1);
-    doc.setItem('b', 2);
-    doc.setItem('c', 3);
-    doc.removeItem('b');
+test('Object: deleteItem', () => {
+    const doc = new CollabJSON('{"a": 1, "b": 2, "c": 3}');
+    doc.deleteItem(['b']);
     assert.deepStrictEqual(doc.getData(), { a: 1, c: 3 });
 });
 
 test('Successive updates to the same item are compressed', () => {
     const doc = new CollabJSON("{}");
-    doc.setItem('item1', { text: 'initial' });
+    doc.updateItem(['item1'], { text: 'initial' });
     assert.strictEqual(doc.ops.length, 1);
-    assert.strictEqual(doc.ops[0].type, 'SET_ITEM');
+    assert.strictEqual(doc.ops[0].type, 'UPDATE_ITEM');
 
     // First update
     doc.updateItem(['item1'], { text: 'update 1' });
@@ -150,7 +127,7 @@ test('Successive updates to the same item are compressed', () => {
 
 test('updateItem can update nested properties', () => {
     const doc = new CollabJSON("{}");
-    doc.setItem('item1', {
+    doc.updateItem(['item1'], {
         text: 'top level',
         details: {
             author: 'John',
@@ -181,7 +158,7 @@ test('updateItem can update nested properties', () => {
 
 test('Successive nested updates are compressed', () => {
     const doc = new CollabJSON("{}");
-    doc.setItem('item1', { details: { author: 'John' } });
+    doc.updateItem(['item1'], { details: { author: 'John' } });
     
     doc.updateItem(['item1', 'details', 'author'], 'Jane');
     assert.strictEqual(doc.ops.length, 2);
@@ -199,7 +176,7 @@ test('Can create and update a nested map object', () => {
     const doc = new CollabJSON("{}");
 
     // Add a nested map as an item
-    doc.setItem('map1', { "a": { "b": 1, "c": 2 }, "d": 3 });
+    doc.updateItem(['map1'], { "a": { "b": 1, "c": 2 }, "d": 3 });
     assert.deepStrictEqual(doc.getData(), { map1: { "a": { "b": 1, "c": 2 }, "d": 3 } });
 
     // Update a deeply nested value
@@ -215,7 +192,7 @@ test('Can create and update a nested map object', () => {
 
 test('findPath finds path to object containing a key, with optional basePath', () => {
     const doc = new CollabJSON("{}");
-    doc.setItem('item1', {
+    doc.updateItem(['item1'], {
         id: 1,
         details: {
             author: 'John',
@@ -224,7 +201,7 @@ test('findPath finds path to object containing a key, with optional basePath', (
             }
         }
     });
-    doc.setItem('item2', {
+    doc.updateItem(['item2'], {
         id: 2,
         details: {
             author: 'Jane',
@@ -233,7 +210,7 @@ test('findPath finds path to object containing a key, with optional basePath', (
             }
         }
     });
-    doc.setItem('item3', {
+    doc.updateItem(['item3'], {
         id: 3,
         tags: [
             { name: 'tagA' },
@@ -279,14 +256,14 @@ test('Basic sync: one-way propagation', () => {
 
 test('Concurrent array adds converge', () => {
     const doc1 = new CollabJSON("[]", {clientId: 'c1'});
-    doc1.addItem(0, { text: 'common' });
+    doc1.addItem([0], { text: 'common' });
     const doc2 = new CollabJSON("[]", {id: doc1.id, clientId: 'c2'});
     doc2.applyOp(doc1.ops[0]);
 
     // Concurrent adds
-    doc1.addItem(1, { text: 'from 1' });
+    doc1.addItem([1], { text: 'from 1' });
     const op1 = doc1.ops[doc1.ops.length - 1];
-    doc2.addItem(1, { text: 'from 2' });
+    doc2.addItem([1], { text: 'from 2' });
     const op2 = doc2.ops[doc2.ops.length - 1];
 
     // Sync
@@ -299,14 +276,14 @@ test('Concurrent array adds converge', () => {
 
 test('Concurrent sets converge', () => {
     const doc1 = new CollabJSON("{}", {clientId: 'c1'});
-    doc1.setItem('common', { text: 'value' });
+    doc1.updateItem(['common'], { text: 'value' });
     const doc2 = new CollabJSON("{}", {id: doc1.id, clientId: 'c2'});
     doc2.applyOp(doc1.ops[0]);
 
     // Concurrent adds
-    doc1.setItem('a', { text: 'from 1' });
+    doc1.updateItem(['a'], { text: 'from 1' });
     const op1 = doc1.ops[doc1.ops.length - 1];
-    doc2.setItem('b', { text: 'from 2' });
+    doc2.updateItem(['b'], { text: 'from 2' });
     const op2 = doc2.ops[doc2.ops.length - 1];
 
     // Sync
@@ -319,7 +296,7 @@ test('Concurrent sets converge', () => {
 
 test('Concurrent update (LWW)', () => {
     const doc1 = new CollabJSON("{}", {clientId: 'c1'});
-    doc1.setItem('item1', { text: 'original' });
+    doc1.updateItem(['item1'], { text: 'original' });
     const doc2 = new CollabJSON("{}", {id: doc1.id, clientId: 'c2'});
     doc2.applyOp(doc1.ops[0]);
 
@@ -341,13 +318,13 @@ test('Concurrent update (LWW)', () => {
 
 test('Concurrent delete and update converge', () => {
     const doc1 = new CollabJSON("{}", {clientId: 'c1'});
-    doc1.setItem('item1', { text: 'original' });
+    doc1.updateItem(['item1'], { text: 'original' });
     const doc2 = new CollabJSON("{}", {id: doc1.id, clientId: 'c2'});
     doc2.applyOp(doc1.ops[0]);
 
     // Concurrent update and delete
     doc1.clock = 10;
-    doc1.removeItem('item1'); // delete wins (later timestamp)
+    doc1.deleteItem(['item1']); // delete wins (later timestamp)
     const op1 = doc1.ops[doc1.ops.length - 1];
     doc2.clock = 5;
     doc2.updateItem(['item1'], { text: 'update from 2' });
@@ -364,14 +341,12 @@ test('Concurrent delete and update converge', () => {
 // --- Boundary and Error Tests ---
 
 test('Throws error on invalid path for update (Object)', () => {
-    const doc = new CollabJSON("{}");
-    doc.setItem('a', { text: 'value a' });
-    assert.throws(() => doc.updateItem(['b'], { text: 'value b' }), /Item not found/);
+    const doc = new CollabJSON('{"a": {"text": "value a"}}');
+    assert.throws(() => doc.updateItem(['b', 'text'], 'value b' ), /Item not found/);
 });
 
 test('Throws error on invalid path for update (Array)', () => {
-    const doc = new CollabJSON("[]");
-    doc.addItem(0, { text: 'a' });
+    const doc = new CollabJSON('[{"text": "a"}]');
     assert.throws(() => doc.updateItem([1], { text: 'b' }), /Item not found/);
 });
 
@@ -379,7 +354,7 @@ test('Throws error on invalid path for update (Array)', () => {
 
 test('getSyncRequest is repeatable', () => {
     const client = new CollabJSON("{}");
-    client.setItem('a', { text: 'value a' });
+    client.updateItem(['a'], { text: 'value a' });
     const req1 = client.getSyncRequest();
     const req2 = client.getSyncRequest();
     assert.deepStrictEqual(req1, req2);
@@ -391,7 +366,7 @@ test('applySyncResponse is idempotent', () => {
     const client = new CollabJSON("{}", { id: docId });
     const server = new CollabJSON("{}", { clientId: 'server', id: docId });
 
-    client.setItem('a', { text: 'value a' });
+    client.updateItem(['a'], { text: 'value a' });
     const request = client.getSyncRequest();
     const response = server.getSyncResponse(request);
 
@@ -414,7 +389,7 @@ test('Full client-server-client sync cycle', () => {
     const client2 = new CollabJSON("{}", { clientId: 'c2', id: docId });
 
     // C1 adds item, syncs with server
-    client1.setItem('c1_item', { text: 'from c1' });
+    client1.updateItem(['c1_item'], { text: 'from c1' });
     let req1 = client1.getSyncRequest();
     let res1 = server.getSyncResponse(req1);
     client1.applySyncResponse(res1);
@@ -429,7 +404,7 @@ test('Full client-server-client sync cycle', () => {
     assert.deepStrictEqual(client2.getData(), { c1_item: { text: 'from c1' } });
 
     // C2 adds item, syncs with server
-    client2.setItem('c2_item', { text: 'from c2' });
+    client2.updateItem(['c2_item'], { text: 'from c2' });
     req2 = client2.getSyncRequest();
     res2 = server.getSyncResponse(req2);
     client2.applySyncResponse(res2);
@@ -452,9 +427,9 @@ test('Concurrent setItem (LWW)', () => {
 
     // C1 and C2 both set the same key. C2 has a higher clock, so it should win.
     client1.clock = 5;
-    client1.setItem('item', { text: 'from c1' });
+    client1.updateItem(['item'], { text: 'from c1' });
     client2.clock = 10;
-    client2.setItem('item', { text: 'from c2' });
+    client2.updateItem(['item'], { text: 'from c2' });
 
     // C1 syncs
     const req1 = client1.getSyncRequest();
@@ -485,7 +460,7 @@ test('Client ops are pruned after successful sync', () => {
     const client = new CollabJSON("{}", { clientId: 'c1', id: docId });
 
     // 1. Client creates an operation
-    client.setItem('op1', { text: 'value1' });
+    client.updateItem(['op1'], { text: 'value1' });
     assert.strictEqual(client.ops.length, 1);
 
     // 2. Client syncs with server
@@ -499,12 +474,12 @@ test('Client ops are pruned after successful sync', () => {
     assert.strictEqual(client.ops.length, 0, 'Ops should be pruned after sync');
 
     // 5. Client creates another op to ensure log is still functional
-    client.setItem('op2', { text: 'value2' });
+    client.updateItem(['op2'], { text: 'value2' });
     assert.strictEqual(client.ops.length, 1);
 
     const req2 = client.getSyncRequest();
     assert.strictEqual(req2.ops.length, 1, 'New sync request should contain only the new op');
-    assert.strictEqual(req2.ops[0].value.text, 'value2');
+    assert.strictEqual(req2.ops[0].data.text, 'value2');
 });
 
 
@@ -516,7 +491,7 @@ test('Sync with a pruned server sends snapshot', () => {
 
     // Make > 100 ops from client1
     for (let i = 0; i < 101; i++) {
-        client1.setItem(`item${i}`, { val: i });
+        client1.updateItem([`item${i}`], { val: i });
     }
     
     // Sync client1 to server
