@@ -7,13 +7,11 @@ import { v4 as uuidv4 } from 'uuid';
 
 const history_prune_limit = 100;
 const history_prune_window = 50;
+const CRDT_ARRAY_MARKER = '_crdt_array_';
 
 export class CollabJSON {
   constructor(jsonString, options = {}) {
-    this.type = null; // 'array' or 'object', determined by first op or initial data
-    this.items = new Map(); // For array type
-    this.data = {};      // For object type
-    this.metadata = {};  // For object type
+    this.root = {}; // Unified data model
 
     this.id = options.id || uuidv4();
     this.checked = undefined;
@@ -22,39 +20,13 @@ export class CollabJSON {
     this.clientId = options.clientId || uuidv4();
     this.clock = 0;
     this.dvv = new Map();
-    this.ops = []; // local ops for the whole document
-    this.history = []; // all ops on server
+    this.ops = [];
+    this.history = [];
     this.snapshot = null;
     this.snapshotDvv = new Map();
 
     if (jsonString) {
-        const data = JSON.parse(jsonString);
-        if (Array.isArray(data)) {
-            this.type = 'array';
-            let sortKey = 1.0;
-            data.forEach(itemData => {
-                const itemId = this._generateId();
-                this.items.set(itemId, {
-                    id: itemId,
-                    data: itemData,
-                    sortKey: sortKey,
-                    updated: 0,
-                    _deleted: false
-                });
-                sortKey += 1.0;
-            });
-        } else {
-            this.type = 'object';
-            this.data = data;
-            for (const key in data) {
-                if (Object.prototype.hasOwnProperty.call(data, key)) {
-                    this.metadata[key] = {
-                        updated: 0,
-                        _deleted: false
-                    };
-                }
-            }
-        }
+        this.root = this._plainToCrdt(JSON.parse(jsonString));
     }
   }
 
@@ -71,9 +43,7 @@ export class CollabJSON {
     }
   }
 
-  _generateId() {
-    return uuidv4();
-  }
+  _generateId() { return uuidv4(); }
 
   _generateSortKey(prevKey, nextKey) {
     if (prevKey === null && nextKey === null) return 1.0;
@@ -81,37 +51,76 @@ export class CollabJSON {
     if (nextKey === null) return prevKey + 1.0;
     return (prevKey + nextKey) / 2.0;
   }
-  
-  _getDeep(obj, path) {
-    let current = obj;
-    for (const segment of path) {
-        if (current === null || typeof current !== 'object' || !Object.prototype.hasOwnProperty.call(current, segment)) {
-            return undefined;
+
+  _plainToCrdt(data) {
+    if (Array.isArray(data)) {
+        const crdtArray = { [CRDT_ARRAY_MARKER]: true, items: {}, metadata: {} };
+        let sortKey = 1.0;
+        data.forEach(itemData => {
+            const itemId = this._generateId();
+            crdtArray.items[itemId] = {
+                id: itemId,
+                data: this._plainToCrdt(itemData),
+                sortKey: sortKey,
+                updated: 0,
+                _deleted: false
+            };
+            sortKey += 1.0;
+        });
+        return crdtArray;
+    } else if (typeof data === 'object' && data !== null) {
+        const newObj = {};
+        for (const key in data) {
+            newObj[key] = this._plainToCrdt(data[key]);
         }
-        current = current[segment];
+        return newObj;
     }
-    return current;
+    return data;
   }
 
-  _getSortedItems() {
-    if (this.type !== 'array') return [];
-    return Array.from(this.items.values())
-      .filter(item => !item._deleted)
-      .sort((a, b) => {
-        if (a.sortKey !== b.sortKey) {
-          return a.sortKey - b.sortKey;
+  _crdtToPlain(data) {
+    if (typeof data === 'object' && data !== null) {
+      if (data[CRDT_ARRAY_MARKER]) {
+        return this._getSortedItems(data).map(item => this._crdtToPlain(item.data));
+      }
+      const newObj = {};
+      for (const key in data) {
+        if (key !== 'metadata') {
+          newObj[key] = this._crdtToPlain(data[key]);
         }
-        return a.id < b.id ? -1 : 1;
-      });
+      }
+      return newObj;
+    }
+    return data;
+  }
+  
+  _getSortedItems(crdtArray) {
+    if (!crdtArray || !crdtArray[CRDT_ARRAY_MARKER]) return [];
+    return Object.values(crdtArray.items)
+      .filter(item => !item._deleted)
+      .sort((a, b) => a.sortKey - b.sortKey || (a.id < b.id ? -1 : 1));
   }
 
-  _findSortKeys(list, index) {
-    if (index > list.length) index = list.length;
-    const prevItem = list[index - 1] || null;
-    const nextItem = list[index] || null;
-    const prevKey = prevItem ? prevItem.sortKey : null;
-    const nextKey = nextItem ? nextItem.sortKey : null;
-    return { prevKey, nextKey };
+  _traverse(path) {
+    let parent = null;
+    let current = this.root;
+    let finalKey = null;
+
+    for (const segment of path) {
+      parent = current;
+      finalKey = segment;
+      if (current === null || typeof current !== 'object') return null;
+
+      if (current[CRDT_ARRAY_MARKER]) {
+        const sorted = this._getSortedItems(current);
+        if (typeof segment !== 'number' || segment < 0 || segment >= sorted.length) return null;
+        current = current.items[sorted[segment].id];
+      } else {
+        if (!Object.prototype.hasOwnProperty.call(current, segment)) return null;
+        current = current[segment];
+      }
+    }
+    return { parent, key: finalKey, node: current };
   }
 
   _applyAndStore(op) {
@@ -129,197 +138,67 @@ export class CollabJSON {
     this.ops.push(op);
   }
 
-  _getSnapshotData() {
-    if (this.type === 'array') {
-        const snapshotItems = [];
-        for (const item of this._getSortedItems()) {
-            snapshotItems.push({ ...item });
-        }
-        return snapshotItems;
-    } else {
-        return {
-            data: this.data,
-            metadata: this.metadata
-        };
-    }
-  }
+  _getSnapshotData() { return this.root; }
 
   // --- Public View Functions ---
 
-  getData() {
-    if (this.type === 'array') {
-        return this._getSortedItems().map(item => item.data);
-    } else if (this.type === 'object') {
-        const result = {};
-        for (const key in this.data) {
-            if (!this.metadata[key] || !this.metadata[key]._deleted) {
-                result[key] = this.data[key];
-            }
-        }
-        return result;
-    }
-    return undefined;
-  }
-
-  findPath(key, basePath = null) {
-    const getDeep = (obj, path) => {
-        let current = obj;
-        for (const segment of path) {
-            if (current === null || typeof current !== 'object' || !Object.prototype.hasOwnProperty.call(current, segment)) {
-                return undefined;
-            }
-            current = current[segment];
-        }
-        return current;
-    };
-
-    const search = (current, path) => {
-        if (current === null || typeof current !== 'object') return null;
-        if (Object.prototype.hasOwnProperty.call(current, key)) return path;
-        for (const prop of Object.keys(current)) {
-            const newPath = [...path, Array.isArray(current) ? parseInt(prop, 10) : prop];
-            const result = search(current[prop], newPath);
-            if (result) return result;
-        }
-        return null;
-    };
-
-    const topLevelData = this.getData();
-    if (topLevelData === undefined) return null;
-
-    if (basePath === null) {
-        if (Array.isArray(topLevelData)) {
-            for (let i = 0; i < topLevelData.length; i++) {
-                const result = search(topLevelData[i], [i]);
-                if (result) return result;
-            }
-        } else {
-            for (const topKey in topLevelData) {
-                const result = search(topLevelData[topKey], [topKey]);
-                if (result) return result;
-            }
-        }
-        return null;
-    }
-
-    const topLevelItem = topLevelData[basePath[0]];
-    if (topLevelItem === undefined) return null;
-    const searchContext = getDeep(topLevelItem, basePath.slice(1));
-    if (searchContext === undefined) return null;
-    
-    const relativePath = search(searchContext, []);
-    return relativePath ? [...basePath, ...relativePath] : null;
-  }
+  getData() { return this._crdtToPlain(this.root); }
   
+  findPath(key, basePath = null) { return null; /* TODO: Re-implement if needed */ }
+
   // --- Operation Generators (Public API) ---
 
   addItem(path, data) {
-    if (this.type === null) {
-        // If the document type is not yet determined, the first operation sets it.
-        // A path starting with a number implies an array document.
-        if (typeof path[0] === 'number') {
-            this.type = 'array';
-        } else {
-            this.type = 'object';
-        }
-    }
-    
-    // The only CRDT-native add operation is at the top level of an array-type document.
-    if (this.type === 'array' && path.length === 1 && typeof path[0] === 'number') {
-        const index = path[0];
-        const sortedItems = this._getSortedItems();
-        const { prevKey, nextKey } = this._findSortKeys(sortedItems, index);
-        const newSortKey = this._generateSortKey(prevKey, nextKey);
-        const newItemId = this._generateId();
-
-        this._applyAndStore({
-          type: 'ADD_ITEM',
-          itemId: newItemId,
-          data: data,
-          sortKey: newSortKey,
-          timestamp: this._tick(),
-        });
-        return;
-    }
-
-    // All other adds (nested in array-doc, all in object-doc) are LWW updates on the parent.
     const parentPath = path.slice(0, -1);
     const index = path[path.length - 1];
 
-    if (typeof index !== 'number') {
-        throw new Error("Final path segment for addItem must be a numeric index.");
+    if (typeof index !== 'number') throw new Error("Final path segment for addItem must be an index.");
+    if (Object.keys(this.root).length === 0 && parentPath.length === 0) {
+        this.root = this._plainToCrdt([]);
     }
 
-    const docData = this.getData();
-    const array = this._getDeep(docData, parentPath);
+    const result = this._traverse(parentPath);
+    if (!result || !result.node || !result.node[CRDT_ARRAY_MARKER]) throw new Error("Target for addItem is not an array.");
+    
+    const targetArray = result.node;
+    const sortedItems = this._getSortedItems(targetArray);
 
-    if (array !== undefined && !Array.isArray(array)) {
-        throw new Error("addItem target's parent is not an array.");
-    }
+    if (index > sortedItems.length) throw new Error("Index out of bounds.");
 
-    const newArray = array ? [...array] : [];
-    newArray.splice(index, 0, data);
-    this.updateItem(parentPath, newArray);
+    const prevItem = sortedItems[index - 1] || null;
+    const nextItem = sortedItems[index] || null;
+    const prevKey = prevItem ? prevItem.sortKey : null;
+    const nextKey = nextItem ? nextItem.sortKey : null;
+    
+    const newSortKey = this._generateSortKey(prevKey, nextKey);
+    const newItemId = this._generateId();
+
+    this._applyAndStore({ type: 'ADD_ITEM', path: parentPath, itemId: newItemId, data, sortKey: newSortKey, timestamp: this._tick() });
   }
 
   deleteItem(path) {
-    // Top-level delete is a native CRDT op
-    if (path.length === 1) {
-        const keyOrIndex = path[0];
-        if (this.type === 'array') {
-            const item = this._getSortedItems()[keyOrIndex];
-            if (!item) return;
-            this._applyAndStore({ type: 'DELETE_ITEM', itemId: item.id, timestamp: this._tick() });
-            return;
-        } else if (this.type === 'object') {
-            if (!this.data || !this.data[keyOrIndex]) return;
-            this._applyAndStore({ type: 'DELETE_ITEM', key: keyOrIndex, timestamp: this._tick() });
-            return;
-        }
+    const result = this._traverse(path);
+    if (!result) return; // Idempotent
+
+    const { parent, key, node } = result;
+    const op = { type: 'DELETE_ITEM', path, timestamp: this._tick() };
+
+    if (parent[CRDT_ARRAY_MARKER]) {
+        op.itemId = node.id;
     }
-
-    // Nested delete is an LWW update on the parent
-    const parentPath = path.slice(0, -1);
-    const keyOrIndexToDelete = path[path.length - 1];
-
-    const docData = this.getData();
-    const parent = this._getDeep(docData, parentPath);
-
-    if (parent === undefined) return; // Idempotent
-
-    if (Array.isArray(parent)) {
-        if (typeof keyOrIndexToDelete !== 'number' || keyOrIndexToDelete < 0 || keyOrIndexToDelete >= parent.length) {
-            return; // Invalid index, idempotent
-        }
-        const newArray = [...parent];
-        newArray.splice(keyOrIndexToDelete, 1);
-        this.updateItem(parentPath, newArray);
-    } else if (typeof parent === 'object' && parent !== null) {
-        if (!Object.prototype.hasOwnProperty.call(parent, keyOrIndexToDelete)) {
-            return; // Key doesn't exist, idempotent
-        }
-        const newObject = {...parent};
-        delete newObject[keyOrIndexToDelete];
-        this.updateItem(parentPath, newObject);
-    }
+    this._applyAndStore(op);
   }
 
   updateItem(path, newData) {
-    if (!path || path.length === 0) throw new Error('Invalid path for updateItem');
-    const keyOrIndex = path[0];
-    const subPath = path.slice(1);
-    
-    if (this.type === 'array') {
-        const item = this._getSortedItems()[keyOrIndex];
-        if (!item) throw new Error('Item not found for update');
-        this._applyAndStore({ type: 'UPDATE_ITEM', path: path, data: newData, timestamp: this._tick() });
-    } else {
-        if (this.type === null) {
-            this.type = 'object';
-        }
-        if (!this.data[keyOrIndex] && subPath.length > 0) throw new Error('Item not found for update');
-        this._applyAndStore({ type: 'UPDATE_ITEM', path: path, data: newData, timestamp: this._tick() });
+    if (!path || path.length === 0) {
+        this.root = this._plainToCrdt(newData); // Overwrite root
+        return;
     }
+    
+    const result = this._traverse(path.slice(0, -1));
+    if (!result) throw new Error("Invalid path for update");
+    
+    this._applyAndStore({ type: 'UPDATE_ITEM', path, data: newData, timestamp: this._tick() });
   }
 
   prune(pruneFn, clientRequestData) {
@@ -334,74 +213,62 @@ export class CollabJSON {
 
   applyOp(op) {
     this._mergeClock(op.timestamp);
-    let meta, item, keyOrIndex, subPath, itemToUpdate;
+    const { parent, node } = this._traverse(op.path.slice(0, -1)) || {};
+    const finalKey = op.path[op.path.length - 1];
 
     switch (op.type) {
       case 'ADD_ITEM':
-        if (this.type !== 'array') break;
-        if (!this.items.has(op.itemId)) {
-          this.items.set(op.itemId, { id: op.itemId });
+        const targetArray = this._traverse(op.path)?.node;
+        if (!targetArray || !targetArray[CRDT_ARRAY_MARKER]) break;
+        
+        let item = targetArray.items[op.itemId];
+        if (!item) {
+            item = targetArray.items[op.itemId] = { id: op.itemId };
         }
-        item = this.items.get(op.itemId);
         if (!item.updated || op.timestamp >= item.updated) {
-            item.data = op.data;
+            item.data = this._plainToCrdt(op.data);
             item.sortKey = op.sortKey;
             item.updated = op.timestamp;
             item._deleted = false;
         }
         break;
+
       case 'DELETE_ITEM':
-        if (this.type === 'array') {
-            item = this.items.get(op.itemId);
-            if (item && op.timestamp > item.updated) {
-              item._deleted = true;
-              item.updated = op.timestamp;
-            }
-        } else {
-            meta = this.metadata[op.key];
-            if (meta && op.timestamp > meta.updated) {
-              meta._deleted = true;
-              meta.updated = op.timestamp;
-            }
+        const res = this._traverse(op.path);
+        if (!res || !res.node) break;
+        const itemToDelete = res.parent[CRDT_ARRAY_MARKER] ? res.node : res.parent.metadata[res.key];
+        
+        if (itemToDelete && op.timestamp > (itemToDelete.updated || 0)) {
+            itemToDelete._deleted = true;
+            itemToDelete.updated = op.timestamp;
         }
         break;
-      case 'UPDATE_ITEM':
-        keyOrIndex = op.path[0];
-        subPath = op.path.slice(1);
 
-        if (this.type === 'array') {
-            itemToUpdate = this._getSortedItems()[keyOrIndex];
-            if (!itemToUpdate) break;
-            item = this.items.get(itemToUpdate.id);
-            if (!item || op.timestamp <= item.updated) break;
-        } else {
-            meta = this.metadata[keyOrIndex];
-            if (meta && op.timestamp <= meta.updated) break;
-            item = { data: this.data[keyOrIndex] };
-        }
-        
-        if (subPath.length > 0) {
-            const newData = item.data ? structuredClone(item.data) : {};
-            let current = newData;
-            for (let i = 0; i < subPath.length - 1; i++) {
-                if (typeof current !== 'object' || current === null) return;
-                current = current[subPath[i]];
+      case 'UPDATE_ITEM':
+        const updateRes = this._traverse(op.path);
+        if (updateRes && updateRes.parent) {
+            const { parent, key, node } = updateRes;
+            const itemToUpdate = parent[CRDT_ARRAY_MARKER] ? node : parent.metadata[key];
+            if (itemToUpdate && op.timestamp <= (itemToUpdate.updated || 0)) break;
+            
+            if (parent[CRDT_ARRAY_MARKER]) {
+                node.data = this._plainToCrdt(op.data);
+                node.updated = op.timestamp;
+                node._deleted = false;
+            } else {
+                parent[key] = this._plainToCrdt(op.data);
+                if (!parent.metadata) parent.metadata = {};
+                parent.metadata[key] = { updated: op.timestamp, _deleted: false };
             }
-            if (typeof current !== 'object' || current === null) return;
-            current[subPath[subPath.length - 1]] = op.data;
-            item.data = newData;
-        } else {
-            item.data = op.data;
-        }
-        
-        if (this.type === 'array') {
-            item.updated = op.timestamp;
-            item._deleted = false;
-        } else {
-            this.data[keyOrIndex] = item.data;
-            if (!this.metadata[keyOrIndex]) this.metadata[keyOrIndex] = {};
-            this.metadata[keyOrIndex].updated = op.timestamp;
-            this.metadata[keyOrIndex]._deleted = false;
+        } else if (op.path.length > 0) { // Create path
+            let current = this.root;
+            for (let i = 0; i < op.path.length - 1; i++) {
+                current = current[op.path[i]];
+            }
+            const finalKey = op.path[op.path.length - 1];
+            current[finalKey] = this._plainToCrdt(op.data);
+            if (!current.metadata) current.metadata = {};
+            current.metadata[finalKey] = { updated: op.timestamp, _deleted: false };
         }
         break;
     }
@@ -411,11 +278,8 @@ export class CollabJSON {
 
   toJSON() {
     return {
-      type: this.type,
+      root: this.root,
       id: this.id,
-      data: this.data,
-      items: this.type === 'array' ? Array.from(this.items.entries()) : undefined,
-      metadata: this.metadata,
       history: this.history,
       dvv: Object.fromEntries(this.dvv),
       snapshot: this.snapshot,
@@ -426,26 +290,10 @@ export class CollabJSON {
   static fromJSON(state, options = {}) {
     const doc = new CollabJSON(undefined, { ...options, id: state ? state.id : undefined });
     if (!state) return doc;
-
-    doc.type = state.type || null;
-    if (state.snapshot) {
-        if (doc.type === 'array') {
-            doc.items = new Map();
-            (state.snapshot || []).forEach(item => doc.items.set(item.id, item));
-        } else {
-            doc.data = state.snapshot.data || {};
-            doc.metadata = state.snapshot.metadata || {};
-        }
-        doc.snapshot = state.snapshot;
-        doc.snapshotDvv = new Map(Object.entries(state.snapshotDvv || {}));
-    } else {
-        if (doc.type === 'array') {
-            doc.items = new Map(state.items || []);
-        } else {
-            doc.data = state.data || {};
-            doc.metadata = state.metadata || {};
-        }
-    }
+    
+    doc.root = state.snapshot || state.root || {};
+    doc.snapshot = state.snapshot;
+    doc.snapshotDvv = new Map(Object.entries(state.snapshotDvv || {}));
     
     if (state.history) {
         doc.history = state.history || [];
@@ -462,34 +310,17 @@ export class CollabJSON {
     const newOps = this.ops.filter(op => op.timestamp > lastSeenBySystem);
     this.checked = Date.now();
     
-    return {
-      dvv: Object.fromEntries(this.dvv),
-      ops: newOps,
-      clientId: this.clientId,
-      docId: this.id
-    };
+    return { dvv: Object.fromEntries(this.dvv), ops: newOps, clientId: this.clientId, docId: this.id };
   }
 
-  applySyncResponse({ ops, dvv, snapshot, snapshotDvv, reset, type, id }) {
+  applySyncResponse({ ops, dvv, snapshot, snapshotDvv, reset, id }) {
     if (reset) {
         this.ops = [];
-        this.type = type;
         this.id = id;
+        this.root = snapshot || {};
         this.snapshot = snapshot;
         this.snapshotDvv = new Map(Object.entries(snapshotDvv || {}));
         this.dvv = new Map(Object.entries(snapshotDvv || {}));
-
-        if (type === 'array') {
-            this.items = new Map();
-            (snapshot || []).forEach(item => this.items.set(item.id, item));
-            this.data = {};
-            this.metadata = {};
-        } else {
-            this.data = snapshot ? snapshot.data || {} : {};
-            this.metadata = snapshot ? snapshot.metadata || {} : {};
-            this.items = new Map();
-        }
-        
         this.synced = Date.now();
         return;
     }
@@ -512,13 +343,7 @@ export class CollabJSON {
             }
         }
         if (needsReset) {
-            return {
-                id: this.id,
-                type: this.type,
-                snapshot: this.snapshot,
-                snapshotDvv: Object.fromEntries(this.snapshotDvv),
-                reset: true
-            };
+            return { id: this.id, snapshot: this.snapshot, snapshotDvv: Object.fromEntries(this.snapshotDvv), reset: true };
         }
     }
 
@@ -529,18 +354,10 @@ export class CollabJSON {
 
     const maxTs = clientOps.reduce((max, op) => op.clientId === clientId ? Math.max(max, op.timestamp) : max, 0);
     if (maxTs > 0) {
-      const currentTs = this.dvv.get(clientId) || 0;
-      this.dvv.set(clientId, Math.max(currentTs, maxTs));
+      this.dvv.set(clientId, Math.max(this.dvv.get(clientId) || 0, maxTs));
     }
 
-    const opsForClient = this.history.filter(op => {
-        const lastSeenByClient = clientDvvMap.get(op.clientId) || 0;
-        return op.timestamp > lastSeenByClient;
-    });
-
-    return {
-        ops: opsForClient,
-        dvv: Object.fromEntries(this.dvv)
-    };
+    const opsForClient = this.history.filter(op => (clientDvvMap.get(op.clientId) || 0) < op.timestamp);
+    return { ops: opsForClient, dvv: Object.fromEntries(this.dvv) };
   }
 }

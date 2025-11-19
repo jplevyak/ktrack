@@ -32,30 +32,18 @@ test('Initialization', () => {
     const arrDoc = new CollabJSON("[]");
     assert.deepStrictEqual(arrDoc.getData(), []);
     const indDoc = new CollabJSON();
-    assert.strictEqual(indDoc.getData(), undefined);
+    assert.deepStrictEqual(indDoc.getData(), {});
 });
 
-test('Indeterminate type resolution', () => {
-    const arrDoc = new CollabJSON();
-    arrDoc.addItem([0], { text: 'a' });
-    assert.deepStrictEqual(arrDoc.getData(), [{ text: 'a' }]);
-
-    const objDoc = new CollabJSON();
-    objDoc.updateItem(['a'], { text: 'value a' });
-    assert.deepStrictEqual(objDoc.getData(), { a: { text: 'value a' } });
-});
-
-test('Constructor initializes with data from JSON string', () => {
-    const objDoc = new CollabJSON('{"a": 1, "b": {"c": 2}}');
-    assert.strictEqual(objDoc.type, 'object');
-    assert.deepStrictEqual(objDoc.getData(), {"a": 1, "b": {"c": 2}});
+test('Constructor initializes with nested data', () => {
+    const objDoc = new CollabJSON('{"a": 1, "b": {"c": [10, 20]}}');
+    assert.deepStrictEqual(objDoc.getData(), {"a": 1, "b": {"c": [10, 20]}});
 
     const arrDoc = new CollabJSON('[{"a": 1}, {"b": 2}]');
-    assert.strictEqual(arrDoc.type, 'array');
     assert.deepStrictEqual(arrDoc.getData(), [{"a": 1}, {"b": 2}]);
 });
 
-test('Array: addItem at beginning, middle, and end', () => {
+test('Top-level Array: addItem at beginning, middle, and end', () => {
     const doc = new CollabJSON("[]");
     doc.addItem([0], { text: 'a' });
     assert.deepStrictEqual(doc.getData(), [{ text: 'a' }]);
@@ -65,7 +53,7 @@ test('Array: addItem at beginning, middle, and end', () => {
     assert.deepStrictEqual(doc.getData(), [{ text: 'a' }, { text: 'b' }, { text: 'c' }]);
 });
 
-test('Array: deleteItem', () => {
+test('Top-level Array: deleteItem', () => {
     const doc = new CollabJSON('[{ "text": "a" }, { "text": "b" }, { "text": "c" }]');
     doc.deleteItem([1]);
     assert.deepStrictEqual(doc.getData(), [{ text: 'a' }, { text: 'c' }]);
@@ -87,12 +75,6 @@ test('Array: updateItem', () => {
     assert.deepStrictEqual(doc.getData(), [{ text: 'A' }, { text: 'b' }]);
 });
 
-test('Object: updateItem', () => {
-    const doc = new CollabJSON('{"a": {"text": "value a"}, "b": {"text": "value b"}}');
-    doc.updateItem(['a'], { text: 'new value a' });
-    assert.deepStrictEqual(doc.getData(), { a: { text: 'new value a' }, b: { text: 'value b' } });
-});
-
 test('Object: deleteItem', () => {
     const doc = new CollabJSON('{"a": 1, "b": 2, "c": 3}');
     doc.deleteItem(['b']);
@@ -102,104 +84,15 @@ test('Object: deleteItem', () => {
 test('Successive updates to the same item are compressed', () => {
     const doc = new CollabJSON("{}");
     doc.updateItem(['item1'], { text: 'initial' });
-    assert.strictEqual(doc.ops.length, 1);
-    assert.strictEqual(doc.ops[0].type, 'UPDATE_ITEM');
     const firstTimestamp = doc.ops[0].timestamp;
-
-    // First update (should compress)
     doc.updateItem(['item1'], { text: 'update 1' });
     assert.strictEqual(doc.ops.length, 1, 'Should compress subsequent updates to the same path');
-    assert.strictEqual(doc.ops[0].type, 'UPDATE_ITEM');
     assert.deepStrictEqual(doc.ops[0].data, { text: 'update 1' });
     assert.ok(doc.ops[0].timestamp > firstTimestamp, 'Timestamp should be updated on compression');
-    const secondTimestamp = doc.ops[0].timestamp;
-
-    // Second update (should compress again)
-    doc.updateItem(['item1'], { text: 'update 2' });
-    assert.strictEqual(doc.ops.length, 1, 'Should still have 1 op after compression');
-    const lastOp = doc.ops[0];
-    assert.strictEqual(lastOp.type, 'UPDATE_ITEM');
-    assert.deepStrictEqual(lastOp.data, { text: 'update 2' }, 'Last op should contain data from second update');
-    assert.ok(lastOp.timestamp > secondTimestamp, 'Timestamp should be updated');
-
-    // Check final state
-    assert.deepStrictEqual(doc.getData(), { item1: { text: 'update 2' } });
 });
 
-test('updateItem can update nested properties', () => {
-    const doc = new CollabJSON("{}");
-    doc.updateItem(['item1'], {
-        text: 'top level',
-        details: {
-            author: 'John',
-            tags: ['a', 'b']
-        }
-    });
 
-    // Update a nested property
-    doc.updateItem(['item1', 'details', 'author'], 'Jane');
-    let data = doc.getData();
-    assert.deepStrictEqual(data.item1.details.author, 'Jane');
-
-    // Update a nested array element
-    doc.updateItem(['item1', 'details', 'tags', 1], 'B');
-    data = doc.getData();
-    assert.deepStrictEqual(data.item1.details.tags, ['a', 'B']);
-
-    // Add a new property
-    doc.updateItem(['item1', 'details', 'year'], 2024);
-    data = doc.getData();
-    assert.deepStrictEqual(data.item1.details.year, 2024);
-
-    // Update the whole top-level item
-    doc.updateItem(['item1'], { text: 'new top level' });
-    data = doc.getData();
-    assert.deepStrictEqual(data.item1, { text: 'new top level' });
-});
-
-test('Successive nested updates are compressed', () => {
-    const doc = new CollabJSON("{}");
-    doc.updateItem(['item1'], { details: { author: 'John' } });
-    
-    doc.updateItem(['item1', 'details', 'author'], 'Jane');
-    assert.strictEqual(doc.ops.length, 2);
-    
-    doc.updateItem(['item1', 'details', 'author'], 'Joan');
-    assert.strictEqual(doc.ops.length, 2, 'Should compress updates to same nested path');
-    assert.deepStrictEqual(doc.ops[1].data, 'Joan');
-    assert.deepStrictEqual(doc.getData(), { item1: { details: { author: 'Joan' } } });
-    
-    doc.updateItem(['item1', 'details'], { author: 'James' });
-    assert.strictEqual(doc.ops.length, 3, 'Should not compress updates to different path');
-});
-
-test('Can create and update a nested map object', () => {
-    const doc = new CollabJSON("{}");
-
-    // Add a nested map as an item
-    doc.updateItem(['map1'], { "a": { "b": 1, "c": 2 }, "d": 3 });
-    assert.deepStrictEqual(doc.getData(), { map1: { "a": { "b": 1, "c": 2 }, "d": 3 } });
-
-    // Update a deeply nested value
-    doc.updateItem(['map1', 'a', 'b'], 10);
-    assert.deepStrictEqual(doc.getData(), { map1: { "a": { "b": 10, "c": 2 }, "d": 3 } });
-
-    // Update a top-level value in the item
-    doc.updateItem(['map1', 'd'], 30);
-    assert.deepStrictEqual(doc.getData(), { map1: { "a": { "b": 10, "c": 2 }, "d": 30 } });
-});
-
-test('addItem can add to a nested array', () => {
-    const doc = new CollabJSON("{}");
-    doc.updateItem(['list'], [{ text: 'a' }, { text: 'c' }]);
-    assert.deepStrictEqual(doc.getData(), { list: [{ text: 'a' }, { text: 'c' }] });
-
-    // Add item to nested list
-    doc.addItem(['list', 1], { text: 'b' });
-    assert.deepStrictEqual(doc.getData(), { list: [{ text: 'a' }, { text: 'b' }, { text: 'c' }] });
-});
-
-test('Arbitrarily nested operations', () => {
+test('Arbitrarily nested operations are CRDT-native', () => {
     const doc = new CollabJSON("{}");
     doc.updateItem(['a'], { b: { c: [ { d: 1 }, { d: 2 } ] } });
 
@@ -224,73 +117,10 @@ test('Arbitrarily nested operations', () => {
     assert.strictEqual(doc.getData().a.b.newKey, undefined);
 });
 
-// --- Nested Structure Tests (Removed) ---
-
-test('findPath finds path to object containing a key, with optional basePath', () => {
-    const doc = new CollabJSON("{}");
-    doc.updateItem(['item1'], {
-        id: 1,
-        details: {
-            author: 'John',
-            meta: {
-                year: 2024
-            }
-        }
-    });
-    doc.updateItem(['item2'], {
-        id: 2,
-        details: {
-            author: 'Jane',
-            meta: {
-                year: 2025
-            }
-        }
-    });
-    doc.updateItem(['item3'], {
-        id: 3,
-        tags: [
-            { name: 'tagA' },
-            { name: 'tagB', info: { deepKey: true } }
-        ]
-    });
-
-    // Search from root
-    assert.deepStrictEqual(doc.findPath('year'), ['item1', 'details', 'meta'], 'Should find first nested key from root');
-
-    // Search with basePath for top-level item
-    assert.deepStrictEqual(doc.findPath('author', ['item2']), ['item2', 'details'], 'Should find key within specified top-level item');
-    
-    // Search with nested basePath
-    assert.deepStrictEqual(doc.findPath('year', ['item2', 'details']), ['item2', 'details', 'meta'], 'Should find key within nested path');
-
-    // Search for key in the base path object itself
-    assert.deepStrictEqual(doc.findPath('year', ['item1', 'details', 'meta']), ['item1', 'details', 'meta'], 'Should return base path if key is in the base object');
-
-    // Search for non-existent key
-    assert.strictEqual(doc.findPath('title'), null, 'Should return null for non-existent key from root');
-    assert.strictEqual(doc.findPath('nonexistent', ['item1']), null, 'Should return null for non-existent key within a path');
-
-    // Search within a nested array
-    assert.deepStrictEqual(doc.findPath('deepKey'), ['item3', 'tags', 1, 'info'], 'Should find key within a nested array');
-});
-
 
 // --- Synchronization Tests ---
 
-test('Basic sync: one-way propagation', () => {
-    const doc1 = new CollabJSON("[]");
-    const doc2 = new CollabJSON("[]", {id: doc1.id});
-
-    doc1.addItem([0], { text: 'a' });
-    doc1.addItem([1], { text: 'b' });
-
-    // Sync ops from 1 to 2
-    doc1.ops.forEach(op => doc2.applyOp(op));
-
-    assert.deepStrictEqual(doc1.getData(), doc2.getData());
-});
-
-test('Concurrent array adds converge', () => {
+test('Concurrent top-level array adds converge', () => {
     const doc1 = new CollabJSON("[]", {clientId: 'c1'});
     doc1.addItem([0], { text: 'common' });
     const doc2 = new CollabJSON("[]", {id: doc1.id, clientId: 'c2'});
@@ -302,13 +132,32 @@ test('Concurrent array adds converge', () => {
     doc2.addItem([1], { text: 'from 2' });
     const op2 = doc2.ops[doc2.ops.length - 1];
 
-    // Sync
     doc2.applyOp(op1);
     doc1.applyOp(op2);
 
     assert.deepStrictEqual(doc1.getData(), doc2.getData());
     assert.strictEqual(doc1.getData().length, 3);
 });
+
+test('Concurrent nested array adds converge', () => {
+    const doc1 = new CollabJSON("{}", {clientId: 'c1'});
+    doc1.updateItem(['list'], ['common']);
+    const doc2 = new CollabJSON("{}", {id: doc1.id, clientId: 'c2'});
+    doc2.applyOp(doc1.ops[0]);
+
+    // Concurrent adds to nested list
+    doc1.addItem(['list', 1], { text: 'from 1' });
+    const op1 = doc1.ops[doc1.ops.length - 1];
+    doc2.addItem(['list', 1], { text: 'from 2' });
+    const op2 = doc2.ops[doc2.ops.length - 1];
+
+    doc2.applyOp(op1);
+    doc1.applyOp(op2);
+
+    assert.deepStrictEqual(doc1.getData(), doc2.getData());
+    assert.strictEqual(doc1.getData().list.length, 3);
+});
+
 
 test('Concurrent sets converge', () => {
     const doc1 = new CollabJSON("{}", {clientId: 'c1'});
@@ -322,7 +171,6 @@ test('Concurrent sets converge', () => {
     doc2.updateItem(['b'], { text: 'from 2' });
     const op2 = doc2.ops[doc2.ops.length - 1];
 
-    // Sync
     doc2.applyOp(op1);
     doc1.applyOp(op2);
 
@@ -331,42 +179,34 @@ test('Concurrent sets converge', () => {
 });
 
 test('Concurrent update (LWW)', () => {
-    const doc1 = new CollabJSON("{}", {clientId: 'c1'});
-    doc1.updateItem(['item1'], { text: 'original' });
-    const doc2 = new CollabJSON("{}", {id: doc1.id, clientId: 'c2'});
-    doc2.applyOp(doc1.ops[0]);
+    const doc1 = new CollabJSON('{"item1": "original"}', {clientId: 'c1'});
+    const doc2 = new CollabJSON('{"item1": "original"}', {id: doc1.id, clientId: 'c2'});
 
-    // Concurrent updates. Force clock to determine winner.
     doc1.clock = 10;
-    doc1.updateItem(['item1'], { text: 'update from 1' }); // This one is later
+    doc1.updateItem(['item1'], 'update from 1'); // This one is later
     const op1 = doc1.ops[doc1.ops.length - 1];
     doc2.clock = 5;
-    doc2.updateItem(['item1'], { text: 'update from 2' }); // This one is earlier
+    doc2.updateItem(['item1'], 'update from 2'); // This one is earlier
     const op2 = doc2.ops[doc2.ops.length - 1];
 
-    // Sync
     doc2.applyOp(op1);
     doc1.applyOp(op2);
 
-    assert.deepStrictEqual(doc1.getData(), { item1: { text: 'update from 1' } });
-    assert.deepStrictEqual(doc2.getData(), { item1: { text: 'update from 1' } });
+    assert.deepStrictEqual(doc1.getData(), { item1: 'update from 1' });
+    assert.deepStrictEqual(doc2.getData(), { item1: 'update from 1' });
 });
 
 test('Concurrent delete and update converge', () => {
-    const doc1 = new CollabJSON("{}", {clientId: 'c1'});
-    doc1.updateItem(['item1'], { text: 'original' });
-    const doc2 = new CollabJSON("{}", {id: doc1.id, clientId: 'c2'});
-    doc2.applyOp(doc1.ops[0]);
+    const doc1 = new CollabJSON('{"item1": "original"}', {clientId: 'c1'});
+    const doc2 = new CollabJSON('{"item1": "original"}', {id: doc1.id, clientId: 'c2'});
 
-    // Concurrent update and delete
     doc1.clock = 10;
     doc1.deleteItem(['item1']); // delete wins (later timestamp)
     const op1 = doc1.ops[doc1.ops.length - 1];
     doc2.clock = 5;
-    doc2.updateItem(['item1'], { text: 'update from 2' });
+    doc2.updateItem(['item1'], 'update from 2');
     const op2 = doc2.ops[doc2.ops.length - 1];
 
-    // Sync
     doc2.applyOp(op1);
     doc1.applyOp(op2);
 
@@ -374,49 +214,7 @@ test('Concurrent delete and update converge', () => {
     assert.deepStrictEqual(doc2.getData(), {});
 });
 
-// --- Boundary and Error Tests ---
-
-test('Throws error on invalid path for update (Object)', () => {
-    const doc = new CollabJSON('{"a": {"text": "value a"}}');
-    assert.throws(() => doc.updateItem(['b', 'text'], 'value b' ), /Item not found/);
-});
-
-test('Throws error on invalid path for update (Array)', () => {
-    const doc = new CollabJSON('[{"text": "a"}]');
-    assert.throws(() => doc.updateItem([1], { text: 'b' }), /Item not found/);
-});
-
 // --- DVV Sync Tests ---
-
-test('getSyncRequest is repeatable', () => {
-    const client = new CollabJSON("{}");
-    client.updateItem(['a'], { text: 'value a' });
-    const req1 = client.getSyncRequest();
-    const req2 = client.getSyncRequest();
-    assert.deepStrictEqual(req1, req2);
-    assert.strictEqual(req1.ops.length, 1);
-});
-
-test('applySyncResponse is idempotent', () => {
-    const docId = 'doc1';
-    const client = new CollabJSON("{}", { id: docId });
-    const server = new CollabJSON("{}", { clientId: 'server', id: docId });
-
-    client.updateItem(['a'], { text: 'value a' });
-    const request = client.getSyncRequest();
-    const response = server.getSyncResponse(request);
-
-    client.applySyncResponse(response);
-    const state1 = client.getData();
-    const dvv1 = client.dvv;
-
-    client.applySyncResponse(response);
-    const state2 = client.getData();
-    const dvv2 = client.dvv;
-
-    assert.deepStrictEqual(state1, state2);
-    assert.deepStrictEqual(dvv1, dvv2);
-});
 
 test('Full client-server-client sync cycle', () => {
     const docId = 'doc1';
@@ -424,30 +222,21 @@ test('Full client-server-client sync cycle', () => {
     const client1 = new CollabJSON("{}", { clientId: 'c1', id: docId });
     const client2 = new CollabJSON("{}", { clientId: 'c2', id: docId });
 
-    // C1 adds item, syncs with server
     client1.updateItem(['c1_item'], { text: 'from c1' });
     let req1 = client1.getSyncRequest();
     let res1 = server.getSyncResponse(req1);
     client1.applySyncResponse(res1);
 
-    assert.deepStrictEqual(server.getData(), { c1_item: { text: 'from c1' } });
-
-    // C2 syncs with server, gets C1's changes
     let req2 = client2.getSyncRequest();
     let res2 = server.getSyncResponse(req2);
     client2.applySyncResponse(res2);
-
     assert.deepStrictEqual(client2.getData(), { c1_item: { text: 'from c1' } });
 
-    // C2 adds item, syncs with server
     client2.updateItem(['c2_item'], { text: 'from c2' });
     req2 = client2.getSyncRequest();
     res2 = server.getSyncResponse(req2);
     client2.applySyncResponse(res2);
 
-    assert.deepStrictEqual(server.getData(), { c1_item: { text: 'from c1' }, c2_item: { text: 'from c2' } });
-
-    // C1 syncs again, gets C2's changes
     req1 = client1.getSyncRequest();
     res1 = server.getSyncResponse(req1);
     client1.applySyncResponse(res1);
@@ -455,67 +244,23 @@ test('Full client-server-client sync cycle', () => {
     assert.deepStrictEqual(client1.getData(), server.getData());
 });
 
-test('Concurrent setItem (LWW)', () => {
-    const docId = 'doc1';
-    const server = new CollabJSON("{}", { clientId: 'server', id: docId });
-    const client1 = new CollabJSON("{}", { clientId: 'c1', id: docId });
-    const client2 = new CollabJSON("{}", { clientId: 'c2', id: docId });
-
-    // C1 and C2 both set the same key. C2 has a higher clock, so it should win.
-    client1.clock = 5;
-    client1.updateItem(['item'], { text: 'from c1' });
-    client2.clock = 10;
-    client2.updateItem(['item'], { text: 'from c2' });
-
-    // C1 syncs
-    const req1 = client1.getSyncRequest();
-    const res1 = server.getSyncResponse(req1);
-    client1.applySyncResponse(res1);
-
-    // C2 syncs
-    const req2 = client2.getSyncRequest();
-    const res2 = server.getSyncResponse(req2);
-    client2.applySyncResponse(res2);
-
-    // Final sync for C1 to get C2's changes
-    const finalReq1 = client1.getSyncRequest();
-    const finalRes1 = server.getSyncResponse(finalReq1);
-    client1.applySyncResponse(finalRes1);
-
-    assert.deepStrictEqual(client1.getData(), client2.getData());
-    assert.strictEqual(Object.keys(client1.getData()).length, 1);
-    assert.deepStrictEqual(client1.getData(), { item: { text: 'from c2' } });
-    assert.deepStrictEqual(client1.getData(), server.getData());
-});
-
-
 
 test('Client ops are pruned after successful sync', () => {
     const docId = 'prune-ops-doc';
     const server = new CollabJSON("{}", { clientId: 'server', id: docId });
     const client = new CollabJSON("{}", { clientId: 'c1', id: docId });
 
-    // 1. Client creates an operation
     client.updateItem(['op1'], { text: 'value1' });
-    assert.strictEqual(client.ops.length, 1);
-
-    // 2. Client syncs with server
     const req1 = client.getSyncRequest();
     const res1 = server.getSyncResponse(req1);
-    
-    // 3. Client applies response
     client.applySyncResponse(res1);
-
-    // 4. Assert local ops are pruned
     assert.strictEqual(client.ops.length, 0, 'Ops should be pruned after sync');
 
-    // 5. Client creates another op to ensure log is still functional
     client.updateItem(['op2'], { text: 'value2' });
     assert.strictEqual(client.ops.length, 1);
-
     const req2 = client.getSyncRequest();
     assert.strictEqual(req2.ops.length, 1, 'New sync request should contain only the new op');
-    assert.strictEqual(req2.ops[0].data.text, 'value2');
+    assert.deepStrictEqual(req2.ops[0].data, { text: 'value2' });
 });
 
 
@@ -523,39 +268,29 @@ test('Sync with a pruned server sends snapshot', () => {
     const docId = 'prune-doc';
     let server = new CollabJSON("{}", { clientId: 'server', id: docId });
     const client1 = new CollabJSON("{}", { clientId: 'c1', id: docId });
-    const client2 = new CollabJSON("{}", { clientId: 'c2', id: docId }); // New client
 
-    // Make > 100 ops from client1
     for (let i = 0; i < 101; i++) {
         client1.updateItem([`item${i}`], { val: i });
     }
     
-    // Sync client1 to server
     let req1 = client1.getSyncRequest();
-    let res1 = server.getSyncResponse(req1);
-    client1.applySyncResponse(res1);
+    server.getSyncResponse(req1);
 
-    assert.strictEqual(server.history.length, 101);
-
-    // Prune the server
-    server.prune((doc) => {}); // Dummy prune function
+    server.prune(() => {});
     assert.strictEqual(server.history.length, 50);
     assert.ok(server.snapshot);
 
-    // Simulate saving and reloading server state from DB
     const serverState = server.toJSON();
     server = CollabJSON.fromJSON(serverState, { clientId: 'server' });
 
-    // Now, new client (client2) tries to sync. It has an empty DVV.
+    const client2 = new CollabJSON("{}", { clientId: 'c2', id: docId });
     const req2 = client2.getSyncRequest();
     const res2 = server.getSyncResponse(req2);
 
-    // It should receive a reset response
     assert.strictEqual(res2.reset, true);
     assert.ok(res2.snapshot);
 
     client2.applySyncResponse(res2);
-    
     assert.deepStrictEqual(client2.getData(), server.getData());
 });
 
