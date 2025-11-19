@@ -93,6 +93,14 @@ test('updateItem can create nested properties (upsert)', () => {
     assert.deepStrictEqual(doc.getData(), { a: { b: { c: 'deep value' } } });
 });
 
+test('updateItem can add or update', () => {
+    const doc = new CollabJSON('{"a": {"b": 1}}');
+    doc.updateItem(['a', 'b', 'c'], 2);
+    assert.deepStrictEqual(doc.getData(), { a: { b: { c: 2 } } });
+    doc.updateItem(['a', 'b', 'c'], 3);
+    assert.deepStrictEqual(doc.getData(), { a: { b: { c: 3 } } });
+});
+
 test('Successive updates to the same item are compressed', () => {
     const doc = new CollabJSON("{}");
     doc.updateItem(['item1'], { text: 'initial' });
