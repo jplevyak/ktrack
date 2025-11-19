@@ -33,23 +33,32 @@ export class CollabJSON {
   // --- Private Helper Functions ---
 
   _tick() {
-    this.clock = Math.round(this.clock) + 1.0 + Math.random();
-    return this.clock;
+    // Hybrid logical clock: integer counter + client ID tie-breaker (simulated via random here for simplicity, 
+    // but ideally should use clientId for strict determinism).
+    this.clock = Math.floor(this.clock) + 1;
+    return this.clock + (Math.random() * 0.99); 
   }
 
   _mergeClock(remoteTimestamp) {
     if (remoteTimestamp) {
-      this.clock = Math.round(Math.max(this.clock, remoteTimestamp)) + 1.0 + Math.random();
+      this.clock = Math.max(Math.floor(this.clock), Math.floor(remoteTimestamp)) + 1;
     }
   }
 
   _generateId() { return uuidv4(); }
 
   _generateSortKey(prevKey, nextKey) {
-    if (prevKey === null && nextKey === null) return 1.0;
-    if (prevKey === null) return nextKey - 1.0;
+    if (prevKey === null && nextKey === null) return 0.5; // Start in middle of 0..1
+    if (prevKey === null) return nextKey / 2.0;
     if (nextKey === null) return prevKey + 1.0;
-    return (prevKey + nextKey) / 2.0;
+    
+    const mid = (prevKey + nextKey) / 2.0;
+    // Basic precision guard
+    if (mid === prevKey || mid === nextKey) {
+        console.warn("CollabJSON: Fractional indexing precision limit reached. Re-sorting recommended.");
+        return prevKey + 0.00000000001; 
+    }
+    return mid;
   }
 
   _plainToCrdt(data) {
@@ -131,6 +140,7 @@ export class CollabJSON {
 
   _applyAndStore(op) {
     op.clientId = this.clientId;
+    // Compression: If updating the same item consecutively, merge ops
     if (op.type === 'UPDATE_ITEM') {
         const lastOp = this.ops.length > 0 ? this.ops[this.ops.length - 1] : null;
         if (lastOp && lastOp.type === 'UPDATE_ITEM' && JSON.stringify(lastOp.path) === JSON.stringify(op.path)) {
@@ -164,7 +174,44 @@ export class CollabJSON {
     return this._crdtToPlain(nodeToConvert);
   }
   
-  findPath(key, basePath = null) { return null; /* TODO: Re-implement if needed */ }
+  /**
+   * Finds the path to a node with a specific ID (for array items) or key.
+   * This is a DFS search.
+   */
+  findPath(targetId, currentPath = [], currentNode = this.root) {
+    if (!currentNode) return null;
+
+    // Unwrap array item wrapper
+    let actualNode = currentNode;
+    if (currentNode.hasOwnProperty('data') && currentNode.hasOwnProperty('sortKey')) {
+        if (currentNode.id === targetId) return currentPath;
+        actualNode = currentNode.data;
+    }
+
+    if (typeof actualNode !== 'object') return null;
+
+    if (actualNode[CRDT_ARRAY_MARKER]) {
+        const sorted = this._getSortedItems(actualNode);
+        for (let i = 0; i < sorted.length; i++) {
+            const item = sorted[i];
+            if (item.id === targetId) return [...currentPath, i];
+            
+            const res = this.findPath(targetId, [...currentPath, i], item);
+            if (res) return res;
+        }
+    } else {
+        for (const key in actualNode) {
+            if (key === 'metadata') continue;
+            if (actualNode.metadata && actualNode.metadata[key] && actualNode.metadata[key]._deleted) continue;
+            
+            if (key === targetId) return [...currentPath, key]; // Found by key name
+
+            const res = this.findPath(targetId, [...currentPath, key], actualNode[key]);
+            if (res) return res;
+        }
+    }
+    return null;
+  }
 
   // --- Operation Generators (Public API) ---
 
@@ -204,6 +251,65 @@ export class CollabJSON {
     this._applyAndStore({ type: 'ADD_ITEM', path: parentPath, itemId: newItemId, data, sortKey: newSortKey, timestamp: this._tick() });
   }
 
+  moveItem(path, fromIndex, toIndex) {
+    const result = this._traverse(path);
+    if (!result || !result.node || !result.node[CRDT_ARRAY_MARKER]) throw new Error("Target for moveItem is not an array.");
+
+    const targetArray = result.node;
+    const sortedItems = this._getSortedItems(targetArray);
+
+    if (fromIndex < 0 || fromIndex >= sortedItems.length) throw new Error("fromIndex out of bounds");
+    if (toIndex < 0 || toIndex > sortedItems.length) throw new Error("toIndex out of bounds");
+    if (fromIndex === toIndex) return;
+
+    const itemToMove = sortedItems[fromIndex];
+    
+    // Calculate new sort key
+    let prevKey = null;
+    let nextKey = null;
+
+    if (toIndex === 0) {
+        // Moving to start
+        nextKey = sortedItems[0].sortKey;
+    } else if (toIndex === sortedItems.length) {
+        // Moving to end
+        prevKey = sortedItems[sortedItems.length - 1].sortKey;
+    } else {
+        // Moving between items
+        // Adjust logic because the item being moved is currently IN the list
+        let leftIndex = toIndex - 1;
+        let rightIndex = toIndex;
+        
+        // If we are moving 'down' the list (0 -> 5), the indices shift after removal
+        if (fromIndex < toIndex) {
+            // The target slot is actually between toIndex and toIndex+1 in the original list?
+            // No, standard splice logic: insert AT toIndex.
+            // But since we are effectively removing fromIndex first, we need to be careful.
+            // Simpler: imagine the list without the item.
+        }
+        
+        const listWithoutItem = sortedItems.filter(i => i.id !== itemToMove.id);
+        // Now we want to insert at toIndex (clamped to new length)
+        const actualToIndex = Math.min(toIndex, listWithoutItem.length);
+        
+        const pItem = listWithoutItem[actualToIndex - 1];
+        const nItem = listWithoutItem[actualToIndex];
+        
+        prevKey = pItem ? pItem.sortKey : null;
+        nextKey = nItem ? nItem.sortKey : null;
+    }
+
+    const newSortKey = this._generateSortKey(prevKey, nextKey);
+
+    this._applyAndStore({ 
+        type: 'MOVE_ITEM', 
+        path: path, 
+        itemId: itemToMove.id, 
+        sortKey: newSortKey, 
+        timestamp: this._tick() 
+    });
+  }
+
   deleteItem(path) {
     const result = this._traverse(path);
     if (!result) return; // Idempotent
@@ -233,13 +339,48 @@ export class CollabJSON {
     this.snapshotDvv = new Map(this.dvv);
     this.history = this.history.slice(-history_prune_window);
   }
+
+  /**
+   * Garbage Collection: Permanently remove items marked as deleted.
+   * WARNING: This can cause desyncs if other clients still have pending ops 
+   * referencing these items. Only use when confident all clients are caught up,
+   * or use a "tombstone TTL" strategy (not implemented here).
+   */
+  purgeTombstones(node = this.root) {
+    if (typeof node !== 'object' || node === null) return;
+
+    if (node[CRDT_ARRAY_MARKER]) {
+        for (const id in node.items) {
+            if (node.items[id]._deleted) {
+                delete node.items[id];
+            } else {
+                this.purgeTombstones(node.items[id].data);
+            }
+        }
+    } else {
+        for (const key in node) {
+            if (key === 'metadata') continue;
+            
+            // Check if this key is deleted in metadata
+            if (node.metadata && node.metadata[key] && node.metadata[key]._deleted) {
+                delete node[key];
+                delete node.metadata[key];
+            } else {
+                this.purgeTombstones(node[key]);
+            }
+        }
+    }
+  }
   
   // --- Sync Function ---
 
   applyOp(op) {
     this._mergeClock(op.timestamp);
-    const { parent, node } = this._traverse(op.path.slice(0, -1)) || {};
-    const finalKey = op.path[op.path.length - 1];
+    
+    // Common traversal for most ops
+    // Note: For MOVE_ITEM, path points to the array, not the item
+    const traversePath = (op.type === 'MOVE_ITEM') ? op.path : op.path.slice(0, -1);
+    const { parent, node } = this._traverse(traversePath) || {};
 
     switch (op.type) {
       case 'ADD_ITEM':
@@ -255,6 +396,23 @@ export class CollabJSON {
             item.sortKey = op.sortKey;
             item.updated = op.timestamp;
             item._deleted = false;
+        }
+        break;
+
+      case 'MOVE_ITEM':
+        const moveArray = this._traverse(op.path)?.node;
+        if (!moveArray || !moveArray[CRDT_ARRAY_MARKER]) break;
+
+        const itemToMove = moveArray.items[op.itemId];
+        if (!itemToMove) break; // Item doesn't exist (maybe deleted or not synced yet)
+
+        // LWW on the sortKey specifically. 
+        // We use the item's general 'updated' timestamp. 
+        // If a delete happened later, _deleted will be true, and we shouldn't un-delete it just by moving.
+        if (op.timestamp > (itemToMove.updated || 0)) {
+            itemToMove.sortKey = op.sortKey;
+            itemToMove.updated = op.timestamp;
+            // Note: We do NOT set _deleted = false here. If it was deleted, moving it shouldn't bring it back.
         }
         break;
 

@@ -59,6 +59,22 @@ test('Top-level Array: deleteItem', () => {
     assert.deepStrictEqual(doc.getData(), [{ text: 'a' }, { text: 'c' }]);
 });
 
+test('Top-level Array: moveItem', () => {
+    const doc = new CollabJSON('["a", "b", "c", "d"]');
+    
+    // Move 'a' to end
+    doc.moveItem([], 0, 4);
+    assert.deepStrictEqual(doc.getData(), ["b", "c", "d", "a"]);
+
+    // Move 'd' to start
+    doc.moveItem([], 2, 0);
+    assert.deepStrictEqual(doc.getData(), ["d", "b", "c", "a"]);
+
+    // Move 'b' between 'c' and 'a'
+    doc.moveItem([], 1, 2);
+    assert.deepStrictEqual(doc.getData(), ["d", "c", "b", "a"]);
+});
+
 test('Object: updateItem can add and overwrite keys', () => {
     const doc = new CollabJSON("{}");
     doc.updateItem(['a'], { text: 'value a' });
@@ -126,6 +142,23 @@ test('getData can retrieve a subtree by path', () => {
     assert.deepStrictEqual(doc.getData(), { a: { b: [10, { c: 20 }] }, d: 30 });
 });
 
+test('findPath locates items', () => {
+    const doc = new CollabJSON('{"a": {"b": [{"id": "x", "val": 10}, {"id": "y", "val": 20}]}}');
+    
+    // We need to get the internal IDs to test findPath reliably on array items
+    const root = doc._traverse([]).node;
+    const arrayNode = root.a.data.b.data;
+    const sorted = doc._getSortedItems(arrayNode);
+    const id1 = sorted[0].id;
+    const id2 = sorted[1].id;
+
+    assert.deepStrictEqual(doc.findPath(id1), ['a', 'b', 0]);
+    assert.deepStrictEqual(doc.findPath(id2), ['a', 'b', 1]);
+    
+    // Find by key
+    assert.deepStrictEqual(doc.findPath('val'), ['a', 'b', 0, 'val']); // Finds first occurrence
+});
+
 test('Successive updates to the same item are compressed', () => {
     const doc = new CollabJSON("{}");
     doc.updateItem(['item1'], { text: 'initial' });
@@ -160,6 +193,22 @@ test('Arbitrarily nested operations are CRDT-native', () => {
     // Nested deleteItem on an object
     doc.deleteItem(['a', 'b', 'newKey']);
     assert.strictEqual(doc.getData().a.b.newKey, undefined);
+});
+
+test('Garbage collection removes tombstones', () => {
+    const doc = new CollabJSON('{"a": 1, "b": 2}');
+    doc.deleteItem(['a']);
+    
+    // Verify tombstone exists internally
+    const root = doc._traverse([]).node;
+    assert.ok(root.metadata.a._deleted === true);
+    
+    doc.purgeTombstones();
+    
+    // Verify tombstone is gone
+    assert.ok(root.metadata.a === undefined);
+    assert.ok(root.a === undefined);
+    assert.deepStrictEqual(doc.getData(), { b: 2 });
 });
 
 
