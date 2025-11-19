@@ -319,16 +319,11 @@ export function save_history(day, profile) {
   history_store.update(function (history) {
     if (history == undefined)
       history = make_history();
-
-    const day_docs = Array.from(history.items.values())
-      .filter(item => !item._deleted)
-      .sort((a, b) => a.sortKey - b.sortKey)
-      .map(item => item.data);
+    let history_data = history.getData();
 
     const key = date_key(day);
-    const existing_index = day_docs.findIndex(d => d && date_key(d) === key);
+    const existing_index = history_data.findIndex(d => d && date_key(d) === key);
 
-    console.log('existing index', existing_index);
     if (existing_index !== -1) {
       history.updateItem([existing_index], day.getData());
     } else {
@@ -350,7 +345,6 @@ export function save_history(day, profile) {
 }
 
 export function save_today(today, profile) {
-  console.log('save2', today);
   today_store.set(today);
   save_history(today, profile);
 }
@@ -362,8 +356,10 @@ export function save_favorite(item, profile, replace_index) {
     
     item = { ...item };
 
+    const favorites_data = favorites.getData();
+
     if (replace_index != undefined) {
-      if (replace_index >= favorites.getData().length) {
+      if (replace_index >= favorites_data.length) {
         console.log("bad replace_index", replace_index);
         return favorites;
       }
@@ -371,8 +367,7 @@ export function save_favorite(item, profile, replace_index) {
       return favorites;
     }
     
-    const items_array = favorites.getData();
-    const existing_index = items_array.findIndex(i => i.name == item.name);
+    const existing_index = favorites_data.findIndex(i => i.name == item.name);
 
     if (existing_index !== -1) {
       favorites.updateItem([existing_index], item);

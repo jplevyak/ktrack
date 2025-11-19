@@ -43,11 +43,18 @@ export function load_async(
 }
 
 export function get_date_info(day) {
-    if (!day || !day.getData) return null;
-    const items = day.getData();
-    if (!items || items.length === 0) return null;
-    // Assume date info is an item that has a 'year' property and no 'mcg' property.
-    return items.find(item => typeof item.year !== 'undefined' && typeof item.mcg === 'undefined');
+  if (!day || !day.getData)
+    return null;
+  let day_data = day.getData();
+  if (!day_data.timestamp)
+    return null;
+  let date = new Date(day_data.timestamp);
+  return {
+    day: date.getDay(),
+    date: date.getDate(),
+    month: date.getMonth(),
+    year: date.getFullYear(),
+  };
 }
 
 export function compare_date(d1, d2) {
@@ -119,42 +126,31 @@ export function get_total_fiber(day) {
 }
 
 export function make_today() {
-  let the_date = new Date();
-  const doc = new CollabJSON();
-  doc.addItem([0], {
-    year: the_date.getFullYear(),
-    month: the_date.getMonth(),
-    date: the_date.getDate(),
-    day: the_date.getDay(),
-  });
-  return doc;
+  let timestamp = new Date().now();
+  let doc = new CollabJSON();
+  doc.addItem(['timestamp'], the_date);
+  doc.addItem(['timestamp'], the_date);
+  return new CollabJSON(`{
+    timestamp: ${the_date},
+    items: []
+  }`);
 }
 
 export function make_historical_day(d, days_ago) {
-  const d_info = get_date_info(d);
-  if (!d_info) {
-    // Cannot create a historical day from a document without date info.
-    // Return an empty doc as a fallback.
-    return new CollabJSON();
-  }
-  let the_date = new Date(d_info.year, d_info.month, d_info.date);
-  the_date = new Date(the_date.getTime() - days_ago * 24 * 3600 * 1000);
-  const doc = new CollabJSON();
-  doc.addItem([0], {
-    year: the_date.getFullYear(),
-    month: the_date.getMonth(),
-    date: the_date.getDate(),
-    day: the_date.getDay(),
-  });
-  return doc;
+  let day_data = d.getData();
+  let the_date = new Date(day_data.timestamp - days_ago * 24 * 3600 * 1000);
+  return new CollabJSON(`{
+    timestamp: ${the_date},
+    items: []
+  }`);
 }
 
 export function make_favorites() {
-  return new CollabJSON();
+  return new CollabJSON("[]");
 }
 
 export function make_history() {
-  return new CollabJSON();
+  return new CollabJSON("[]");
 }
 
 export function make_profile() {
@@ -167,32 +163,32 @@ export function make_profile() {
 }
 
 export function prune_today(server_doc, clientRequestData) {
-    // First, perform the standard tombstone pruning.
-    prune_tombstones(server_doc);
+  // First, perform the standard tombstone pruning.
+  prune_tombstones(server_doc);
 
-    if (!clientRequestData || !clientRequestData.ops || clientRequestData.ops.length === 0) {
-        return;
-    }
+  if (!clientRequestData || !clientRequestData.ops || clientRequestData.ops.length === 0) {
+      return;
+  }
 
-    // Create a temporary document from the client's operations to inspect its state.
-    const client_day_temp = new CollabJSON();
-    clientRequestData.ops.forEach(op => client_day_temp.applyOp(op));
+  // Create a temporary document from the client's operations to inspect its state.
+  const client_day_temp = new CollabJSON("{}");
+  clientRequestData.ops.forEach(op => client_day_temp.applyOp(op));
+  let client_day_temp_data = client_day_temp.getData();
+  if (!client_day_temp_data.timestamp) {
+    return; // Client ops don't contain a valid timestamp, so do nothing.
+  }
 
-    const client_has_date = get_date_info(client_day_temp);
-    if (!client_has_date) {
-        return; // Client ops don't contain a valid day, so do nothing.
-    }
+  let server_data = server_doc.getData();
+  const server_has_date = !!server_data.timestamp;
 
-    const server_has_date = get_date_info(server_doc);
-
-    // If server has no date, or client's date is newer, overwrite server state.
-    if (!server_has_date || compare_date(client_day_temp, server_doc) > 0) {
-        // Reset the server document's state. 
-        // getSyncResponse will then build the new state from the client's operations.
-        server_doc.items.clear();
-        server_doc.history = [];
-        server_doc.dvv.clear();
-    }
+  // If server has no date, or client's date is newer, overwrite server state.
+  if (!server_has_date || compare_date(client_day_temp, server_doc) > 0) {
+      // Reset the server document's state. 
+      // getSyncResponse will then build the new state from the client's operations.
+      server_doc.items.clear();
+      server_doc.history = [];
+      server_doc.dvv.clear();
+  }
 }
 
 export function prune_tombstones(doc) {

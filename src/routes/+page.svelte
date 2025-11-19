@@ -53,8 +53,7 @@
     console.log('unsubscribe_edit', d);
     let edit_data = d ? d.getData() : undefined;
     if (edit_data != undefined && edit_data.start_edit) {
-      if (Date.now() - edit_data.start_edit > 10 * 60 * 1000) {
-        // 10 min.
+      if (Date.now() - edit_data.start_edit > 10 * 60 * 1000 /* 10 min */) {
         edit_store.set(undefined);
         d = undefined;
       }
@@ -95,6 +94,7 @@
     if (compare_date(day, today) == 0) {
       save_today(day, profile);
     } else {
+      day.deleteItem(['start_edit']);
       save_history(day, profile);
     }
   }
@@ -105,7 +105,7 @@
         editing = undefined;
       };
       document.getElementById("save").onclick = function () {
-        day.updateItem([editing_index], editing);
+        day.updateItem(['items', editing_index], editing);
         save_day();
         editing = undefined;
       };
