@@ -156,9 +156,17 @@ export class CollabJSON {
 
   addItem(path, data) {
     const parentPath = path.slice(0, -1);
-    const index = path[path.length - 1];
+    const keyOrIndex = path[path.length - 1];
 
-    if (typeof index !== 'number') throw new Error("Final path segment for addItem must be an index.");
+    if (typeof keyOrIndex === 'string') {
+        this.updateItem(path, data);
+        return;
+    }
+
+    if (typeof keyOrIndex !== 'number') throw new Error("Final path segment for addItem must be an index or a key.");
+    
+    const index = keyOrIndex;
+
     if (Object.keys(this.root).length === 0 && parentPath.length === 0) {
         this.root = this._plainToCrdt([]);
     }

@@ -81,6 +81,12 @@ test('Object: deleteItem', () => {
     assert.deepStrictEqual(doc.getData(), { a: 1, c: 3 });
 });
 
+test('addItem can add property to an object', () => {
+    const doc = new CollabJSON('{"a": {"b": 1}}');
+    doc.addItem(['a', 'c'], 2);
+    assert.deepStrictEqual(doc.getData(), { a: { b: 1, c: 2 } });
+});
+
 test('Successive updates to the same item are compressed', () => {
     const doc = new CollabJSON("{}");
     doc.updateItem(['item1'], { text: 'initial' });
