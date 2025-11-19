@@ -147,7 +147,7 @@ test('findPath locates items', () => {
     
     // We need to get the internal IDs to test findPath reliably on array items
     const root = doc._traverse([]).node;
-    const arrayNode = root.a.data.b.data;
+    const arrayNode = root.a.b;
     const sorted = doc._getSortedItems(arrayNode);
     const id1 = sorted[0].id;
     const id2 = sorted[1].id;
