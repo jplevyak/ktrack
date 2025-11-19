@@ -87,6 +87,12 @@ test('addItem can add property to an object', () => {
     assert.deepStrictEqual(doc.getData(), { a: { b: 1, c: 2 } });
 });
 
+test('updateItem can create nested properties (upsert)', () => {
+    const doc = new CollabJSON('{}');
+    doc.updateItem(['a', 'b', 'c'], 'deep value');
+    assert.deepStrictEqual(doc.getData(), { a: { b: { c: 'deep value' } } });
+});
+
 test('Successive updates to the same item are compressed', () => {
     const doc = new CollabJSON("{}");
     doc.updateItem(['item1'], { text: 'initial' });

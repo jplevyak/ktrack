@@ -209,9 +209,6 @@ export class CollabJSON {
         return;
     }
     
-    const result = this._traverse(path.slice(0, -1));
-    if (!result) throw new Error("Invalid path for update");
-    
     this._applyAndStore({ type: 'UPDATE_ITEM', path, data: newData, timestamp: this._tick() });
   }
 
@@ -274,15 +271,34 @@ export class CollabJSON {
                 if (!parent.metadata) parent.metadata = {};
                 parent.metadata[key] = { updated: op.timestamp, _deleted: false };
             }
-        } else if (op.path.length > 0) { // Create path
+        } else if (op.path.length > 0) { // Create path (upsert)
             let current = this.root;
             for (let i = 0; i < op.path.length - 1; i++) {
-                current = current[op.path[i]];
+                const segment = op.path[i];
+                let container = current;
+                if (container && container.hasOwnProperty('data') && container.hasOwnProperty('sortKey')) {
+                    container = container.data;
+                }
+
+                if (!Object.prototype.hasOwnProperty.call(container, segment) || typeof container[segment] !== 'object' || container[segment] === null) {
+                    container[segment] = this._plainToCrdt({});
+                    if (!container.metadata) container.metadata = {};
+                    container.metadata[segment] = { updated: op.timestamp, _deleted: false };
+                }
+                current = container[segment];
             }
+
             const finalKey = op.path[op.path.length - 1];
-            current[finalKey] = this._plainToCrdt(op.data);
-            if (!current.metadata) current.metadata = {};
-            current.metadata[finalKey] = { updated: op.timestamp, _deleted: false };
+            let parentContainer = current;
+            if (parentContainer && parentContainer.hasOwnProperty('data') && parentContainer.hasOwnProperty('sortKey')) {
+                parentContainer = parentContainer.data;
+            }
+
+            if (typeof parentContainer !== 'object' || parentContainer === null) break;
+
+            parentContainer[finalKey] = this._plainToCrdt(op.data);
+            if (!parentContainer.metadata) parentContainer.metadata = {};
+            parentContainer.metadata[finalKey] = { updated: op.timestamp, _deleted: false };
         }
         break;
     }
