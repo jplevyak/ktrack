@@ -1,4 +1,4 @@
-/* simple CRDT-based class for a collaborative JSON document (nested arrays).
+/* Simple CRDT-based class for a collaborative JSON document.
  *
  * It uses Lamport timestamps for causal ordering, Last-Write-Wins (LWW)
  * for atomic updates, and fractional indexing for list ordering.
