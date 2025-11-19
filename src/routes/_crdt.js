@@ -214,61 +214,93 @@ export class CollabJSON {
   // --- Operation Generators (Public API) ---
 
   addItem(path, data) {
-    if (this.type === 'object') {
-        const parentPath = path.slice(0, -1);
-        const index = path[path.length - 1];
-
-        if (typeof index !== 'number') {
-            throw new Error("Index for addItem must be a number.");
+    if (this.type === null) {
+        // If the document type is not yet determined, the first operation sets it.
+        // A path starting with a number implies an array document.
+        if (typeof path[0] === 'number') {
+            this.type = 'array';
+        } else {
+            this.type = 'object';
         }
+    }
+    
+    // The only CRDT-native add operation is at the top level of an array-type document.
+    if (this.type === 'array' && path.length === 1 && typeof path[0] === 'number') {
+        const index = path[0];
+        const sortedItems = this._getSortedItems();
+        const { prevKey, nextKey } = this._findSortKeys(sortedItems, index);
+        const newSortKey = this._generateSortKey(prevKey, nextKey);
+        const newItemId = this._generateId();
 
-        const docData = this.getData();
-        const array = this._getDeep(docData, parentPath);
-
-        if (array !== undefined && !Array.isArray(array)) {
-            throw new Error("addItem target is not an array.");
-        }
-
-        const newArray = array ? [...array] : [];
-        newArray.splice(index, 0, data);
-        this.updateItem(parentPath, newArray);
+        this._applyAndStore({
+          type: 'ADD_ITEM',
+          itemId: newItemId,
+          data: data,
+          sortKey: newSortKey,
+          timestamp: this._tick(),
+        });
         return;
     }
 
-    if (this.type === null) {
-        this.type = 'array';
+    // All other adds (nested in array-doc, all in object-doc) are LWW updates on the parent.
+    const parentPath = path.slice(0, -1);
+    const index = path[path.length - 1];
+
+    if (typeof index !== 'number') {
+        throw new Error("Final path segment for addItem must be a numeric index.");
     }
-    const index = path[0];
-    const subPath = path.slice(1);
-    
-    if (subPath.length > 0) throw new Error("Nested addItem is not supported yet for array-type documents.");
 
-    const sortedItems = this._getSortedItems();
-    const { prevKey, nextKey } = this._findSortKeys(sortedItems, index);
-    const newSortKey = this._generateSortKey(prevKey, nextKey);
-    const newItemId = this._generateId();
+    const docData = this.getData();
+    const array = this._getDeep(docData, parentPath);
 
-    this._applyAndStore({
-      type: 'ADD_ITEM',
-      itemId: newItemId,
-      data: data,
-      sortKey: newSortKey,
-      timestamp: this._tick(),
-    });
+    if (array !== undefined && !Array.isArray(array)) {
+        throw new Error("addItem target's parent is not an array.");
+    }
+
+    const newArray = array ? [...array] : [];
+    newArray.splice(index, 0, data);
+    this.updateItem(parentPath, newArray);
   }
 
   deleteItem(path) {
-    const keyOrIndex = path[0];
-    const subPath = path.slice(1);
-    if (subPath.length > 0) throw new Error("Nested deleteItem is not supported yet.");
+    // Top-level delete is a native CRDT op
+    if (path.length === 1) {
+        const keyOrIndex = path[0];
+        if (this.type === 'array') {
+            const item = this._getSortedItems()[keyOrIndex];
+            if (!item) return;
+            this._applyAndStore({ type: 'DELETE_ITEM', itemId: item.id, timestamp: this._tick() });
+            return;
+        } else if (this.type === 'object') {
+            if (!this.data || !this.data[keyOrIndex]) return;
+            this._applyAndStore({ type: 'DELETE_ITEM', key: keyOrIndex, timestamp: this._tick() });
+            return;
+        }
+    }
 
-    if (this.type === 'array') {
-        const item = this._getSortedItems()[keyOrIndex];
-        if (!item) return;
-        this._applyAndStore({ type: 'DELETE_ITEM', itemId: item.id, timestamp: this._tick() });
-    } else {
-        if (!this.data || !this.data[keyOrIndex]) return;
-        this._applyAndStore({ type: 'DELETE_ITEM', key: keyOrIndex, timestamp: this._tick() });
+    // Nested delete is an LWW update on the parent
+    const parentPath = path.slice(0, -1);
+    const keyOrIndexToDelete = path[path.length - 1];
+
+    const docData = this.getData();
+    const parent = this._getDeep(docData, parentPath);
+
+    if (parent === undefined) return; // Idempotent
+
+    if (Array.isArray(parent)) {
+        if (typeof keyOrIndexToDelete !== 'number' || keyOrIndexToDelete < 0 || keyOrIndexToDelete >= parent.length) {
+            return; // Invalid index, idempotent
+        }
+        const newArray = [...parent];
+        newArray.splice(keyOrIndexToDelete, 1);
+        this.updateItem(parentPath, newArray);
+    } else if (typeof parent === 'object' && parent !== null) {
+        if (!Object.prototype.hasOwnProperty.call(parent, keyOrIndexToDelete)) {
+            return; // Key doesn't exist, idempotent
+        }
+        const newObject = {...parent};
+        delete newObject[keyOrIndexToDelete];
+        this.updateItem(parentPath, newObject);
     }
   }
 

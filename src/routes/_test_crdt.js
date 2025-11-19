@@ -199,6 +199,31 @@ test('addItem can add to a nested array', () => {
     assert.deepStrictEqual(doc.getData(), { list: [{ text: 'a' }, { text: 'b' }, { text: 'c' }] });
 });
 
+test('Arbitrarily nested operations', () => {
+    const doc = new CollabJSON("{}");
+    doc.updateItem(['a'], { b: { c: [ { d: 1 }, { d: 2 } ] } });
+
+    // Nested addItem
+    doc.addItem(['a', 'b', 'c', 1], { d: 1.5 });
+    assert.deepStrictEqual(doc.getData().a.b.c, [ { d: 1 }, { d: 1.5 }, { d: 2 } ]);
+    
+    // Nested deleteItem on an array
+    doc.deleteItem(['a', 'b', 'c', 0]);
+    assert.deepStrictEqual(doc.getData().a.b.c, [ { d: 1.5 }, { d: 2 } ]);
+
+    // Nested updateItem
+    doc.updateItem(['a', 'b', 'c', 1, 'd'], 2.5);
+    assert.deepStrictEqual(doc.getData().a.b.c, [ { d: 1.5 }, { d: 2.5 } ]);
+
+    // Add a new key to a nested object
+    doc.updateItem(['a', 'b', 'newKey'], 'newValue');
+    assert.strictEqual(doc.getData().a.b.newKey, 'newValue');
+
+    // Nested deleteItem on an object
+    doc.deleteItem(['a', 'b', 'newKey']);
+    assert.strictEqual(doc.getData().a.b.newKey, undefined);
+});
+
 // --- Nested Structure Tests (Removed) ---
 
 test('findPath finds path to object containing a key, with optional basePath', () => {
