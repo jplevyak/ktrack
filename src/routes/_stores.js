@@ -305,7 +305,7 @@ export function add_item(item, today, edit, profile) {
     item = { ...item };
     if (item.servings == undefined)
       item.servings = 1.0;
-    day.addItem(['items', data.length], item);
+    day.addItem(['items', data.items.length], item);
 
     if (edit == undefined) {
       save_history(day, profile);
@@ -327,8 +327,8 @@ export function save_history(day, profile) {
     if (existing_index !== -1) {
       history.updateItem([existing_index], day.getData());
     } else {
-      const insert_index = day_docs.findIndex(d => d && date_key(d) < key);
-      history.addItem([insert_index === -1 ? day_docs.length : insert_index], day.getData());
+      const insert_index = history_data.findIndex(d => d && date_key(d) < key);
+      history.addItem([insert_index === -1 ? history_data.length : insert_index], day.getData());
     }
     
     const limit = merge_history_limit || 50;
@@ -373,7 +373,7 @@ export function save_favorite(item, profile, replace_index) {
       favorites.updateItem([existing_index], item);
     } else {
       if (item.servings == undefined) item.servings = 1.0;
-      favorites.addItem([items_array.length], item);
+      favorites.addItem([favorites_data.length], item);
     }
     
     return favorites;
@@ -396,4 +396,3 @@ export function logout() {
   favorites_store.set(make_favorites());
   history_store.set(make_history());
 }
-
