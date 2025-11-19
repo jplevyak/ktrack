@@ -43,12 +43,15 @@ export function load_async(
 }
 
 export function get_date_info(day) {
-  if (!day || !day.getData)
+  // Accept both a day object and a CollabJSON day.
+  if (!day.timestamp) {
+    if (!day || !day.getData)
+      return null;
+    day = day.getData();
+  }
+  if (!day.timestamp)
     return null;
-  let day_data = day.getData();
-  if (!day_data.timestamp)
-    return null;
-  let date = new Date(day_data.timestamp);
+  let date = new Date(day.timestamp);
   return {
     day: date.getDay(),
     date: date.getDate(),
@@ -87,7 +90,6 @@ export function compute_averages(h) {
   var a = 0.0;
   var n = 0;
   for (let i in h) {
-    console.log('h[i]', h[i]);
     a += get_total(h[i]);
     n += 1;
     if (n > 1 && n % 2 == 1) {
@@ -100,8 +102,9 @@ export function compute_averages(h) {
 
 export function get_total(day) {
   let n = 0.0;
-  if (!day || !day.getData) return n;
-  for (let f of day.getData()) {
+  if (!day)
+    return n;
+  for (let f of day.items) {
     if (f.mcg != undefined) {
       n += f.mcg * f.servings;
     }
@@ -112,8 +115,9 @@ export function get_total(day) {
 export function get_total_fiber(day) {
   let n = 0.0;
   let unknown = false;
-  if (!day || !day.getData) return [n, unknown];
-  for (let f of day.getData()) {
+  if (!day)
+    return [n, unknown];
+  for (let f of day.items) {
     if (f.mcg != undefined) {
       if (f.hasOwnProperty('fiber') && f.fiber != "") {
           n += f.fiber * f.servings;
@@ -126,22 +130,9 @@ export function get_total_fiber(day) {
 }
 
 export function make_today() {
-  let timestamp = new Date().now();
-  let doc = new CollabJSON();
-  doc.addItem(['timestamp'], the_date);
-  doc.addItem(['timestamp'], the_date);
   return new CollabJSON(`{
-    timestamp: ${the_date},
-    items: []
-  }`);
-}
-
-export function make_historical_day(d, days_ago) {
-  let day_data = d.getData();
-  let the_date = new Date(day_data.timestamp - days_ago * 24 * 3600 * 1000);
-  return new CollabJSON(`{
-    timestamp: ${the_date},
-    items: []
+    "timestamp": ${Date.now()},
+    "items": []
   }`);
 }
 

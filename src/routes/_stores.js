@@ -297,7 +297,7 @@ export function add_item(item, today, edit, profile) {
       day = make_today();
 
     const data = day.getData();
-    const existing_index = data.findIndex(i => i.name == item.name);
+    const existing_index = data.items.findIndex(i => i.name == item.name);
     if (existing_index !== -1) {
       return day;
     }
@@ -305,7 +305,7 @@ export function add_item(item, today, edit, profile) {
     item = { ...item };
     if (item.servings == undefined)
       item.servings = 1.0;
-    day.addItem([data.length], item);
+    day.addItem(['items', data.length], item);
 
     if (edit == undefined) {
       save_history(day, profile);

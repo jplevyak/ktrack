@@ -33,8 +33,7 @@
   const unsubscribe_profile = profile_store.subscribe((p) => { profile = p; });
   const unsubscribe_today = today_store.subscribe((t) => { today = t; });
   const unsubscribe_edit = edit_store.subscribe((value) => { edit = value; });
-  const unsubscribe_history = history_store.subscribe((value) => { history = value;
-  });
+  const unsubscribe_history = history_store.subscribe((value) => { history = value; });
   onDestroy(() => {
     unsubscribe_profile();
     unsubscribe_today();
@@ -100,28 +99,27 @@ Number of days to view <input type="number" id="limit" value={limit} />
 <br /><br />
 
 {#each results as day, e}
+  {@const day_info = get_day_info(day)}
   <b
-    >Date: {weekdays[day[0].day]}
-    {months[day[0].month]}
-    {day[0].date}, {day[0].year} <button on:click={() => edit_day(day)}>edit</button>
+    >Date: {weekdays[day_info.day]}
+    {months[day_info.month]}
+    {day_info.date}, {day_info.year} <button on:click={() => edit_day(day)}>edit</button>
   </b><br /><br />
-  {#each day as f, i}
-    {#if i != 0}
-      <Food
-        name={f.name}
-        notes={f.notes}
-        entry={e}
-        index={i}
-        mcg={f.mcg}
-        fiber={f.fiber}
-        unit={f.unit}
-        servings={f.servings}
-        source={f.source}
-        use_add="true"
-        use_fav="true"
-        on:message={do_msg}
-      />
-    {/if}
+  {#each day.items as f, i}
+    <Food
+      name={f.name}
+      notes={f.notes}
+      entry={e}
+      index={i}
+      mcg={f.mcg}
+      fiber={f.fiber}
+      unit={f.unit}
+      servings={f.servings}
+      source={f.source}
+      use_add="true"
+      use_fav="true"
+      on:message={do_msg}
+    />
   {/each}
   Total: {get_total(day).toFixed(2)} Total fiber: {get_total_fiber(day)[0].toFixed(2)} {#if get_total_fiber(day)[1]} * some unknown * {/if} 
   <br /><br />
