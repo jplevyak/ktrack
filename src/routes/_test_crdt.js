@@ -104,22 +104,23 @@ test('Successive updates to the same item are compressed', () => {
     doc.updateItem(['item1'], { text: 'initial' });
     assert.strictEqual(doc.ops.length, 1);
     assert.strictEqual(doc.ops[0].type, 'UPDATE_ITEM');
+    const firstTimestamp = doc.ops[0].timestamp;
 
-    // First update
+    // First update (should compress)
     doc.updateItem(['item1'], { text: 'update 1' });
-    assert.strictEqual(doc.ops.length, 2, 'Should have SET and one UPDATE op');
-    assert.strictEqual(doc.ops[1].type, 'UPDATE_ITEM');
-    assert.deepStrictEqual(doc.ops[1].data, { text: 'update 1' });
-    assert.deepStrictEqual(doc.ops[1].path, [], 'Path should be empty for top-level update');
-    const firstUpdateTimestamp = doc.ops[1].timestamp;
+    assert.strictEqual(doc.ops.length, 1, 'Should compress subsequent updates to the same path');
+    assert.strictEqual(doc.ops[0].type, 'UPDATE_ITEM');
+    assert.deepStrictEqual(doc.ops[0].data, { text: 'update 1' });
+    assert.ok(doc.ops[0].timestamp > firstTimestamp, 'Timestamp should be updated on compression');
+    const secondTimestamp = doc.ops[0].timestamp;
 
-    // Second update (should compress)
+    // Second update (should compress again)
     doc.updateItem(['item1'], { text: 'update 2' });
-    assert.strictEqual(doc.ops.length, 2, 'Should still have 2 ops after compression');
-    const lastOp = doc.ops[1];
+    assert.strictEqual(doc.ops.length, 1, 'Should still have 1 op after compression');
+    const lastOp = doc.ops[0];
     assert.strictEqual(lastOp.type, 'UPDATE_ITEM');
     assert.deepStrictEqual(lastOp.data, { text: 'update 2' }, 'Last op should contain data from second update');
-    assert.ok(lastOp.timestamp > firstUpdateTimestamp, 'Timestamp should be updated');
+    assert.ok(lastOp.timestamp > secondTimestamp, 'Timestamp should be updated');
 
     // Check final state
     assert.deepStrictEqual(doc.getData(), { item1: { text: 'update 2' } });
@@ -245,8 +246,8 @@ test('Basic sync: one-way propagation', () => {
     const doc1 = new CollabJSON("[]");
     const doc2 = new CollabJSON("[]", {id: doc1.id});
 
-    doc1.addItem(0, { text: 'a' });
-    doc1.addItem(1, { text: 'b' });
+    doc1.addItem([0], { text: 'a' });
+    doc1.addItem([1], { text: 'b' });
 
     // Sync ops from 1 to 2
     doc1.ops.forEach(op => doc2.applyOp(op));
