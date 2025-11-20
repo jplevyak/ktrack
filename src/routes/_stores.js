@@ -63,7 +63,7 @@ export function synced_store(key, initialValue, sync, fromJSON) {
       return;
     }
 
-    console.log('Syncing to server...');
+    console.log('Syncing to server...', key);
     status.set('syncing');
 
     try {
@@ -99,7 +99,7 @@ export function synced_store(key, initialValue, sync, fromJSON) {
       }
       isDirty = false;
       status.set('idle');
-      console.log('Sync successful');
+      console.log('Sync successful', key);
 
     } catch (error) {
       console.error(error.message);
@@ -110,16 +110,6 @@ export function synced_store(key, initialValue, sync, fromJSON) {
   const debouncedSync = debounce(syncToServer, DEBOUNCE_WAIT);
 
   const set = (newValue) => {
-    if (newValue) {
-      console.log('set', key, newValue, typeof newValue.getData === 'function' ? newValue.getData() : 'no getData');
-    }
-    if (newValue && (key == "history" || key == "favorites")) {
-      if (typeof newValue.getData !== 'function' || !Array.isArray(newValue.getData())) {
-        console.error(`Invalid value set for ${key}`, newValue);
-        console.trace();
-        return;
-      }
-    }
     if (browser) {
       localStorage.setItem(key, JSON.stringify(newValue));
       localStorage.setItem(dirtyKey, 'true');
@@ -279,7 +269,9 @@ async function sync_internal(doc, name) {
         console.log("sync err", name, sync_response.err);
         return false;
       }
+      console.log('sync_internal', name, doc.getData(), sync_response);
       doc.applySyncResponse(sync_response);
+      console.log('sync_internal 2', name, doc.getData());
     } catch (err) {
       console.log(name, "JSON error", err.message);
       return false;
@@ -358,6 +350,8 @@ export function save_history(day, profile) {
     let history_data = history.getData();
 
     if (!Array.isArray(history_data)) {
+      console.error(`Invalid value set for history`, history_data);
+      console.trace();
       history.updateItem([], []);
       history_data = [];
     }

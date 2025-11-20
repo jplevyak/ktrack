@@ -154,11 +154,8 @@ export function make_profile() {
 }
 
 export function prune_today(server_doc, clientRequestData) {
-  // First, perform the standard tombstone pruning.
-  prune_tombstones(server_doc);
-
   if (!clientRequestData || !clientRequestData.ops || clientRequestData.ops.length === 0) {
-      return;
+    return;
   }
 
   // Create a temporary document from the client's operations to inspect its state.
@@ -174,35 +171,24 @@ export function prune_today(server_doc, clientRequestData) {
 
   // If server has no date, or client's date is newer, overwrite server state.
   if (!server_has_date || compare_date(client_day_temp, server_doc) > 0) {
-      // Reset the server document's state. 
-      // getSyncResponse will then build the new state from the client's operations.
-      server_doc.items.clear();
-      server_doc.history = [];
-      server_doc.dvv.clear();
+    // Reset the server document's state. 
+    // getSyncResponse will then build the new state from the client's operations.
+    server_doc.items.clear();
+    server_doc.history = [];
+    server_doc.dvv.clear();
   }
 }
 
-export function prune_tombstones(doc) {
-    // The snapshotting process already filters out deleted items by calling getData().
-    // This function can be used to permanently remove tombstones from the items map
-    // before the snapshot is taken, making the pruning explicit.
-    for (const [key, item] of doc.items.entries()) {
-        if (item._deleted) {
-            doc.items.delete(key);
-        }
-    }
-}
-
 export function prune_history(history_doc) {
-    const limit = merge_history_limit;
-    // getData() returns items sorted by their fractional index, which should reflect date order.
-    const items = history_doc.getData();
-    if (items.length > limit) {
-        // We delete items from the 'limit' index onwards to remove the oldest entries.
-        const to_delete = items.length - limit;
-        for (let i = 0; i < to_delete; i++) {
-            // Always delete the item at the `limit` index because the list shrinks after each deletion.
-            history_doc.deleteItem([limit]);
-        }
+  const limit = merge_history_limit;
+  // getData() returns items sorted by their fractional index, which should reflect date order.
+  const items = history_doc.getData();
+  if (items.length > limit) {
+    // We delete items from the 'limit' index onwards to remove the oldest entries.
+    const to_delete = items.length - limit;
+    for (let i = 0; i < to_delete; i++) {
+      // Always delete the item at the `limit` index because the list shrinks after each deletion.
+      history_doc.deleteItem([limit]);
     }
+  }
 }

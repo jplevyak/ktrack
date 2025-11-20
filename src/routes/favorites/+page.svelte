@@ -159,7 +159,7 @@
       if (results_map != undefined) i = results_map.get(index);
       let j = i - 1;
       if (j >= 0) {
-        favorites.moveItem([i], [i-1]);
+        favorites.moveItem([], i, i-1);
         save(favorites);
         return;
       }
@@ -167,9 +167,9 @@
       let i = index;
       if (results_map != undefined) i = results_map.get(index);
       let j = i + 1;
-      if (j < favorites.items.length) {
-        favorites.moveItem([i], [i+1]);
-        save(favs);
+      if (j < favorites.getData().length) {
+        favorites.moveItem([], i, i+1);
+        save(favorites);
         return;
       }
     } else if (change > 0) {

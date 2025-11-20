@@ -50,7 +50,9 @@
       }
       let found = search.search(search_box.value);
       results = [];
-      for (let f of found) results.push(foods[f.ref]);
+      let results_set = new Set();
+      for (let f of found) results_set.add(f.ref);
+      for (let f of results_set) results.push(foods[f]);
     }
     search_box.onchange = search_results;
     document.getElementById("search").onclick = search_results;
@@ -82,20 +84,20 @@
 Search <input type="text" id="search_string" />
 <button type="button" id="search">Search</button>
 <button type="button" id="clear_input">Clear</button>
-&nbsp;&nbsp; Added: {added_count}
-<br /><br />
+  &nbsp;&nbsp; Added: {added_count}
+  <br /><br />
 
-{#each results as f, i}
-  <Food
-    name={f.name}
-    notes={f.notes}
-    index={i}
-    mcg={f.mcg}
-    fiber={f.fiber}
-    unit={f.unit}
-    source={f.source}
-    use_add="true"
-    use_fav="true"
-    on:message={do_msg}
-  />
-{/each}
+  {#each results as f, i}
+    <Food
+      name={f.name}
+      notes={f.notes}
+      index={i}
+      mcg={f.mcg}
+      fiber={f.fiber}
+      unit={f.unit}
+      source={f.source}
+      use_add="true"
+      use_fav="true"
+      on:message={do_msg}
+    />
+  {/each}

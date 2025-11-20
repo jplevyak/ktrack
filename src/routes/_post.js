@@ -35,19 +35,14 @@ async function do_post_internal(req, data, username, dbname, db, prune, defaultJ
       server_doc = CollabJSON.fromJSON(JSON.parse(db_value_str), { clientId: 'server' });
   }
 
-  console.log('do_post_internal', dbname, db_value_str ? 'FOUND' : 'NOT_FOUND', server_doc.getData());
-
   // Allow special logic to run (e.g. for 'today' store) and handle pruning.
   // The 'prune' function is passed from the specific API endpoint.
   server_doc.prune(prune, data);
 
-  console.log('do_post_internal post prune', server_doc.getData());
-  
   // If the client's document ID doesn't match the server's, it means the client
   // has a fresh (e.g., post-login) or stale copy and needs to be reset with the
   // server's authoritative state.
   if (db_value_str && server_doc.id && data.docId && server_doc.id !== data.docId) {
-    console.log('do_post_internal RESET', server_doc.id, data.docId);
     return new Response(JSON.stringify({
       snapshot: server_doc._getSnapshotData(),
       snapshotDvv: Object.fromEntries(server_doc.dvv),

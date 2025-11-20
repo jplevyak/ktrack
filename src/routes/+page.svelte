@@ -83,6 +83,7 @@
   }
 
   function save_day() {
+    console.log('save day', day.getData());
     if (compare_date(day, today) == 0) {
       save_today(day, profile);
     } else {
@@ -153,7 +154,7 @@
     let change = event.detail.change;
     
     if (change == "del") {
-      day.deleteItem([original_index]);
+      day.deleteItem(['items', original_index]);
       save_day();
     } else if (change == "fav") {
       save_favorite(item_data, profile);
@@ -161,12 +162,10 @@
       editing = { ...item_data };
       editing_index = original_index;
     } else {
-      change = get_change(item_data.servings, change);
-      let new_data = { ...item_data };
-      new_data.servings += change;
+      let servings_change = get_change(item_data.servings, change);
       // round to prevent small errors from accumulating.
-      new_data.servings = parseFloat(new_data.servings.toFixed(6));
-      day.updateItem([original_index], new_data);
+      let new_servings = parseFloat((item_data.servings + servings_change).toFixed(6));
+      day.updateItem(['items', original_index, 'servings'], new_servings);
       save_day();
     }
   }
