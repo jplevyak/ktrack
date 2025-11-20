@@ -482,6 +482,7 @@ export class CollabJSON {
     return {
       root: this.root,
       id: this.id,
+      clock: this.clock,
       history: this.history,
       dvv: Object.fromEntries(this.dvv),
       snapshot: this.snapshot,
@@ -497,6 +498,10 @@ export class CollabJSON {
     doc.snapshot = state.snapshot;
     doc.snapshotDvv = new Map(Object.entries(state.snapshotDvv || {}));
     
+    if (state.clock !== undefined) {
+        doc.clock = state.clock;
+    }
+
     if (state.history) {
         doc.history = state.history || [];
         doc.dvv = new Map(Object.entries(state.dvv || {}));
