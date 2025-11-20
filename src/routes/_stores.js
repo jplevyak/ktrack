@@ -70,8 +70,11 @@ export function synced_store(key, initialValue, sync, fromJSON) {
 
       svelteSet(currentValue); // Notify Svelte of mutated value
 
+      if (browser) {
+        localStorage.setItem(key, JSON.stringify(currentValue));
+        localStorage.setItem(dirtyKey, 'false');
+      }
       isDirty = false;
-      if (browser) localStorage.setItem(dirtyKey, 'false');
       status.set('idle');
       console.log('Sync successful');
 
