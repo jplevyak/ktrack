@@ -203,7 +203,7 @@ test('Garbage collection removes tombstones', () => {
     const root = doc._traverse([]).node;
     assert.ok(root.metadata.a._deleted === true);
     
-    doc.purgeTombstones();
+    doc.purgeTombstones(undefined, Infinity);
     
     // Verify tombstone is gone
     assert.ok(root.metadata.a === undefined);

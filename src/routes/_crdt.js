@@ -335,6 +335,13 @@ export class CollabJSON {
   prune(pruneFn, clientRequestData) {
     if (pruneFn) pruneFn(this, clientRequestData);
     if (this.history.length < history_prune_limit) return;
+
+    // Tombstone TTL strategy:
+    // We purge tombstones that are older than the history window we are keeping.
+    // We approximate the timestamp threshold using the logical clock and the prune window size.
+    const minTimestamp = this.clock - history_prune_window;
+    this.purgeTombstones(this.root, minTimestamp);
+
     this.snapshot = this._getSnapshotData();
     this.snapshotDvv = new Map(this.dvv);
     this.history = this.history.slice(-history_prune_window);
@@ -346,15 +353,17 @@ export class CollabJSON {
    * referencing these items. Only use when confident all clients are caught up,
    * or use a "tombstone TTL" strategy (not implemented here).
    */
-  purgeTombstones(node = this.root) {
+  purgeTombstones(node = this.root, minTimestamp = 0) {
     if (typeof node !== 'object' || node === null) return;
 
     if (node[CRDT_ARRAY_MARKER]) {
         for (const id in node.items) {
             if (node.items[id]._deleted) {
-                delete node.items[id];
+                if (node.items[id].updated < minTimestamp) {
+                    delete node.items[id];
+                }
             } else {
-                this.purgeTombstones(node.items[id].data);
+                this.purgeTombstones(node.items[id].data, minTimestamp);
             }
         }
     } else {
@@ -363,10 +372,12 @@ export class CollabJSON {
             
             // Check if this key is deleted in metadata
             if (node.metadata && node.metadata[key] && node.metadata[key]._deleted) {
-                delete node[key];
-                delete node.metadata[key];
+                if (node.metadata[key].updated < minTimestamp) {
+                    delete node[key];
+                    delete node.metadata[key];
+                }
             } else {
-                this.purgeTombstones(node[key]);
+                this.purgeTombstones(node[key], minTimestamp);
             }
         }
     }
