@@ -55,8 +55,8 @@ export function synced_store(key, initialValue, sync, fromJSON) {
     return () => clearInterval(intervalId);
   });
 
-  async function syncToServer() {
-    if (!browser || !isDirty || !get(online)) {
+  async function syncToServer(force = false) {
+    if (!browser || (!isDirty && !force) || !get(online)) {
       if (isDirty && !get(online)) {
         status.set('error');
       }
@@ -128,6 +128,7 @@ export function synced_store(key, initialValue, sync, fromJSON) {
     subscribe,
     set,
     update,
+    sync: () => syncToServer(true),
     status: {
       subscribe: status.subscribe
     }
@@ -168,6 +169,10 @@ export async function sync_profile(profile) {
       profile.authenticated = p.authenticated;
       if (p.authenticated) {
         profile.old_password = "";
+        // Force sync of other stores upon successful login
+        if (today_store && today_store.sync) today_store.sync();
+        if (favorites_store && favorites_store.sync) favorites_store.sync();
+        if (history_store && history_store.sync) history_store.sync();
       }
       localStorage.setItem('profile', JSON.stringify(profile));
     } catch (err) {
