@@ -382,7 +382,6 @@ export function save_favorite(item, profile, replace_index) {
 
 export function check_for_new_day(t, profile) {
   let new_day = make_today();
-  // Use get_date_info as the document no longer has date properties directly.
   if (!t || !get_date_info(t) || compare_date(t, new_day) < 0) {
     save_today(new_day, profile);
     return new_day;
