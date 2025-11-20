@@ -18,10 +18,24 @@ async function do_post_internal(req, data, username, dbname, db, prune, defaultJ
     }
   }
 
-  const server_doc_state = db_value_str ? JSON.parse(db_value_str) : defaultJSON;
-  const server_doc = CollabJSON.fromJSON(server_doc_state, { clientId: 'server' });
+  let server_doc;
 
-  console.log('do_post_internal', dbname, db_value_str, server_doc_state, server_doc.getData());
+  if (!db_value_str && data.snapshot) {
+      // Initialize from client snapshot
+      server_doc = new CollabJSON(undefined, { clientId: 'server', id: data.docId });
+      server_doc.root = data.snapshot;
+      server_doc.snapshot = data.snapshot;
+      server_doc.snapshotDvv = new Map(Object.entries(data.snapshotDvv || {}));
+      server_doc.dvv = new Map(Object.entries(data.snapshotDvv || {}));
+  } else if (!db_value_str) {
+      // Initialize from default
+      server_doc = new CollabJSON(defaultJSON, { clientId: 'server', id: data.docId });
+  } else {
+      // Load from DB
+      server_doc = CollabJSON.fromJSON(JSON.parse(db_value_str), { clientId: 'server' });
+  }
+
+  console.log('do_post_internal', dbname, db_value_str ? 'FOUND' : 'NOT_FOUND', server_doc.getData());
 
   // Allow special logic to run (e.g. for 'today' store) and handle pruning.
   // The 'prune' function is passed from the specific API endpoint.

@@ -528,7 +528,14 @@ export class CollabJSON {
     const newOps = this.ops.filter(op => op.timestamp > lastSeenBySystem);
     this.checked = Date.now();
     
-    return { dvv: Object.fromEntries(this.dvv), ops: newOps, clientId: this.clientId, docId: this.id };
+    const req = { dvv: Object.fromEntries(this.dvv), ops: newOps, clientId: this.clientId, docId: this.id };
+
+    if (!this.synced) {
+        req.snapshot = this._getSnapshotData();
+        req.snapshotDvv = Object.fromEntries(this.dvv);
+    }
+    
+    return req;
   }
 
   applySyncResponse({ ops, dvv, snapshot, snapshotDvv, reset, id }) {
