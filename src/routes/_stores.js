@@ -269,9 +269,7 @@ async function sync_internal(doc, name) {
         console.log("sync err", name, sync_response.err);
         return false;
       }
-      console.log('sync_internal', name, doc.getData(), sync_response);
       doc.applySyncResponse(sync_response);
-      console.log('sync_internal 2', name, doc.getData());
     } catch (err) {
       console.log(name, "JSON error", err.message);
       return false;

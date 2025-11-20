@@ -2,6 +2,7 @@
   import { goto } from "$app/navigation";
   import { onMount, onDestroy } from "svelte";
   import Food from "../_food.svelte";
+  import { CollabJSON } from "../_crdt.js";
   import {
     get_date_info,
     weekdays,
@@ -74,7 +75,7 @@
   }
 
   function edit_day(day) {
-    let day_doc = CollabJSON(JSON.stringify(day));
+    let day_doc = new CollabJSON(JSON.stringify(day));
     today = check_for_new_day(today, profile);
     if (compare_date(day_doc, today) == 0) {
       edit_store.set(undefined);
@@ -82,7 +83,7 @@
       return;
     }
     day_doc.addItem(['start_edit'], Date.now());
-    edit_store.set(day);
+    edit_store.set(day_doc);
     goto("/");
   }
 </script>
