@@ -5,7 +5,7 @@ import { CollabJSON, history_prune_limit } from "./_crdt.js";
 
 export var profile = new Level("./profile");
 
-export async function do_post_internal(req, data, username, db, prune) {
+async function do_post_internal(req, data, username, dbname, db, prune, defaultJSON) {
   let db_value_str;
   try {
     db_value_str = await db.get(username);
@@ -18,18 +18,22 @@ export async function do_post_internal(req, data, username, db, prune) {
     }
   }
 
-  const server_doc_state = db_value_str ? JSON.parse(db_value_str) : null;
-  
+  const server_doc_state = db_value_str ? JSON.parse(db_value_str) : defaultJSON;
   const server_doc = CollabJSON.fromJSON(server_doc_state, { clientId: 'server' });
+
+  console.log('do_post_internal', dbname, db_value_str, server_doc_state, server_doc.getData());
 
   // Allow special logic to run (e.g. for 'today' store) and handle pruning.
   // The 'prune' function is passed from the specific API endpoint.
   server_doc.prune(prune, data);
+
+  console.log('do_post_internal post prune', server_doc.getData());
   
   // If the client's document ID doesn't match the server's, it means the client
   // has a fresh (e.g., post-login) or stale copy and needs to be reset with the
   // server's authoritative state.
-  if (server_doc.id && data.docId && server_doc.id !== data.docId) {
+  if (db_value_str && server_doc.id && data.docId && server_doc.id !== data.docId) {
+    console.log('do_post_internal RESET', server_doc.id, data.docId);
     return new Response(JSON.stringify({
       snapshot: server_doc._getSnapshotData(),
       snapshotDvv: Object.fromEntries(server_doc.dvv),
@@ -44,7 +48,7 @@ export async function do_post_internal(req, data, username, db, prune) {
   return new Response(JSON.stringify(sync_response));
 }
 
-export async function do_post(req, db, prune) {
+export async function do_post(req, dbname, db, prune, defaultJSON) {
   let data = await req.request.json();
   let username = data.username;
   let password = data.password;
@@ -90,5 +94,5 @@ export async function do_post(req, db, prune) {
     console.log("incorrect password");
     return new Response(JSON.stringify({ err: "incorrect password" }));
   }
-  return await do_post_internal(req, data, username, db, prune);
+  return await do_post_internal(req, data, username, dbname, db, prune, defaultJSON);
 }
