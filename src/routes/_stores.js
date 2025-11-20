@@ -84,6 +84,18 @@ export function synced_store(key, initialValue, sync, fromJSON) {
   const debouncedSync = debounce(syncToServer, DEBOUNCE_WAIT);
 
   const set = (newValue) => {
+    if (newValue) {
+      console.log('set', key, newValue, newValue.getData());
+    }
+    if (newValue && (key == "history" || key == "favorites")) {
+      if (!Array.isArray(newValue.getData())) {
+        console.trace();
+        return;
+      }
+    }
+    if (newValue && key == "history") {
+      console.log('set history', newValue, newValue.getData())
+    }
     if (browser) {
       localStorage.setItem(key, JSON.stringify(newValue));
       localStorage.setItem(dirtyKey, 'true');
