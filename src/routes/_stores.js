@@ -33,8 +33,12 @@ export function synced_store(key, initialValue, sync, fromJSON) {
   if (browser) {
     const fromStorage = localStorage.getItem(key);
     if (fromStorage) {
-      const parsed = JSON.parse(fromStorage);
-      storedValue = fromJSON ? fromJSON(parsed) : parsed;
+      try {
+        const parsed = JSON.parse(fromStorage);
+        storedValue = fromJSON ? fromJSON(parsed) : parsed;
+      } catch (e) {
+        console.error(`Error parsing ${key} from localStorage`, e);
+      }
     }
     isDirty = localStorage.getItem(dirtyKey) === 'true';
   }
@@ -64,11 +68,30 @@ export function synced_store(key, initialValue, sync, fromJSON) {
 
     try {
       const currentValue = get({ subscribe });
+      
+      // Sanity check before sync
+      if (fromJSON && !(currentValue instanceof CollabJSON)) {
+         console.error(`Store ${key} corrupted before sync: expected CollabJSON`, currentValue);
+         // Attempt to recover or abort
+         return;
+      }
+
       const ok = await sync(currentValue);
 
       if (!ok) throw new Error('Server sync failed');
 
-      svelteSet(currentValue); // Notify Svelte of mutated value
+      // Sanity check after sync
+      if (fromJSON && !(currentValue instanceof CollabJSON)) {
+         console.error(`Store ${key} corrupted after sync: expected CollabJSON`, currentValue);
+         return;
+      }
+
+      // Notify Svelte of mutated value. 
+      // Note: standard writable skips notification if object reference is same.
+      // We force update by passing a new reference if possible, or relying on Svelte 5 signals/proxies if applicable.
+      // For Svelte 4/standard stores, we might need to trigger a change.
+      // However, since we are just fixing the corruption issue, we focus on persistence.
+      svelteSet(currentValue); 
 
       if (browser) {
         localStorage.setItem(key, JSON.stringify(currentValue));
@@ -88,16 +111,14 @@ export function synced_store(key, initialValue, sync, fromJSON) {
 
   const set = (newValue) => {
     if (newValue) {
-      console.log('set', key, newValue, newValue.getData());
+      console.log('set', key, newValue, typeof newValue.getData === 'function' ? newValue.getData() : 'no getData');
     }
     if (newValue && (key == "history" || key == "favorites")) {
-      if (!Array.isArray(newValue.getData())) {
+      if (typeof newValue.getData !== 'function' || !Array.isArray(newValue.getData())) {
+        console.error(`Invalid value set for ${key}`, newValue);
         console.trace();
         return;
       }
-    }
-    if (newValue && key == "history") {
-      console.log('set history', newValue, newValue.getData())
     }
     if (browser) {
       localStorage.setItem(key, JSON.stringify(newValue));
@@ -335,6 +356,11 @@ export function save_history(day, profile) {
     if (history == undefined)
       history = make_history();
     let history_data = history.getData();
+
+    if (!Array.isArray(history_data)) {
+      history.updateItem([], []);
+      history_data = [];
+    }
 
     const key = date_key(day);
     const existing_index = history_data.findIndex(d => d && date_key(d) === key);
