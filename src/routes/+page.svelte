@@ -20,6 +20,7 @@
     save_today,
     save_favorite,
     save_history,
+    check_for_new_day,
   } from "./_stores.js";
 
   let total = 0;
@@ -76,10 +77,7 @@
   $: averages = compute_averages(history.getData());
 
   function handle_new_day() {
-    let new_day = make_today();
-    if (today && compare_date(today, new_day) < 0) {
-      save_today(new_day, profile);
-    }
+    check_for_new_day(today, profile);
   }
 
   function save_day() {
