@@ -69,7 +69,7 @@
     unsubscribe_history();
   });
 
-  $: day, handle_new_day();
+  $: day, check_for_new_day();
   $: day = edit || today;
   $: date_info = day ? get_date_info(day) : null;
   $: day_data = day ? day.getData() : null;
@@ -80,12 +80,8 @@
   // Ensure averages is always an array of numbers
   $: averages = (history && history.getData) ? (compute_averages(history.getData()) || [0,0,0]) : [0,0,0];
 
-  function handle_new_day() {
-    check_for_new_day(today, profile);
-  }
-
   function save_day() {
-    if (compare_date(day, today) == 0) {
+    if (day == today) {
       save_today(day, profile);
     } else {
       day.deleteItem(['start_edit']);
