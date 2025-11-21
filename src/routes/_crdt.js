@@ -558,6 +558,13 @@ export class CollabJSON {
     return doc;
   }
 
+  static fromSyncRequest(syncRequest) {
+    if (!syncRequest || !syncRequest.ops || syncRequest.ops.length === 0) {
+        return null;
+    }
+    return CollabJSON.fromOps(syncRequest.ops);
+  }
+
   // --- DVV Sync Methods ---
 
   getSyncRequest() {
