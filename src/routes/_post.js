@@ -5,7 +5,7 @@ import { CollabJSON, history_prune_limit } from "./_crdt.js";
 
 export var profile = new Level("./profile");
 
-async function do_post_internal(req, data, username, dbname, db, prune, defaultJSON) {
+async function do_post_internal(req, syncRequest, username, dbname, db, prune, defaultJSON) {
   let db_value_str;
   try {
     db_value_str = await db.get(username);
@@ -18,20 +18,20 @@ async function do_post_internal(req, data, username, dbname, db, prune, defaultJ
     }
   }
 
-  let server_doc = CollabJSON.loadOrInit(db_value_str, data, defaultJSON);
+  let server_doc = CollabJSON.loadOrInit(db_value_str, syncRequest, defaultJSON);
 
   // Allow special logic to run (e.g. for 'today' store) and handle pruning.
   // The 'prune' function is passed from the specific API endpoint.
-  server_doc.prune(prune, data);
+  server_doc.prune(prune, syncRequest);
 
   // If the client's document ID doesn't match the server's, it means the client
   // has a fresh (e.g., post-login) or stale copy and needs to be reset with the
   // server's authoritative state.
-  if (db_value_str && server_doc.id && data.docId && server_doc.id !== data.docId) {
+  if (db_value_str && server_doc.id && syncRequest.docId && server_doc.id !== syncRequest.docId) {
     return new Response(JSON.stringify(server_doc.getResetResponse()));
   }
 
-  const sync_response = server_doc.getSyncResponse(data);
+  const sync_response = server_doc.getSyncResponse(syncRequest);
 
   await db.put(username, JSON.stringify(server_doc.toJSON()));
 
@@ -40,9 +40,9 @@ async function do_post_internal(req, data, username, dbname, db, prune, defaultJ
 
 export async function do_post(req, dbname, db, prune, defaultJSON) {
   // Check user and password.
-  let data = await req.request.json();
-  let username = data.username;
-  let password = data.password;
+  let syncRequest = await req.request.json();
+  let username = syncRequest.username;
+  let password = syncRequest.password;
   if (
     username == undefined ||
     !username ||
@@ -85,5 +85,5 @@ export async function do_post(req, dbname, db, prune, defaultJSON) {
     console.log("incorrect password");
     return new Response(JSON.stringify({ err: "incorrect password" }));
   }
-  return await do_post_internal(req, data, username, dbname, db, prune, defaultJSON);
+  return await do_post_internal(req, syncRequest, username, dbname, db, prune, defaultJSON);
 }
