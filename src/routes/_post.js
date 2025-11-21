@@ -27,7 +27,7 @@ async function do_post_internal(req, syncRequest, username, dbname, db, prune, d
   // If the client's document ID doesn't match the server's, it means the client
   // has a fresh (e.g., post-login) or stale copy and needs to be reset with the
   // server's authoritative state.
-  if (db_value_str && server_doc.id && syncRequest.docId && server_doc.id !== syncRequest.docId) {
+  if (server_doc.requiresReset(syncRequest)) {
     return new Response(JSON.stringify(server_doc.getResetResponse()));
   }
 

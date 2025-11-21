@@ -567,6 +567,10 @@ export class CollabJSON {
     return req;
   }
 
+  requiresReset(syncRequest) {
+    return !!(this.id && syncRequest && syncRequest.docId && this.id !== syncRequest.docId);
+  }
+
   getResetResponse() {
     return {
       snapshot: this._getSnapshotData(),
