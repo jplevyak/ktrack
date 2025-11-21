@@ -383,6 +383,15 @@ export class CollabJSON {
     }
   }
   
+  clear() {
+    this.root = {};
+    this.history = [];
+    this.dvv.clear();
+    this.snapshot = null;
+    this.snapshotDvv.clear();
+    this.ops = [];
+  }
+
   // --- Sync Function ---
 
   applyOp(op) {

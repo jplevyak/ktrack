@@ -173,9 +173,7 @@ export function prune_today(server_doc, clientRequestData) {
   if (!server_has_date || compare_date(client_day_temp, server_doc) > 0) {
     // Reset the server document's state. 
     // getSyncResponse will then build the new state from the client's operations.
-    server_doc.items.clear();
-    server_doc.history = [];
-    server_doc.dvv.clear();
+    server_doc.clear();
   }
 }
 
