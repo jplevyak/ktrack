@@ -83,7 +83,6 @@
   }
 
   function save_day() {
-    console.log('save day', day.getData());
     if (compare_date(day, today) == 0) {
       save_today(day, profile);
     } else {
