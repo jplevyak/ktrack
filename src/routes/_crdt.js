@@ -550,6 +550,14 @@ export class CollabJSON {
     return new CollabJSON(defaultJson, { ...opts, id: syncRequest ? syncRequest.docId : undefined });
   }
 
+  static fromOps(ops) {
+    const doc = new CollabJSON("{}");
+    if (Array.isArray(ops)) {
+        ops.forEach(op => doc.applyOp(op));
+    }
+    return doc;
+  }
+
   // --- DVV Sync Methods ---
 
   getSyncRequest() {
