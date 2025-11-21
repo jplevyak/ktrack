@@ -22,11 +22,7 @@ async function do_post_internal(req, data, username, dbname, db, prune, defaultJ
 
   if (!db_value_str && data.snapshot) {
       // Initialize from client snapshot
-      server_doc = new CollabJSON(undefined, { clientId: 'server', id: data.docId });
-      server_doc.root = data.snapshot;
-      server_doc.snapshot = data.snapshot;
-      server_doc.snapshotDvv = new Map(Object.entries(data.snapshotDvv || {}));
-      server_doc.dvv = new Map(Object.entries(data.snapshotDvv || {}));
+      server_doc = CollabJSON.fromSnapshot(data.snapshot, data.snapshotDvv, data.docId, { clientId: 'server' });
   } else if (!db_value_str) {
       // Initialize from default
       server_doc = new CollabJSON(defaultJSON, { clientId: 'server', id: data.docId });

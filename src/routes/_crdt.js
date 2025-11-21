@@ -530,6 +530,15 @@ export class CollabJSON {
     return doc;
   }
 
+  static fromSnapshot(snapshot, snapshotDvv, docId, options = {}) {
+    const doc = new CollabJSON(undefined, { ...options, id: docId });
+    doc.root = snapshot || {};
+    doc.snapshot = snapshot || {};
+    doc.snapshotDvv = new Map(Object.entries(snapshotDvv || {}));
+    doc.dvv = new Map(Object.entries(snapshotDvv || {}));
+    return doc;
+  }
+
   // --- DVV Sync Methods ---
 
   getSyncRequest() {
