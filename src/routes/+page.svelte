@@ -35,6 +35,9 @@
   let edit = undefined;
   let day = undefined;
 
+  // Access the status store from the custom store object
+  const today_status = today_store.status;
+
   // straddle all small moves.
   let stops = [
     0.2, 0.25, 0.3, 0.3333333333, 0.4, 0.5, 0.6, 0.6666666666, 0.7, 0.75, 0.8,
@@ -74,7 +77,8 @@
   $: food_items = all_items.filter(item => typeof item.mcg !== 'undefined');
   $: total = get_total(day_data);
   $: [total_fiber, fiber_unknown] = get_total_fiber(day_data);
-  $: averages = compute_averages(history.getData());
+  // Ensure averages is always an array of numbers
+  $: averages = (history && history.getData) ? (compute_averages(history.getData()) || [0,0,0]) : [0,0,0];
 
   function handle_new_day() {
     check_for_new_day(today, profile);
@@ -172,10 +176,10 @@
   <title>KTrack - Day</title>
 </svelte:head>
 
-{#if $today_store.status && $today_store.status != 'idle'}
-  <span>🟡 Unsaved changes: {$today_store.status} </span> <br>
+{#if $today_status && $today_status != 'idle'}
+  <span>🟡 Unsaved changes: {$today_status} </span> <br>
 {/if}
-Averages [3, 5, 7] days: [{averages[0].toFixed(1)}, {averages[1].toFixed(1)}, {averages[2].toFixed(
+Averages [3, 5, 7] days: [{(averages[0]||0).toFixed(1)}, {(averages[1]||0).toFixed(1)}, {(averages[2]||0).toFixed(
   1
 )}]<br />
 <b
