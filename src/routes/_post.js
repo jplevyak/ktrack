@@ -18,18 +18,7 @@ async function do_post_internal(req, data, username, dbname, db, prune, defaultJ
     }
   }
 
-  let server_doc;
-
-  if (!db_value_str && data.snapshot) {
-      // Initialize from client snapshot
-      server_doc = CollabJSON.fromSnapshot(data.snapshot, data.snapshotDvv, data.docId, { clientId: 'server' });
-  } else if (!db_value_str) {
-      // Initialize from default
-      server_doc = new CollabJSON(defaultJSON, { clientId: 'server', id: data.docId });
-  } else {
-      // Load from DB
-      server_doc = CollabJSON.fromJSON(JSON.parse(db_value_str), { clientId: 'server' });
-  }
+  let server_doc = CollabJSON.loadOrInit(db_value_str, data, defaultJSON, { clientId: 'server' });
 
   // Allow special logic to run (e.g. for 'today' store) and handle pruning.
   // The 'prune' function is passed from the specific API endpoint.

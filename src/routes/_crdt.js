@@ -539,6 +539,16 @@ export class CollabJSON {
     return doc;
   }
 
+  static loadOrInit(stateString, requestData, defaultJson, options = {}) {
+    if (stateString) {
+        return CollabJSON.fromJSON(JSON.parse(stateString), options);
+    }
+    if (requestData && requestData.snapshot) {
+        return CollabJSON.fromSnapshot(requestData.snapshot, requestData.snapshotDvv, requestData.docId, options);
+    }
+    return new CollabJSON(defaultJson, { ...options, id: requestData ? requestData.docId : undefined });
+  }
+
   // --- DVV Sync Methods ---
 
   getSyncRequest() {
