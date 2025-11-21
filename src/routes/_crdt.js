@@ -540,13 +540,14 @@ export class CollabJSON {
   }
 
   static loadOrInit(stateString, requestData, defaultJson, options = {}) {
+    const opts = { ...options, clientId: 'server' };
     if (stateString) {
-        return CollabJSON.fromJSON(JSON.parse(stateString), options);
+        return CollabJSON.fromJSON(JSON.parse(stateString), opts);
     }
     if (requestData && requestData.snapshot) {
-        return CollabJSON.fromSnapshot(requestData.snapshot, requestData.snapshotDvv, requestData.docId, options);
+        return CollabJSON.fromSnapshot(requestData.snapshot, requestData.snapshotDvv, requestData.docId, opts);
     }
-    return new CollabJSON(defaultJson, { ...options, id: requestData ? requestData.docId : undefined });
+    return new CollabJSON(defaultJson, { ...opts, id: requestData ? requestData.docId : undefined });
   }
 
   // --- DVV Sync Methods ---

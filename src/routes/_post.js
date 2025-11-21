@@ -18,7 +18,7 @@ async function do_post_internal(req, data, username, dbname, db, prune, defaultJ
     }
   }
 
-  let server_doc = CollabJSON.loadOrInit(db_value_str, data, defaultJSON, { clientId: 'server' });
+  let server_doc = CollabJSON.loadOrInit(db_value_str, data, defaultJSON);
 
   // Allow special logic to run (e.g. for 'today' store) and handle pruning.
   // The 'prune' function is passed from the specific API endpoint.
