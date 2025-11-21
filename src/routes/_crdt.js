@@ -547,6 +547,15 @@ export class CollabJSON {
     return req;
   }
 
+  getResetResponse() {
+    return {
+      snapshot: this._getSnapshotData(),
+      snapshotDvv: Object.fromEntries(this.dvv),
+      reset: true,
+      id: this.id
+    };
+  }
+
   applySyncResponse({ ops, dvv, snapshot, snapshotDvv, reset, id }) {
     if (reset) {
         this.ops = [];

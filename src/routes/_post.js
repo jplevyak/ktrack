@@ -43,11 +43,7 @@ async function do_post_internal(req, data, username, dbname, db, prune, defaultJ
   // has a fresh (e.g., post-login) or stale copy and needs to be reset with the
   // server's authoritative state.
   if (db_value_str && server_doc.id && data.docId && server_doc.id !== data.docId) {
-    return new Response(JSON.stringify({
-      snapshot: server_doc._getSnapshotData(),
-      snapshotDvv: Object.fromEntries(server_doc.dvv),
-      reset: true
-    }));
+    return new Response(JSON.stringify(server_doc.getResetResponse()));
   }
 
   const sync_response = server_doc.getSyncResponse(data);
