@@ -168,11 +168,30 @@ async function handleSyncRequest(req, res) {
   // 1. Authenticate user (omitted for brevity)
 
   // 2. Load the document state from the database
-  const docStateJSON = await db.get(username);
-  const docState = docStateJSON ? JSON.parse(docStateJSON) : null;
+  let docStateJSON;
+  try {
+      docStateJSON = await db.get(username);
+  } catch (e) {
+      if (e.code !== 'LEVEL_NOT_FOUND') throw e;
+  }
 
   // 3. Reconstruct the server's copy of the document
-  const serverDoc = CollabJSON.fromJSON(docState, { clientId: 'server' });
+  //    If the DB is empty, initialize from the client's snapshot if provided, or use a default.
+  let serverDoc;
+  if (!docStateJSON && syncRequest.snapshot) {
+       // Initialize from client snapshot
+       serverDoc = new CollabJSON(undefined, { clientId: 'server', id: syncRequest.docId });
+       serverDoc.root = syncRequest.snapshot;
+       serverDoc.snapshot = syncRequest.snapshot;
+       serverDoc.snapshotDvv = new Map(Object.entries(syncRequest.snapshotDvv || {}));
+       serverDoc.dvv = new Map(Object.entries(syncRequest.snapshotDvv || {}));
+  } else if (!docStateJSON) {
+       // Initialize from default
+       serverDoc = new CollabJSON('{}', { clientId: 'server', id: syncRequest.docId });
+  } else {
+       // Load from DB
+       serverDoc = CollabJSON.fromJSON(JSON.parse(docStateJSON), { clientId: 'server' });
+  }
 
   // 4. Process the client's request and generate a response
   const syncResponse = serverDoc.getSyncResponse(syncRequest);

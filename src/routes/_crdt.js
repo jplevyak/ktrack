@@ -5,8 +5,8 @@
  */
 import { v4 as uuidv4 } from 'uuid';
 
-const history_prune_limit = 100;
-const history_prune_window = 50;
+const HISTORY_PRUNE_LIMIT = 100;
+const HISTORY_PRUNE_WINDOW = 50;
 const CRDT_ARRAY_MARKER = '_crdt_array_';
 
 export class CollabJSON {
@@ -334,17 +334,17 @@ export class CollabJSON {
 
   prune(pruneFn, clientRequestData) {
     if (pruneFn) pruneFn(this, clientRequestData);
-    if (this.history.length < history_prune_limit) return;
+    if (this.history.length < HISTORY_PRUNE_LIMIT) return;
 
     // Tombstone TTL strategy:
     // We purge tombstones that are older than the history window we are keeping.
     // We approximate the timestamp threshold using the logical clock and the prune window size.
-    const minTimestamp = this.clock - history_prune_window;
+    const minTimestamp = this.clock - HISTORY_PRUNE_WINDOW;
     this.purgeTombstones(this.root, minTimestamp);
 
     this.snapshot = this._getSnapshotData();
     this.snapshotDvv = new Map(this.dvv);
-    this.history = this.history.slice(-history_prune_window);
+    this.history = this.history.slice(-HISTORY_PRUNE_WINDOW);
   }
 
   /**
