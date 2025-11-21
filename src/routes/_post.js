@@ -58,6 +58,7 @@ async function do_post_internal(req, data, username, dbname, db, prune, defaultJ
 }
 
 export async function do_post(req, dbname, db, prune, defaultJSON) {
+  // Check user and password.
   let data = await req.request.json();
   let username = data.username;
   let password = data.password;
