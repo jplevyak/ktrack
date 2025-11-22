@@ -351,15 +351,15 @@ export function save_history(day, profile) {
     if (history == undefined)
       history = make_history();
     let history_data = history.getData();
+    let day_data = day.getData();
 
-    const key = date_key(day);
-    const existing_index = history_data.findIndex(d => d && date_key(d) === key);
+    const existing_index = history_data.findIndex(d => d && d.timestamp === day_data.timestamp);
 
     if (existing_index !== -1) {
-      history.updateItem([existing_index], day.getData());
+      history.updateItem([existing_index], day_data);
     } else {
-      const insert_index = history_data.findIndex(d => d && date_key(d) < key);
-      history.addItem([insert_index === -1 ? history_data.length : insert_index], day.getData());
+      const insert_index = history_data.findIndex(d => d && d.timestamp < day_data.timestamp);
+      history.addItem([insert_index === -1 ? history_data.length : insert_index], day_data);
     }
 
     const limit = merge_history_limit || 50;
