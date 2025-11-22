@@ -9,7 +9,6 @@ import {
   make_favorites,
   make_history,
   make_profile,
-  date_key,
 } from "./_util.js";
 
 function debounce(func, wait) {
