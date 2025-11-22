@@ -541,6 +541,14 @@ export class CollabJSON {
     doc.snapshot = snapshot || {};
     doc.snapshotDvv = new Map(Object.entries(snapshotDvv || {}));
     doc.dvv = new Map(Object.entries(snapshotDvv || {}));
+    
+    // Initialize clock to the maximum timestamp seen in the snapshot
+    let maxTs = 0;
+    for (const ts of doc.dvv.values()) {
+        if (ts > maxTs) maxTs = ts;
+    }
+    doc.clock = maxTs;
+
     return doc;
   }
 
@@ -608,6 +616,14 @@ export class CollabJSON {
         this.snapshot = snapshot;
         this.snapshotDvv = new Map(Object.entries(snapshotDvv || {}));
         this.dvv = new Map(Object.entries(snapshotDvv || {}));
+        
+        // Update clock to the maximum timestamp seen in the snapshot
+        let maxTs = 0;
+        for (const ts of this.dvv.values()) {
+            if (ts > maxTs) maxTs = ts;
+        }
+        this.clock = Math.max(this.clock, maxTs);
+
         this.synced = Date.now();
         return;
     }
