@@ -52,25 +52,13 @@ export function get_date_info(day) {
   if (!day.timestamp)
     return null;
 
-  if (typeof day.timestamp === 'string') {
-    const parts = day.timestamp.split('-');
-    if (parts.length === 4) {
-      return {
-        year: parseInt(parts[0], 10),
-        month: parseInt(parts[1], 10) - 1,
-        date: parseInt(parts[2], 10),
-        day: parseInt(parts[3], 10)
-      };
-    }
-  }
-
-  let date = new Date(day.timestamp);
+  const parts = day.timestamp.split('-');
   return {
-    day: date.getDay(),
-    date: date.getDate(),
-    month: date.getMonth(),
-    year: date.getFullYear(),
-  };
+    year: parseInt(parts[0], 10),
+    month: parseInt(parts[1], 10) - 1,
+    date: parseInt(parts[2], 10),
+    day: parseInt(parts[3], 10)
+  }
 }
 
 export function compare_date(d1, d2) {
@@ -89,12 +77,6 @@ export function compare_date(d1, d2) {
   if (d1_info.date > d2_info.date) return 1;
   if (d1_info.date < d2_info.date) return -1;
   return 0;
-}
-
-export function date_key(i) {
-  const date_info = get_date_info(i);
-  if (!date_info) return 0;
-  return new Date(date_info.year, date_info.month, date_info.date).getTime();
 }
 
 export function compute_averages(h) {
