@@ -306,7 +306,7 @@ export class CollabJSON {
         
         // pItem is guaranteed to exist because toIndex > 0 (handled by Case 1).
         // nItem might be undefined if actualToIndex equals listWithoutItem.length (appending to reduced list).
-        prevKey = pItem ? pItem.sortKey : null;
+        prevKey = pItem.sortKey;
         nextKey = nItem ? nItem.sortKey : null;
     }
 
