@@ -284,13 +284,15 @@ export class CollabJSON {
     if (toIndex === 0) {
         // Case 1: Moving to the very start of the list.
         // The item will be placed before the current first item.
+        // We don't need to check for null here because the list is guaranteed to be non-empty (contains itemToMove).
         nextKey = sortedItems[0].sortKey;
     } else if (toIndex === sortedItems.length) {
         // Case 2: Moving to the very end of the list.
         // The item will be placed after the current last item.
+        // We don't need to check for null here because the list is guaranteed to be non-empty.
         prevKey = sortedItems[sortedItems.length - 1].sortKey;
     } else {
-        // Case 3: Moving to the middle.
+        // Case 3: Moving to the middle (or effectively the end of the reduced list).
         // We simulate the list without the moved item to find the correct neighbors.
         
         const listWithoutItem = sortedItems.filter(i => i.id !== itemToMove.id);
@@ -302,6 +304,8 @@ export class CollabJSON {
         const pItem = listWithoutItem[actualToIndex - 1];
         const nItem = listWithoutItem[actualToIndex];
         
+        // pItem is guaranteed to exist because toIndex > 0 (handled by Case 1).
+        // nItem might be undefined if actualToIndex equals listWithoutItem.length (appending to reduced list).
         prevKey = pItem ? pItem.sortKey : null;
         nextKey = nItem ? nItem.sortKey : null;
     }
