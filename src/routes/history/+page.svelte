@@ -122,6 +122,6 @@ Number of days to view <input type="number" id="limit" value={limit} />
       on:message={do_msg}
     />
   {/each}
-  Total: {get_total(day.items).toFixed(2)} Total fiber: {get_total_fiber(day.items)[0].toFixed(2)} {#if get_total_fiber(day.items)[1]} * some unknown * {/if} 
+  Total: {get_total(day.items).toFixed(2)} Total fiber: {get_total_fiber(day.items)[0].toFixed(2)} {#if get_total_fiber(day.items)[1]} * some unknown * {/if}
   <br /><br />
 {/each}

@@ -22,7 +22,7 @@ export function create_elasticlunr() {
  *
  * When using this convenience function a new index will be created with the
  * following functions already in the pipeline:
- * 
+ *
  * 1. elasticlunr.trimmer - trim non-word character
  * 2. elasticlunr.StopWordFilter - filters out any stop words before they enter the
  * index
@@ -35,29 +35,29 @@ export function create_elasticlunr() {
  *       this.addField('id');
  *       this.addField('title');
  *       this.addField('body');
- *       
+ *
  *       //this.setRef('id'); // default ref is 'id'
  *
  *       this.pipeline.add(function () {
  *         // some custom pipeline function
  *       });
  *     });
- * 
+ *
  *    idx.addDoc({
- *      id: 1, 
+ *      id: 1,
  *      title: 'Oracle released database 12g',
  *      body: 'Yestaday, Oracle has released their latest database, named 12g, more robust. this product will increase Oracle profit.'
  *    });
- * 
+ *
  *    idx.addDoc({
- *      id: 2, 
+ *      id: 2,
  *      title: 'Oracle released annual profit report',
  *      body: 'Yestaday, Oracle has released their annual profit report of 2015, total profit is 12.5 Billion.'
  *    });
- * 
+ *
  *    # simple search
  *    idx.search('oracle database');
- * 
+ *
  *    # search with query-time boosting
  *    idx.search('oracle database', {fields: {title: {boost: 2}, body: {boost: 1}}});
  *
@@ -142,7 +142,7 @@ elasticlunr.utils.toString = function (obj) {
  *
  * Each event could has multiple corresponding functions,
  * these functions will be called as the sequence that they are added into the event.
- * 
+ *
  * @constructor
  */
 elasticlunr.EventEmitter = function () {
@@ -311,7 +311,7 @@ elasticlunr.tokenizer.getSeperator = function() {
  */
 
 /**
- * elasticlunr.Pipelines maintain an ordered list of functions to be applied to 
+ * elasticlunr.Pipelines maintain an ordered list of functions to be applied to
  * both documents tokens and query tokens.
  *
  * An instance of elasticlunr.Index will contain a pipeline
@@ -545,7 +545,7 @@ elasticlunr.Pipeline.prototype.reset = function () {
 /**
  * Returns a representation of the pipeline ready for serialisation.
  * Only serialize pipeline function's name. Not storing function, so when
- * loading the archived JSON index file, corresponding pipeline function is 
+ * loading the archived JSON index file, corresponding pipeline function is
  * added by registered function of elasticlunr.Pipeline.registeredFunctions
  *
  * Logs a warning if the function has not been registered.
@@ -1628,7 +1628,7 @@ elasticlunr.clearStopWords = function () {
 /**
  * Add customized stop words
  * user could use this function to add customized stop words
- * 
+ *
  * @params {Array} words customized stop words
  * @return {null}
  */
@@ -1847,7 +1847,7 @@ elasticlunr.InvertedIndex.load = function (serialisedData) {
  * By default this function starts at the root of the current inverted index, however
  * it can start at any node of the inverted index if required.
  *
- * @param {String} token 
+ * @param {String} token
  * @param {Object} tokenInfo format: { ref: 1, tf: 2}
  * @param {Object} root An optional node at which to start looking for the
  * correct place to enter the doc, by default the root of this elasticlunr.InvertedIndex
@@ -1879,7 +1879,7 @@ elasticlunr.InvertedIndex.prototype.addToken = function (token, tokenInfo, root)
 
 /**
  * Checks whether a token is in this elasticlunr.InvertedIndex.
- * 
+ *
  *
  * @param {String} token The token to be checked
  * @return {Boolean}
@@ -1901,7 +1901,7 @@ elasticlunr.InvertedIndex.prototype.hasToken = function (token) {
 /**
  * Retrieve a node from the inverted index for a given token.
  * If token not found in this InvertedIndex, return null.
- * 
+ *
  *
  * @param {String} token The token to get the node for.
  * @return {Object}
@@ -2046,60 +2046,60 @@ elasticlunr.InvertedIndex.prototype.toJSON = function () {
  * elasticlunr.Configuration
  * Copyright (C) 2017 Wei Song
  */
- 
- /** 
+
+ /**
   * elasticlunr.Configuration is used to analyze the user search configuration.
-  * 
+  *
   * By elasticlunr.Configuration user could set query-time boosting, boolean model in each field.
-  * 
+  *
   * Currently configuration supports:
   * 1. query-time boosting, user could set how to boost each field.
   * 2. boolean model chosing, user could choose which boolean model to use for each field.
   * 3. token expandation, user could set token expand to True to improve Recall. Default is False.
-  * 
-  * Query time boosting must be configured by field category, "boolean" model could be configured 
+  *
+  * Query time boosting must be configured by field category, "boolean" model could be configured
   * by both field category or globally as the following example. Field configuration for "boolean"
   * will overwrite global configuration.
   * Token expand could be configured both by field category or golbally. Local field configuration will
   * overwrite global configuration.
-  * 
+  *
   * configuration example:
   * {
-  *   fields:{ 
+  *   fields:{
   *     title: {boost: 2},
   *     body: {boost: 1}
   *   },
   *   bool: "OR"
   * }
-  * 
+  *
   * "bool" field configuation overwrite global configuation example:
   * {
-  *   fields:{ 
+  *   fields:{
   *     title: {boost: 2, bool: "AND"},
   *     body: {boost: 1}
   *   },
   *   bool: "OR"
   * }
-  * 
+  *
   * "expand" example:
   * {
-  *   fields:{ 
+  *   fields:{
   *     title: {boost: 2, bool: "AND"},
   *     body: {boost: 1}
   *   },
   *   bool: "OR",
   *   expand: true
   * }
-  * 
+  *
   * "expand" example for field category:
   * {
-  *   fields:{ 
+  *   fields:{
   *     title: {boost: 2, bool: "AND", expand: true},
   *     body: {boost: 1}
   *   },
   *   bool: "OR"
   * }
-  * 
+  *
   * setting the boost to 0 ignores the field (this will only search the title):
   * {
   *   fields:{
@@ -2110,10 +2110,10 @@ elasticlunr.InvertedIndex.prototype.toJSON = function () {
   *
   * then, user could search with configuration to do query-time boosting.
   * idx.search('oracle database', {fields: {title: {boost: 2}, body: {boost: 1}}});
-  * 
-  * 
+  *
+  *
   * @constructor
-  * 
+  *
   * @param {String} config user configuration
   * @param {Array} fields fields of index instance
   * @module
@@ -2139,7 +2139,7 @@ elasticlunr.Configuration = function (config, fields) {
 
 /**
  * Build default search configuration.
- * 
+ *
  * @param {Array} fields fields of index instance
  */
 elasticlunr.Configuration.prototype.buildDefaultConfig = function (fields) {
@@ -2155,7 +2155,7 @@ elasticlunr.Configuration.prototype.buildDefaultConfig = function (fields) {
 
 /**
  * Build user configuration.
- * 
+ *
  * @param {JSON} config User JSON configuratoin
  * @param {Array} fields fields of index instance
  */
@@ -2197,7 +2197,7 @@ elasticlunr.Configuration.prototype.buildUserConfig = function (config, fields) 
 
 /**
  * Add all fields to user search configuration.
- * 
+ *
  * @param {String} bool Boolean model
  * @param {String} expand Expand model
  * @param {Array} fields fields of index instance

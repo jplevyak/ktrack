@@ -29,7 +29,7 @@
   const unsubscribe_profile = profile_store.subscribe((p) => { profile = p; });
   const unsubscribe_today = today_store.subscribe((t) => { today = t; });
   const unsubscribe_edit = edit_store.subscribe((e) => { edit = e; });
-  
+
   $: today, check_for_new_day(today, profile);
 
   onDestroy(() => {

@@ -16,7 +16,7 @@ export class CollabJSON {
     this.id = options.id || uuidv4();
     this.checked = undefined;
     this.synced = undefined;
-    
+
     this.clientId = options.clientId || uuidv4();
     this.clock = 0;
     this.dvv = new Map();
@@ -33,10 +33,10 @@ export class CollabJSON {
   // --- Private Helper Functions ---
 
   _tick() {
-    // Hybrid logical clock: integer counter + client ID tie-breaker (simulated via random here for simplicity, 
+    // Hybrid logical clock: integer counter + client ID tie-breaker (simulated via random here for simplicity,
     // but ideally should use clientId for strict determinism).
     this.clock = Math.floor(this.clock) + 1;
-    return this.clock + (Math.random() * 0.99); 
+    return this.clock + (Math.random() * 0.99);
   }
 
   _mergeClock(remoteTimestamp) {
@@ -51,12 +51,12 @@ export class CollabJSON {
     if (prevKey === null && nextKey === null) return 0.5; // Start in middle of 0..1
     if (prevKey === null) return nextKey / 2.0;
     if (nextKey === null) return prevKey + 1.0;
-    
+
     const mid = (prevKey + nextKey) / 2.0;
     // Basic precision guard
     if (mid === prevKey || mid === nextKey) {
         console.warn("CollabJSON: Fractional indexing precision limit reached. Re-sorting recommended.");
-        return prevKey + 0.00000000001; 
+        return prevKey + 0.00000000001;
     }
     return mid;
   }
@@ -103,7 +103,7 @@ export class CollabJSON {
     }
     return data;
   }
-  
+
   _getSortedItems(crdtArray) {
     if (!crdtArray || !crdtArray[CRDT_ARRAY_MARKER]) return [];
     return Object.values(crdtArray.items)
@@ -121,7 +121,7 @@ export class CollabJSON {
       if (container && container.hasOwnProperty('data') && container.hasOwnProperty('sortKey')) {
         container = container.data;
       }
-      
+
       parent = container;
       finalKey = segment;
       if (container === null || typeof container !== 'object') return null;
@@ -173,7 +173,7 @@ export class CollabJSON {
 
     return this._crdtToPlain(nodeToConvert);
   }
-  
+
   /**
    * Finds the path to a node with a specific ID (for array items) or key.
    * This is a DFS search.
@@ -195,7 +195,7 @@ export class CollabJSON {
         for (let i = 0; i < sorted.length; i++) {
             const item = sorted[i];
             if (item.id === targetId) return [...currentPath, i];
-            
+
             const res = this.findPath(targetId, [...currentPath, i], item);
             if (res) return res;
         }
@@ -203,7 +203,7 @@ export class CollabJSON {
         for (const key in actualNode) {
             if (key === 'metadata') continue;
             if (actualNode.metadata && actualNode.metadata[key] && actualNode.metadata[key]._deleted) continue;
-            
+
             if (key === targetId) return [...currentPath, key]; // Found by key name
 
             const res = this.findPath(targetId, [...currentPath, key], actualNode[key]);
@@ -225,7 +225,7 @@ export class CollabJSON {
     }
 
     if (typeof keyOrIndex !== 'number') throw new Error("Final path segment for addItem must be an index or a key.");
-    
+
     const index = keyOrIndex;
 
     if (Object.keys(this.root).length === 0 && parentPath.length === 0) {
@@ -234,7 +234,7 @@ export class CollabJSON {
 
     const result = this._traverse(parentPath);
     if (!result || !result.node || !result.node[CRDT_ARRAY_MARKER]) throw new Error("Target for addItem is not an array.");
-    
+
     const targetArray = result.node;
     const sortedItems = this._getSortedItems(targetArray);
 
@@ -244,7 +244,7 @@ export class CollabJSON {
     const nextItem = sortedItems[index] || null;
     const prevKey = prevItem ? prevItem.sortKey : null;
     const nextKey = nextItem ? nextItem.sortKey : null;
-    
+
     const newSortKey = this._generateSortKey(prevKey, nextKey);
     const newItemId = this._generateId();
 
@@ -263,7 +263,7 @@ export class CollabJSON {
     if (fromIndex === toIndex) return;
 
     const itemToMove = sortedItems[fromIndex];
-    
+
     // Calculate new sort key
     let prevKey = null;
     let nextKey = null;
@@ -279,7 +279,7 @@ export class CollabJSON {
         // Adjust logic because the item being moved is currently IN the list
         let leftIndex = toIndex - 1;
         let rightIndex = toIndex;
-        
+
         // If we are moving 'down' the list (0 -> 5), the indices shift after removal
         if (fromIndex < toIndex) {
             // The target slot is actually between toIndex and toIndex+1 in the original list?
@@ -287,26 +287,26 @@ export class CollabJSON {
             // But since we are effectively removing fromIndex first, we need to be careful.
             // Simpler: imagine the list without the item.
         }
-        
+
         const listWithoutItem = sortedItems.filter(i => i.id !== itemToMove.id);
         // Now we want to insert at toIndex (clamped to new length)
         const actualToIndex = Math.min(toIndex, listWithoutItem.length);
-        
+
         const pItem = listWithoutItem[actualToIndex - 1];
         const nItem = listWithoutItem[actualToIndex];
-        
+
         prevKey = pItem ? pItem.sortKey : null;
         nextKey = nItem ? nItem.sortKey : null;
     }
 
     const newSortKey = this._generateSortKey(prevKey, nextKey);
 
-    this._applyAndStore({ 
-        type: 'MOVE_ITEM', 
-        path: path, 
-        itemId: itemToMove.id, 
-        sortKey: newSortKey, 
-        timestamp: this._tick() 
+    this._applyAndStore({
+        type: 'MOVE_ITEM',
+        path: path,
+        itemId: itemToMove.id,
+        sortKey: newSortKey,
+        timestamp: this._tick()
     });
   }
 
@@ -328,7 +328,7 @@ export class CollabJSON {
         this.root = this._plainToCrdt(newData); // Overwrite root
         return;
     }
-    
+
     this._applyAndStore({ type: 'UPDATE_ITEM', path, data: newData, timestamp: this._tick() });
   }
 
@@ -349,7 +349,7 @@ export class CollabJSON {
 
   /**
    * Garbage Collection: Permanently remove items marked as deleted.
-   * WARNING: This can cause desyncs if other clients still have pending ops 
+   * WARNING: This can cause desyncs if other clients still have pending ops
    * referencing these items. Only use when confident all clients are caught up,
    * or use a "tombstone TTL" strategy (not implemented here).
    */
@@ -369,7 +369,7 @@ export class CollabJSON {
     } else {
         for (const key in node) {
             if (key === 'metadata') continue;
-            
+
             // Check if this key is deleted in metadata
             if (node.metadata && node.metadata[key] && node.metadata[key]._deleted) {
                 if (node.metadata[key].updated < minTimestamp) {
@@ -382,7 +382,7 @@ export class CollabJSON {
         }
     }
   }
-  
+
   clear() {
     this.root = {};
     this.history = [];
@@ -396,7 +396,7 @@ export class CollabJSON {
 
   applyOp(op) {
     this._mergeClock(op.timestamp);
-    
+
     // Common traversal for most ops
     // Note: For MOVE_ITEM, path points to the array, not the item
     const traversePath = (op.type === 'MOVE_ITEM') ? op.path : op.path.slice(0, -1);
@@ -406,7 +406,7 @@ export class CollabJSON {
       case 'ADD_ITEM':
         const targetArray = this._traverse(op.path)?.node;
         if (!targetArray || !targetArray[CRDT_ARRAY_MARKER]) break;
-        
+
         let item = targetArray.items[op.itemId];
         if (!item) {
             item = targetArray.items[op.itemId] = { id: op.itemId };
@@ -426,8 +426,8 @@ export class CollabJSON {
         const itemToMove = moveArray.items[op.itemId];
         if (!itemToMove) break; // Item doesn't exist (maybe deleted or not synced yet)
 
-        // LWW on the sortKey specifically. 
-        // We use the item's general 'updated' timestamp. 
+        // LWW on the sortKey specifically.
+        // We use the item's general 'updated' timestamp.
         // If a delete happened later, _deleted will be true, and we shouldn't un-delete it just by moving.
         if (op.timestamp > (itemToMove.updated || 0)) {
             itemToMove.sortKey = op.sortKey;
@@ -440,7 +440,7 @@ export class CollabJSON {
         const res = this._traverse(op.path);
         if (!res || !res.node) break;
         const itemToDelete = res.parent[CRDT_ARRAY_MARKER] ? res.node : res.parent.metadata[res.key];
-        
+
         if (itemToDelete && op.timestamp > (itemToDelete.updated || 0)) {
             itemToDelete._deleted = true;
             itemToDelete.updated = op.timestamp;
@@ -453,7 +453,7 @@ export class CollabJSON {
             const { parent, key, node } = updateRes;
             const itemToUpdate = parent[CRDT_ARRAY_MARKER] ? node : parent.metadata[key];
             if (itemToUpdate && op.timestamp <= (itemToUpdate.updated || 0)) break;
-            
+
             if (parent[CRDT_ARRAY_MARKER]) {
                 node.data = this._plainToCrdt(op.data);
                 node.updated = op.timestamp;
@@ -512,17 +512,17 @@ export class CollabJSON {
   }
 
   static fromJSON(state, options = {}) {
-    const doc = new CollabJSON(undefined, { 
-        ...options, 
+    const doc = new CollabJSON(undefined, {
+        ...options,
         id: state ? state.id : undefined,
-        clientId: (state && state.clientId) ? state.clientId : options.clientId 
+        clientId: (state && state.clientId) ? state.clientId : options.clientId
     });
     if (!state) return doc;
-    
+
     doc.root = state.snapshot || state.root || {};
     doc.snapshot = state.snapshot;
     doc.snapshotDvv = new Map(Object.entries(state.snapshotDvv || {}));
-    
+
     if (state.clock !== undefined) {
         doc.clock = state.clock;
     }
@@ -541,7 +541,7 @@ export class CollabJSON {
     doc.snapshot = snapshot || {};
     doc.snapshotDvv = new Map(Object.entries(snapshotDvv || {}));
     doc.dvv = new Map(Object.entries(snapshotDvv || {}));
-    
+
     // Initialize clock to the maximum timestamp seen in the snapshot
     let maxTs = 0;
     for (const ts of doc.dvv.values()) {
@@ -584,14 +584,14 @@ export class CollabJSON {
     const lastSeenBySystem = this.dvv.get(this.clientId) || 0;
     const newOps = this.ops.filter(op => op.timestamp > lastSeenBySystem);
     this.checked = Date.now();
-    
+
     const req = { dvv: Object.fromEntries(this.dvv), ops: newOps, clientId: this.clientId, docId: this.id };
 
     if (!this.synced) {
         req.snapshot = this._getSnapshotData();
         req.snapshotDvv = Object.fromEntries(this.dvv);
     }
-    
+
     return req;
   }
 
@@ -616,7 +616,7 @@ export class CollabJSON {
         this.snapshot = snapshot;
         this.snapshotDvv = new Map(Object.entries(snapshotDvv || {}));
         this.dvv = new Map(Object.entries(snapshotDvv || {}));
-        
+
         // Update clock to the maximum timestamp seen in the snapshot
         let maxTs = 0;
         for (const ts of this.dvv.values()) {

@@ -68,7 +68,7 @@ export function synced_store(key, initialValue, sync, fromJSON) {
 
     try {
       const currentValue = get({ subscribe });
-      
+
       // Sanity check before sync
       if (fromJSON && !(currentValue instanceof CollabJSON)) {
          console.error(`Store ${key} corrupted before sync: expected CollabJSON`, currentValue);
@@ -86,12 +86,12 @@ export function synced_store(key, initialValue, sync, fromJSON) {
          return;
       }
 
-      // Notify Svelte of mutated value. 
+      // Notify Svelte of mutated value.
       // Note: standard writable skips notification if object reference is same.
       // We force update by passing a new reference if possible, or relying on Svelte 5 signals/proxies if applicable.
       // For Svelte 4/standard stores, we might need to trigger a change.
       // However, since we are just fixing the corruption issue, we focus on persistence.
-      svelteSet(currentValue); 
+      svelteSet(currentValue);
 
       if (browser) {
         localStorage.setItem(key, JSON.stringify(currentValue));
@@ -250,7 +250,7 @@ async function sync_internal(doc, name) {
   if (profile == undefined || !profile.authenticated) {
     return false;
   }
-  
+
   const syncRequest = doc.getSyncRequest();
   const data = {
     username: profile.username,
@@ -361,7 +361,7 @@ export function save_history(day, profile) {
       const insert_index = history_data.findIndex(d => d && date_key(d) < key);
       history.addItem([insert_index === -1 ? history_data.length : insert_index], day.getData());
     }
-    
+
     const limit = merge_history_limit || 50;
     const current_items = history.getData();
     if (current_items.length > limit) {
@@ -384,7 +384,7 @@ export function save_favorite(item, profile, replace_index) {
   favorites_store.update(function (favorites) {
     if (favorites == undefined)
       favorites = make_favorites();
-    
+
     item = { ...item };
 
     const favorites_data = favorites.getData();
@@ -397,7 +397,7 @@ export function save_favorite(item, profile, replace_index) {
       favorites.updateItem([replace_index], item);
       return favorites;
     }
-    
+
     const existing_index = favorites_data.findIndex(i => i.name == item.name);
 
     if (existing_index !== -1) {
@@ -406,7 +406,7 @@ export function save_favorite(item, profile, replace_index) {
       if (item.servings == undefined) item.servings = 1.0;
       favorites.addItem([favorites_data.length], item);
     }
-    
+
     return favorites;
   });
 }
@@ -417,20 +417,20 @@ export function check_for_new_day(t, profile) {
     save_today(new_day, profile);
     return new_day;
   }
-  
+
   if (!get_date_info(t) || compare_date(t, new_day) < 0) {
     save_history(t, profile);
-    
+
     // Mutate existing document to preserve ID and avoid server reset
     const newData = new_day.getData();
-    
+
     if (newData.timestamp) {
         t.updateItem(['items'], '[]');
         t.updateItem(['timestamp'], newData.timestamp);
     }
-    
+
     t.updateItem(['items'], []);
-    
+
     save_today(t, profile);
     return t;
   }

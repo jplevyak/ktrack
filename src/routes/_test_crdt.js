@@ -61,7 +61,7 @@ test('Top-level Array: deleteItem', () => {
 
 test('Top-level Array: moveItem', () => {
     const doc = new CollabJSON('["a", "b", "c", "d"]');
-    
+
     // Move 'a' to end
     doc.moveItem([], 0, 4);
     assert.deepStrictEqual(doc.getData(), ["b", "c", "d", "a"]);
@@ -119,13 +119,13 @@ test('updateItem can add or update', () => {
 
 test('getData can retrieve a subtree by path', () => {
     const doc = new CollabJSON('{"a": {"b": [10, {"c": 20}]}, "d": 30}');
-    
+
     // Get a nested object
     assert.deepStrictEqual(doc.getData(['a']), { b: [10, { c: 20 }] });
-    
+
     // Get a nested array
     assert.deepStrictEqual(doc.getData(['a', 'b']), [10, { c: 20 }]);
-    
+
     // Get a nested value from within an array
     assert.deepStrictEqual(doc.getData(['a', 'b', 1]), { c: 20 });
     assert.deepStrictEqual(doc.getData(['a', 'b', 1, 'c']), 20);
@@ -144,7 +144,7 @@ test('getData can retrieve a subtree by path', () => {
 
 test('findPath locates items', () => {
     const doc = new CollabJSON('{"a": {"b": [{"id": "x", "val": 10}, {"id": "y", "val": 20}]}}');
-    
+
     // We need to get the internal IDs to test findPath reliably on array items
     const root = doc._traverse([]).node;
     const arrayNode = root.a.b;
@@ -154,7 +154,7 @@ test('findPath locates items', () => {
 
     assert.deepStrictEqual(doc.findPath(id1), ['a', 'b', 0]);
     assert.deepStrictEqual(doc.findPath(id2), ['a', 'b', 1]);
-    
+
     // Find by key
     assert.deepStrictEqual(doc.findPath('val'), ['a', 'b', 0, 'val']); // Finds first occurrence
 });
@@ -177,7 +177,7 @@ test('Arbitrarily nested operations are CRDT-native', () => {
     // Nested addItem
     doc.addItem(['a', 'b', 'c', 1], { d: 1.5 });
     assert.deepStrictEqual(doc.getData().a.b.c, [ { d: 1 }, { d: 1.5 }, { d: 2 } ]);
-    
+
     // Nested deleteItem on an array
     doc.deleteItem(['a', 'b', 'c', 0]);
     assert.deepStrictEqual(doc.getData().a.b.c, [ { d: 1.5 }, { d: 2 } ]);
@@ -198,13 +198,13 @@ test('Arbitrarily nested operations are CRDT-native', () => {
 test('Garbage collection removes tombstones', () => {
     const doc = new CollabJSON('{"a": 1, "b": 2}');
     doc.deleteItem(['a']);
-    
+
     // Verify tombstone exists internally
     const root = doc._traverse([]).node;
     assert.ok(root.metadata.a._deleted === true);
-    
+
     doc.purgeTombstones(undefined, Infinity);
-    
+
     // Verify tombstone is gone
     assert.ok(root.metadata.a === undefined);
     assert.ok(root.a === undefined);
@@ -366,7 +366,7 @@ test('Sync with a pruned server sends snapshot', () => {
     for (let i = 0; i < 101; i++) {
         client1.updateItem([`item${i}`], { val: i });
     }
-    
+
     let req1 = client1.getSyncRequest();
     server.getSyncResponse(req1);
 
