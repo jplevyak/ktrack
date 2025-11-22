@@ -89,13 +89,13 @@ export function compute_averages(h) {
   if (h == undefined) return result;
   var a = 0.0;
   var n = 0;
-  for (let i in h) {
-    a += get_total(h[i].items);
+  for (let i = 0; i < 7; i++) {
+    if (i < h.length)
+      a += get_total(h[i].items);
     n += 1;
     if (n > 1 && n % 2 == 1) {
       result[(n - 3) / 2] = a / n;
     }
-    if (n >= 7) break;
   }
   return result;
 }
