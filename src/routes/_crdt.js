@@ -268,16 +268,16 @@ export class CollabJSON {
     let prevKey = null;
     let nextKey = null;
 
-    /* 
-       Problem: We need to generate a fractional sortKey that places 'itemToMove' 
-       at 'toIndex'. 
-       
-       When moving an item within a list, the indices of other items shift. 
+    /*
+       Problem: We need to generate a fractional sortKey that places 'itemToMove'
+       at 'toIndex'.
+
+       When moving an item within a list, the indices of other items shift.
        For example, if we have [A, B, C, D] and move A (index 0) to index 2:
        1. Conceptually remove A: [B, C, D]
        2. Insert A at index 2: [B, C, A, D]
-       
-       To find the correct sortKey for A, we need to look at its new neighbors 
+
+       To find the correct sortKey for A, we need to look at its new neighbors
        in the list *excluding* A itself. In this example, A is between C and D.
     */
 
@@ -294,19 +294,17 @@ export class CollabJSON {
     } else {
         // Case 3: Moving to the middle (or effectively the end of the reduced list).
         // We simulate the list without the moved item to find the correct neighbors.
-        
+
         const listWithoutItem = sortedItems.filter(i => i.id !== itemToMove.id);
-        
-        // We want to insert at 'toIndex'. However, since we removed one item, 
+
+        // We want to insert at 'toIndex'. However, since we removed one item,
         // the target index might be at the end of the reduced list.
         const actualToIndex = Math.min(toIndex, listWithoutItem.length);
-        
-        const pItem = listWithoutItem[actualToIndex - 1];
-        const nItem = listWithoutItem[actualToIndex];
-        
-        // pItem is guaranteed to exist because toIndex > 0 (handled by Case 1).
+
+        // The previous item is guaranteed to exist because toIndex > 0 (handled by Case 1).
         // nItem might be undefined if actualToIndex equals listWithoutItem.length (appending to reduced list).
-        prevKey = pItem.sortKey;
+        prevKey = listWithoutItem[actualToIndex - 1].sortKey;
+        const nItem = listWithoutItem[actualToIndex];
         nextKey = nItem ? nItem.sortKey : null;
     }
 
