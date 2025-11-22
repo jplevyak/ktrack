@@ -51,6 +51,19 @@ export function get_date_info(day) {
   }
   if (!day.timestamp)
     return null;
+
+  if (typeof day.timestamp === 'string') {
+    const parts = day.timestamp.split('-');
+    if (parts.length === 4) {
+      return {
+        year: parseInt(parts[0], 10),
+        month: parseInt(parts[1], 10) - 1,
+        date: parseInt(parts[2], 10),
+        day: parseInt(parts[3], 10)
+      };
+    }
+  }
+
   let date = new Date(day.timestamp);
   return {
     day: date.getDay(),
@@ -127,7 +140,12 @@ export function get_total_fiber(items) {
 
 export function make_today() {
   const doc = new CollabJSON("{}");
-  doc.updateItem(['timestamp'], Date.now());
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  const day = now.getDay();
+  doc.updateItem(['timestamp'], `${y}-${m}-${d}-${day}`);
   doc.updateItem(['items'], []);
   return doc;
 }
@@ -165,7 +183,7 @@ export function prune_today(server_doc, clientSyncRequest) {
 
   // If server has no date, or client's date is newer, overwrite server state.
   if (!server_has_date || compare_date(client_day_temp, server_doc) > 0) {
-    // Reset the server document's state.
+    // Reset the server document's state. 
     // getSyncResponse will then build the new state from the client's operations.
     server_doc.clear();
   }
