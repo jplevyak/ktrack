@@ -383,6 +383,15 @@ export class CollabJSON {
     }
   }
   
+  clear() {
+    this.root = {};
+    this.history = [];
+    this.dvv.clear();
+    this.snapshot = null;
+    this.snapshotDvv.clear();
+    this.ops = [];
+  }
+
   // --- Sync Function ---
 
   applyOp(op) {
@@ -521,6 +530,41 @@ export class CollabJSON {
     return doc;
   }
 
+  static fromSnapshot(snapshot, snapshotDvv, docId, options = {}) {
+    const doc = new CollabJSON(undefined, { ...options, id: docId });
+    doc.root = snapshot || {};
+    doc.snapshot = snapshot || {};
+    doc.snapshotDvv = new Map(Object.entries(snapshotDvv || {}));
+    doc.dvv = new Map(Object.entries(snapshotDvv || {}));
+    return doc;
+  }
+
+  static loadOrInit(stateString, syncRequest, defaultJson, options = {}) {
+    const opts = { ...options, clientId: 'server' };
+    if (stateString) {
+        return CollabJSON.fromJSON(JSON.parse(stateString), opts);
+    }
+    if (syncRequest && syncRequest.snapshot) {
+        return CollabJSON.fromSnapshot(syncRequest.snapshot, syncRequest.snapshotDvv, syncRequest.docId, opts);
+    }
+    return new CollabJSON(defaultJson, { ...opts, id: syncRequest ? syncRequest.docId : undefined });
+  }
+
+  static fromOps(ops) {
+    const doc = new CollabJSON("{}");
+    if (Array.isArray(ops)) {
+        ops.forEach(op => doc.applyOp(op));
+    }
+    return doc;
+  }
+
+  static fromSyncRequest(syncRequest) {
+    if (!syncRequest || !syncRequest.ops || syncRequest.ops.length === 0) {
+        return null;
+    }
+    return CollabJSON.fromOps(syncRequest.ops);
+  }
+
   // --- DVV Sync Methods ---
 
   getSyncRequest() {
@@ -536,6 +580,19 @@ export class CollabJSON {
     }
     
     return req;
+  }
+
+  requiresReset(syncRequest) {
+    return !!(this.id && syncRequest && syncRequest.docId && this.id !== syncRequest.docId);
+  }
+
+  getResetResponse() {
+    return {
+      snapshot: this._getSnapshotData(),
+      snapshotDvv: Object.fromEntries(this.dvv),
+      reset: true,
+      id: this.id
+    };
   }
 
   applySyncResponse({ ops, dvv, snapshot, snapshotDvv, reset, id }) {

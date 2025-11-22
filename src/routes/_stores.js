@@ -55,8 +55,8 @@ export function synced_store(key, initialValue, sync, fromJSON) {
     return () => clearInterval(intervalId);
   });
 
-  async function syncToServer() {
-    if (!browser || !isDirty || !get(online)) {
+  async function syncToServer(force = false) {
+    if (!browser || (!isDirty && !force) || !get(online)) {
       if (isDirty && !get(online)) {
         status.set('error');
       }
@@ -128,6 +128,7 @@ export function synced_store(key, initialValue, sync, fromJSON) {
     subscribe,
     set,
     update,
+    sync: () => syncToServer(true),
     status: {
       subscribe: status.subscribe
     }
@@ -168,6 +169,10 @@ export async function sync_profile(profile) {
       profile.authenticated = p.authenticated;
       if (p.authenticated) {
         profile.old_password = "";
+        // Force sync of other stores upon successful login
+        if (today_store && today_store.sync) today_store.sync();
+        if (favorites_store && favorites_store.sync) favorites_store.sync();
+        if (history_store && history_store.sync) history_store.sync();
       }
       localStorage.setItem('profile', JSON.stringify(profile));
     } catch (err) {
@@ -269,9 +274,7 @@ async function sync_internal(doc, name) {
         console.log("sync err", name, sync_response.err);
         return false;
       }
-      console.log('sync_internal', name, doc.getData(), sync_response);
       doc.applySyncResponse(sync_response);
-      console.log('sync_internal 2', name, doc.getData());
     } catch (err) {
       console.log(name, "JSON error", err.message);
       return false;
@@ -417,9 +420,25 @@ export function save_favorite(item, profile, replace_index) {
 
 export function check_for_new_day(t, profile) {
   let new_day = make_today();
-  if (!t || !get_date_info(t) || compare_date(t, new_day) < 0) {
+  if (!t) {
     save_today(new_day, profile);
     return new_day;
+  }
+  
+  if (!get_date_info(t) || compare_date(t, new_day) < 0) {
+    save_history(t, profile);
+    
+    // Mutate existing document to preserve ID and avoid server reset
+    const newData = new_day.getData();
+    
+    if (newData.timestamp) {
+        t.updateItem(['timestamp'], newData.timestamp);
+    }
+    
+    t.updateItem(['items'], []);
+    
+    save_today(t, profile);
+    return t;
   }
   return t;
 }

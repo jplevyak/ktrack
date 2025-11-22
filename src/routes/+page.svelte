@@ -20,6 +20,7 @@
     save_today,
     save_favorite,
     save_history,
+    check_for_new_day,
   } from "./_stores.js";
 
   let total = 0;
@@ -33,6 +34,9 @@
   let resolution = 0.0001;
   let edit = undefined;
   let day = undefined;
+
+  // Access the status store from the custom store object
+  const today_status = today_store.status;
 
   // straddle all small moves.
   let stops = [
@@ -65,7 +69,7 @@
     unsubscribe_history();
   });
 
-  $: day, handle_new_day();
+  $: day, check_for_new_day();
   $: day = edit || today;
   $: date_info = day ? get_date_info(day) : null;
   $: day_data = day ? day.getData() : null;
@@ -73,18 +77,11 @@
   $: food_items = all_items.filter(item => typeof item.mcg !== 'undefined');
   $: total = get_total(day_data);
   $: [total_fiber, fiber_unknown] = get_total_fiber(day_data);
-  $: averages = compute_averages(history.getData());
-
-  function handle_new_day() {
-    let new_day = make_today();
-    if (today && compare_date(today, new_day) < 0) {
-      save_today(new_day, profile);
-    }
-  }
+  // Ensure averages is always an array of numbers
+  $: averages = (history && history.getData) ? (compute_averages(history.getData()) || [0,0,0]) : [0,0,0];
 
   function save_day() {
-    console.log('save day', day.getData());
-    if (compare_date(day, today) == 0) {
+    if (day == today) {
       save_today(day, profile);
     } else {
       day.deleteItem(['start_edit']);
@@ -175,10 +172,10 @@
   <title>KTrack - Day</title>
 </svelte:head>
 
-{#if $today_store.status && $today_store.status != 'idle'}
-  <span>🟡 Unsaved changes: {$today_store.status} </span> <br>
+{#if $today_status && $today_status != 'idle'}
+  <span>🟡 Unsaved changes: {$today_status} </span> <br>
 {/if}
-Averages [3, 5, 7] days: [{averages[0].toFixed(1)}, {averages[1].toFixed(1)}, {averages[2].toFixed(
+Averages [3, 5, 7] days: [{(averages[0]||0).toFixed(1)}, {(averages[1]||0).toFixed(1)}, {(averages[2]||0).toFixed(
   1
 )}]<br />
 <b

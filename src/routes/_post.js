@@ -5,7 +5,7 @@ import { CollabJSON, history_prune_limit } from "./_crdt.js";
 
 export var profile = new Level("./profile");
 
-async function do_post_internal(req, data, username, dbname, db, prune, defaultJSON) {
+async function do_post_internal(req, syncRequest, username, dbname, db, prune, defaultJSON) {
   let db_value_str;
   try {
     db_value_str = await db.get(username);
@@ -18,39 +18,20 @@ async function do_post_internal(req, data, username, dbname, db, prune, defaultJ
     }
   }
 
-  let server_doc;
-
-  if (!db_value_str && data.snapshot) {
-      // Initialize from client snapshot
-      server_doc = new CollabJSON(undefined, { clientId: 'server', id: data.docId });
-      server_doc.root = data.snapshot;
-      server_doc.snapshot = data.snapshot;
-      server_doc.snapshotDvv = new Map(Object.entries(data.snapshotDvv || {}));
-      server_doc.dvv = new Map(Object.entries(data.snapshotDvv || {}));
-  } else if (!db_value_str) {
-      // Initialize from default
-      server_doc = new CollabJSON(defaultJSON, { clientId: 'server', id: data.docId });
-  } else {
-      // Load from DB
-      server_doc = CollabJSON.fromJSON(JSON.parse(db_value_str), { clientId: 'server' });
-  }
+  let server_doc = CollabJSON.loadOrInit(db_value_str, syncRequest, defaultJSON);
 
   // Allow special logic to run (e.g. for 'today' store) and handle pruning.
   // The 'prune' function is passed from the specific API endpoint.
-  server_doc.prune(prune, data);
+  server_doc.prune(prune, syncRequest);
 
   // If the client's document ID doesn't match the server's, it means the client
   // has a fresh (e.g., post-login) or stale copy and needs to be reset with the
   // server's authoritative state.
-  if (db_value_str && server_doc.id && data.docId && server_doc.id !== data.docId) {
-    return new Response(JSON.stringify({
-      snapshot: server_doc._getSnapshotData(),
-      snapshotDvv: Object.fromEntries(server_doc.dvv),
-      reset: true
-    }));
+  if (server_doc.requiresReset(syncRequest)) {
+    return new Response(JSON.stringify(server_doc.getResetResponse()));
   }
 
-  const sync_response = server_doc.getSyncResponse(data);
+  const sync_response = server_doc.getSyncResponse(syncRequest);
 
   await db.put(username, JSON.stringify(server_doc.toJSON()));
 
@@ -58,9 +39,10 @@ async function do_post_internal(req, data, username, dbname, db, prune, defaultJ
 }
 
 export async function do_post(req, dbname, db, prune, defaultJSON) {
-  let data = await req.request.json();
-  let username = data.username;
-  let password = data.password;
+  // Check user and password.
+  let syncRequest = await req.request.json();
+  let username = syncRequest.username;
+  let password = syncRequest.password;
   if (
     username == undefined ||
     !username ||
@@ -103,5 +85,5 @@ export async function do_post(req, dbname, db, prune, defaultJSON) {
     console.log("incorrect password");
     return new Response(JSON.stringify({ err: "incorrect password" }));
   }
-  return await do_post_internal(req, data, username, dbname, db, prune, defaultJSON);
+  return await do_post_internal(req, syncRequest, username, dbname, db, prune, defaultJSON);
 }

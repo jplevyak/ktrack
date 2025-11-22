@@ -153,14 +153,12 @@ export function make_profile() {
   };
 }
 
-export function prune_today(server_doc, clientRequestData) {
-  if (!clientRequestData || !clientRequestData.ops || clientRequestData.ops.length === 0) {
+export function prune_today(server_doc, clientSyncRequest) {
+  const client_day_temp = CollabJSON.fromSyncRequest(clientSyncRequest);
+  if (!client_day_temp) {
     return;
   }
 
-  // Create a temporary document from the client's operations to inspect its state.
-  const client_day_temp = new CollabJSON("{}");
-  clientRequestData.ops.forEach(op => client_day_temp.applyOp(op));
   let client_day_temp_data = client_day_temp.getData();
   if (!client_day_temp_data.timestamp) {
     return; // Client ops don't contain a valid timestamp, so do nothing.
@@ -173,9 +171,7 @@ export function prune_today(server_doc, clientRequestData) {
   if (!server_has_date || compare_date(client_day_temp, server_doc) > 0) {
     // Reset the server document's state. 
     // getSyncResponse will then build the new state from the client's operations.
-    server_doc.items.clear();
-    server_doc.history = [];
-    server_doc.dvv.clear();
+    server_doc.clear();
   }
 }
 

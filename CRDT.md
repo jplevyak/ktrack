@@ -56,11 +56,16 @@ Marks an item in an array or a property on an object as deleted.
 
 *   `path` (Array of strings and numbers): The path to the item to be deleted.
 
-### `prune(pruneFn)`
+### `clear()`
+
+Resets the document to an empty state. This clears the root data, history, vector clocks, and snapshots.
+
+### `prune(pruneFn, clientRequestData)`
 
 *(Server-side)* Compacts the document's history to save space. It creates a snapshot of the current state, stores the current DVV, and clears the historical operation log.
 
-*   `pruneFn` (Function): A function that is given the `CollabJSON` instance to perform any application-specific pruning on the data *before* the snapshot is created.
+*   `pruneFn` (Function): A function that is given the `CollabJSON` instance and the client request data to perform any application-specific pruning on the data *before* the snapshot is created.
+*   `clientRequestData` (Object): The data from the client request, passed to `pruneFn`.
 
 ### `toJSON()`
 
@@ -73,9 +78,50 @@ Marks an item in an array or a property on an object as deleted.
 *   `state` (Object): The plain object retrieved from storage.
 *   `options` (Object): Constructor options, primarily to set a `clientId`.
 
+### `static CollabJSON.fromSnapshot(snapshot, snapshotDvv, docId, options)`
+
+*(Server-side)* Creates a new `CollabJSON` instance initialized from a snapshot.
+
+*   `snapshot` (Object): The data snapshot.
+*   `snapshotDvv` (Object): The dotted version vector associated with the snapshot.
+*   `docId` (String): The document ID.
+*   `options` (Object): Constructor options.
+
+### `static CollabJSON.loadOrInit(stateString, syncRequest, defaultJson, options)`
+
+*(Server-side)* A convenience factory method to load a document from a database string, or initialize it from a client's sync request (if it contains a snapshot), or fall back to a default JSON structure. It automatically sets the `clientId` to 'server' unless overridden in options.
+
+*   `stateString` (String|null): The serialized JSON string from the database.
+*   `syncRequest` (Object): The incoming sync request from a client.
+*   `defaultJson` (String): A JSON string representing the default state if no other state is available.
+*   `options` (Object): Constructor options.
+
+### `static CollabJSON.fromOps(ops)`
+
+Creates a temporary `CollabJSON` instance by applying a list of operations. Useful for inspecting the state implied by a set of operations without affecting the main document.
+
+*   `ops` (Array): An array of operation objects.
+
+### `static CollabJSON.fromSyncRequest(syncRequest)`
+
+Creates a temporary `CollabJSON` instance from the operations contained in a sync request. Returns `null` if the request contains no operations.
+
+*   `syncRequest` (Object): The sync request object.
+
 ### `getSyncRequest()`
 
 *(Client-side)* Gathers all local operations that have not yet been acknowledged by the server and prepares a sync request payload. This method is repeatable; it can be called multiple times without losing data if a network request fails.
+
+### `requiresReset(syncRequest)`
+
+*(Server-side)* Checks if the server's document ID differs from the client's document ID in the sync request. If they differ, the client likely needs to be reset.
+
+*   `syncRequest` (Object): The incoming sync request.
+*   Returns `true` if a reset is required, `false` otherwise.
+
+### `getResetResponse()`
+
+*(Server-side)* Generates a response payload that instructs the client to reset its state to match the server's current snapshot.
 
 ### `applySyncResponse(response)`
 
@@ -164,42 +210,29 @@ import { db } from './_database.js'; // Your database client
 
 async function handleSyncRequest(req, res) {
   const { username, ...syncRequest } = req.body;
+  const defaultJson = '{}';
 
   // 1. Authenticate user (omitted for brevity)
 
   // 2. Load the document state from the database
-  let docStateJSON;
-  try {
-      docStateJSON = await db.get(username);
-  } catch (e) {
-      if (e.code !== 'LEVEL_NOT_FOUND') throw e;
+  const docStateString = await db.get(username).catch(() => undefined);
+
+  // 3. Load or initialize the server's copy of the document
+  const serverDoc = CollabJSON.loadOrInit(docStateString, syncRequest, defaultJson);
+
+  // 4. Check if client needs a reset (e.g. ID mismatch)
+  if (serverDoc.requiresReset(syncRequest)) {
+      res.json(serverDoc.getResetResponse());
+      return;
   }
 
-  // 3. Reconstruct the server's copy of the document
-  //    If the DB is empty, initialize from the client's snapshot if provided, or use a default.
-  let serverDoc;
-  if (!docStateJSON && syncRequest.snapshot) {
-       // Initialize from client snapshot
-       serverDoc = new CollabJSON(undefined, { clientId: 'server', id: syncRequest.docId });
-       serverDoc.root = syncRequest.snapshot;
-       serverDoc.snapshot = syncRequest.snapshot;
-       serverDoc.snapshotDvv = new Map(Object.entries(syncRequest.snapshotDvv || {}));
-       serverDoc.dvv = new Map(Object.entries(syncRequest.snapshotDvv || {}));
-  } else if (!docStateJSON) {
-       // Initialize from default
-       serverDoc = new CollabJSON('{}', { clientId: 'server', id: syncRequest.docId });
-  } else {
-       // Load from DB
-       serverDoc = CollabJSON.fromJSON(JSON.parse(docStateJSON), { clientId: 'server' });
-  }
-
-  // 4. Process the client's request and generate a response
+  // 5. Process the client's request and generate a response
   const syncResponse = serverDoc.getSyncResponse(syncRequest);
 
-  // 5. Save the updated document state back to the database
+  // 6. Save the updated document state back to the database
   await db.put(username, JSON.stringify(serverDoc.toJSON()));
 
-  // 6. Send the response back to the client
+  // 7. Send the response back to the client
   res.json(syncResponse);
 }
 ```
