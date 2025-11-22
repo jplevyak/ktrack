@@ -268,33 +268,40 @@ export class CollabJSON {
     let prevKey = null;
     let nextKey = null;
 
+    /* 
+       Problem: We need to generate a fractional sortKey that places 'itemToMove' 
+       at 'toIndex'. 
+       
+       When moving an item within a list, the indices of other items shift. 
+       For example, if we have [A, B, C, D] and move A (index 0) to index 2:
+       1. Conceptually remove A: [B, C, D]
+       2. Insert A at index 2: [B, C, A, D]
+       
+       To find the correct sortKey for A, we need to look at its new neighbors 
+       in the list *excluding* A itself. In this example, A is between C and D.
+    */
+
     if (toIndex === 0) {
-        // Moving to start
+        // Case 1: Moving to the very start of the list.
+        // The item will be placed before the current first item.
         nextKey = sortedItems[0].sortKey;
     } else if (toIndex === sortedItems.length) {
-        // Moving to end
+        // Case 2: Moving to the very end of the list.
+        // The item will be placed after the current last item.
         prevKey = sortedItems[sortedItems.length - 1].sortKey;
     } else {
-        // Moving between items
-        // Adjust logic because the item being moved is currently IN the list
-        let leftIndex = toIndex - 1;
-        let rightIndex = toIndex;
-
-        // If we are moving 'down' the list (0 -> 5), the indices shift after removal
-        if (fromIndex < toIndex) {
-            // The target slot is actually between toIndex and toIndex+1 in the original list?
-            // No, standard splice logic: insert AT toIndex.
-            // But since we are effectively removing fromIndex first, we need to be careful.
-            // Simpler: imagine the list without the item.
-        }
-
+        // Case 3: Moving to the middle.
+        // We simulate the list without the moved item to find the correct neighbors.
+        
         const listWithoutItem = sortedItems.filter(i => i.id !== itemToMove.id);
-        // Now we want to insert at toIndex (clamped to new length)
+        
+        // We want to insert at 'toIndex'. However, since we removed one item, 
+        // the target index might be at the end of the reduced list.
         const actualToIndex = Math.min(toIndex, listWithoutItem.length);
-
+        
         const pItem = listWithoutItem[actualToIndex - 1];
         const nItem = listWithoutItem[actualToIndex];
-
+        
         prevKey = pItem ? pItem.sortKey : null;
         nextKey = nItem ? nItem.sortKey : null;
     }
