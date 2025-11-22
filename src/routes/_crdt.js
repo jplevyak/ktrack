@@ -502,6 +502,7 @@ export class CollabJSON {
     return {
       root: this.root,
       id: this.id,
+      clientId: this.clientId,
       clock: this.clock,
       history: this.history,
       dvv: Object.fromEntries(this.dvv),
@@ -511,7 +512,11 @@ export class CollabJSON {
   }
 
   static fromJSON(state, options = {}) {
-    const doc = new CollabJSON(undefined, { ...options, id: state ? state.id : undefined });
+    const doc = new CollabJSON(undefined, { 
+        ...options, 
+        id: state ? state.id : undefined,
+        clientId: (state && state.clientId) ? state.clientId : options.clientId 
+    });
     if (!state) return doc;
     
     doc.root = state.snapshot || state.root || {};

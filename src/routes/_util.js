@@ -130,10 +130,10 @@ export function get_total_fiber(day) {
 }
 
 export function make_today() {
-  return new CollabJSON(`{
-    "timestamp": ${Date.now()},
-    "items": []
-  }`);
+  const doc = new CollabJSON("{}");
+  doc.updateItem(['timestamp'], Date.now());
+  doc.updateItem(['items'], []);
+  return doc;
 }
 
 export function make_favorites() {
