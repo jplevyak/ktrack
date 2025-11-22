@@ -352,13 +352,6 @@ export function save_history(day, profile) {
       history = make_history();
     let history_data = history.getData();
 
-    if (!Array.isArray(history_data)) {
-      console.error(`Invalid value set for history`, history_data);
-      console.trace();
-      history.updateItem([], []);
-      history_data = [];
-    }
-
     const key = date_key(day);
     const existing_index = history_data.findIndex(d => d && date_key(d) === key);
 
@@ -432,6 +425,7 @@ export function check_for_new_day(t, profile) {
     const newData = new_day.getData();
     
     if (newData.timestamp) {
+        t.updateItem(['items'], '[]');
         t.updateItem(['timestamp'], newData.timestamp);
     }
     

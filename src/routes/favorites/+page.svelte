@@ -25,9 +25,7 @@
   let today = undefined;
   let edit = undefined;
 
-  const unsubscribe_profile = profile_store.subscribe((p) => {
-    profile = p;
-  });
+  const unsubscribe_profile = profile_store.subscribe((p) => { profile = p; });
   const unsubscribe_favorites = favorites_store.subscribe((value) => {
     if (value == undefined) {
       return;
@@ -36,12 +34,11 @@
     create_index();
     update_results();
   });
-  const unsubscribe_today = today_store.subscribe((t) => {
-    today = check_for_new_day(t, profile);
-  });
-  const unsubscribe_edit = edit_store.subscribe((value) => {
-    edit = value;
-  });
+  const unsubscribe_today = today_store.subscribe((t) => { today = t; });
+  const unsubscribe_edit = edit_store.subscribe((e) => { edit = e; });
+
+  $: today, check_for_new_day(today, profile);
+
   onDestroy(() => {
     unsubscribe_today();
     unsubscribe_edit();

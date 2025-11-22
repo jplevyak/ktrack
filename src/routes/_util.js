@@ -90,7 +90,7 @@ export function compute_averages(h) {
   var a = 0.0;
   var n = 0;
   for (let i in h) {
-    a += get_total(h[i]);
+    a += get_total(h[i].items);
     n += 1;
     if (n > 1 && n % 2 == 1) {
       result[(n - 3) / 2] = a / n;
@@ -100,11 +100,9 @@ export function compute_averages(h) {
   return result;
 }
 
-export function get_total(day) {
+export function get_total(items) {
   let n = 0.0;
-  if (!day)
-    return n;
-  for (let f of day.items) {
+  for (let f of items) {
     if (f.mcg != undefined) {
       n += f.mcg * f.servings;
     }
@@ -112,12 +110,10 @@ export function get_total(day) {
   return n;
 }
 
-export function get_total_fiber(day) {
+export function get_total_fiber(items) {
   let n = 0.0;
   let unknown = false;
-  if (!day)
-    return [n, unknown];
-  for (let f of day.items) {
+  for (let f of items) {
     if (f.mcg != undefined) {
       if (f.hasOwnProperty('fiber') && f.fiber != "") {
           n += f.fiber * f.servings;

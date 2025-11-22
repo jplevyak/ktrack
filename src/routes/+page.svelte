@@ -69,15 +69,14 @@
     unsubscribe_history();
   });
 
-  $: day, check_for_new_day();
+  $: today, check_for_new_day(today, profile);
   $: day = edit || today;
   $: date_info = day ? get_date_info(day) : null;
   $: day_data = day ? day.getData() : null;
-  $: all_items = day ? day_data.items : [];
+  $: all_items = (day && day_data.items) ? day_data.items : [];
   $: food_items = all_items.filter(item => typeof item.mcg !== 'undefined');
-  $: total = get_total(day_data);
-  $: [total_fiber, fiber_unknown] = get_total_fiber(day_data);
-  // Ensure averages is always an array of numbers
+  $: total = get_total(all_items);
+  $: [total_fiber, fiber_unknown] = get_total_fiber(all_items);
   $: averages = (history && history.getData) ? (compute_averages(history.getData()) || [0,0,0]) : [0,0,0];
 
   function save_day() {
