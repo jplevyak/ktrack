@@ -197,7 +197,7 @@ def remove_duplicates(a):
     del a[i+1:]
     return i + 1
 
-data = sorted(data,key=lambda x: x["name"])
+data = sorted(data,key=lambda x: str(x));
 
 print('size', len(data));
 print('size without duplicates', remove_duplicates(data))
