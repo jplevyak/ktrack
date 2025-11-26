@@ -83,7 +83,7 @@
     if (day == today) {
       save_today(day, profile);
     } else {
-      day.deleteItem(['start_edit']);
+      edit_store.set(day);
       save_history(day, profile);
     }
   }
