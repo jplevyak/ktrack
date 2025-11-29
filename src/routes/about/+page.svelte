@@ -50,6 +50,21 @@
     unsubscribe_profile();
   });
 
+  function download_json(filename, data) {
+    if (!data) return;
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   onMount(async () => {
     let username_input = document.getElementById("username");
     let password_input = document.getElementById("password");
@@ -110,16 +125,19 @@ is lost.
 <input type="button" id="logout" value="Logout" />
 <br /><br />
 Today
+<button on:click={() => download_json("today.json", today)}>Download</button>
 <ul>
   <li> Server Check Time: {today.checked ? new Date(today.checked).toString() : "unsynced"} </li>
   <li> Server Sync Time: {today.synced ? new Date(today.synced).toString() : "unsynced"} </li>
 </ul>
 Favorites
+<button on:click={() => download_json("favorites.json", favorites)}>Download</button>
 <ul>
   <li> Server Check Time: {favorites.checked ? new Date(favorites.checked).toString() : "unsynced"} </li>
   <li> Server Sync Time: {favorites.synced ? new Date(favorites.synced).toString() : "unsynced"} </li>
 </ul>
 History
+<button on:click={() => download_json("history.json", history)}>Download</button>
 <ul>
   <li> Server Check Time: {history.checked ? new Date(history.checked).toString() : "unsynced"} </li>
   <li> Server Sync Time: {history.synced ? new Date(history.synced).toString() : "unsynced"} </li>
