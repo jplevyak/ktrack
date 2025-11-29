@@ -11,6 +11,57 @@ import {
   make_profile,
 } from "./_util.js";
 
+// --- IndexedDB Helper ---
+const DB_NAME = 'KTrackDB';
+const DB_VERSION = 1;
+
+function openDB() {
+  if (!browser) return Promise.reject("Not in browser");
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains('stores')) {
+        db.createObjectStore('stores');
+      }
+    };
+  });
+}
+
+async function dbGet(key) {
+  try {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction('stores', 'readonly');
+      const store = transaction.objectStore('stores');
+      const request = store.get(key);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  } catch (e) {
+    console.error("DB Get Error", e);
+    return undefined;
+  }
+}
+
+async function dbSet(key, value) {
+  try {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction('stores', 'readwrite');
+      const store = transaction.objectStore('stores');
+      const request = store.put(value, key);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  } catch (e) {
+    console.error("DB Set Error", e);
+  }
+}
+// ------------------------
+
 function debounce(func, wait) {
   let timeout;
   return function(...args) {
@@ -24,40 +75,49 @@ export function synced_store(key, initialValue, sync, fromJSON) {
   const SYNC_INTERVAL = 1000 * 60 * 5; // 5 minutes
   const DEBOUNCE_WAIT = 2000; // 2 seconds
 
-  const dirtyKey = `${key}:dirty`;
-
-  let storedValue = initialValue;
+  // We store an object in IDB: { data: serializedData, dirty: boolean }
+  
   let isDirty = false;
+  const status = writable('loading'); // Start with loading status
 
-  if (browser) {
-    const fromStorage = localStorage.getItem(key);
-    if (fromStorage) {
-      try {
-        const parsed = JSON.parse(fromStorage);
-        storedValue = fromJSON ? fromJSON(parsed) : parsed;
-      } catch (e) {
-        console.error(`Error parsing ${key} from localStorage`, e);
-      }
-    }
-    isDirty = localStorage.getItem(dirtyKey) === 'true';
-  }
-
-  const status = writable(isDirty ? 'dirty' : 'idle');
-
-  let intervalId;
-  const { subscribe, set: svelteSet, update: svelteUpdate } = writable(storedValue, () => {
+  // Initialize with default value
+  const { subscribe, set: svelteSet, update: svelteUpdate } = writable(initialValue, () => {
     if (!browser) return;
-    // Start function (on first subscriber)
-    if (isDirty) syncToServer();
-    intervalId = setInterval(syncToServer, SYNC_INTERVAL);
-    // Stop function (on last unsubscriber)
+    
+    // Setup sync interval
+    const intervalId = setInterval(syncToServer, SYNC_INTERVAL);
     return () => clearInterval(intervalId);
   });
+
+  // Load from IndexedDB on initialization
+  if (browser) {
+    dbGet(key).then(record => {
+      if (record) {
+        try {
+          // record.data is the JSON object (CollabJSON.toJSON result)
+          const parsed = record.data;
+          const value = fromJSON ? fromJSON(parsed) : parsed;
+          svelteSet(value);
+          isDirty = record.dirty || false;
+          status.set(isDirty ? 'dirty' : 'idle');
+          
+          // If we loaded a dirty state, try to sync
+          if (isDirty) syncToServer();
+        } catch (e) {
+          console.error(`Error parsing ${key} from IndexedDB`, e);
+          status.set('error');
+        }
+      } else {
+        // No data in DB, use initialValue
+        status.set('idle');
+      }
+    });
+  }
 
   async function syncToServer(force = false) {
     if (!browser || (!isDirty && !force) || !get(online)) {
       if (isDirty && !get(online)) {
-        status.set('error');
+        status.set('error'); // Offline but dirty
       }
       return;
     }
@@ -71,7 +131,6 @@ export function synced_store(key, initialValue, sync, fromJSON) {
       // Sanity check before sync
       if (fromJSON && !(currentValue instanceof CollabJSON)) {
          console.error(`Store ${key} corrupted before sync: expected CollabJSON`, currentValue);
-         // Attempt to recover or abort
          return;
       }
 
@@ -87,9 +146,11 @@ export function synced_store(key, initialValue, sync, fromJSON) {
 
       // Notify Svelte of mutated value.
       svelteSet(currentValue);
+      
       if (browser) {
-        localStorage.setItem(key, JSON.stringify(currentValue));
-        localStorage.setItem(dirtyKey, 'false');
+        // Save clean state to IDB
+        const serialized = fromJSON ? currentValue.toJSON() : currentValue;
+        await dbSet(key, { data: serialized, dirty: false });
       }
       
       isDirty = false;
@@ -105,13 +166,18 @@ export function synced_store(key, initialValue, sync, fromJSON) {
   const debouncedSync = debounce(syncToServer, DEBOUNCE_WAIT);
 
   const set = (newValue) => {
-    if (browser) {
-      localStorage.setItem(key, JSON.stringify(newValue));
-      localStorage.setItem(dirtyKey, 'true');
-    }
     isDirty = true;
     status.set('dirty');
     svelteSet(newValue);
+    
+    if (browser) {
+      // Save dirty state to IDB
+      const serialized = fromJSON ? newValue.toJSON() : newValue;
+      // We don't await this because set() is synchronous in Svelte contract usually, 
+      // but IDB is async. It's "fire and forget" for the UI, but ensures persistence.
+      dbSet(key, { data: serialized, dirty: true });
+    }
+    
     debouncedSync();
   };
 
@@ -156,7 +222,7 @@ export async function sync_profile(profile) {
       const data = await response.json();
       if (data.err) {
         console.log("profile err", data.err);
-        localStorage.setItem('profile', JSON.stringify(profile));
+        // Persist error state if needed, though profile_store handles its own persistence via set()
         return false;
       }
       let p = data.value;
@@ -169,15 +235,13 @@ export async function sync_profile(profile) {
         if (favorites_store && favorites_store.sync) favorites_store.sync();
         if (history_store && history_store.sync) history_store.sync();
       }
-      localStorage.setItem('profile', JSON.stringify(profile));
+      // profile_store.set will handle IDB persistence
     } catch (err) {
       console.log("JSON error", err.message);
-      localStorage.setItem('profile', JSON.stringify(profile));
       return false;
     }
   } catch (err) {
     console.log("POST error", err.message);
-    localStorage.setItem('profile', JSON.stringify(profile));
     return false;
   }
   return true;
@@ -198,6 +262,9 @@ export const online = readable(browser ? navigator.onLine : true, (set) => {
 });
 
 function local_writable(key, initialValue) {
+    // Keep local_writable using localStorage for small non-critical UI state (like 'edit')
+    // or switch to IDB if consistency is desired. 
+    // 'edit' is transient, so localStorage is probably fine, but let's keep it simple.
     let storedValue = initialValue;
     if (browser) {
         const fromStorage = localStorage.getItem(key);
@@ -216,7 +283,11 @@ function local_writable(key, initialValue) {
         subscribe,
         set: (value) => {
             if (browser) {
-                localStorage.setItem(key, JSON.stringify(value));
+                try {
+                    localStorage.setItem(key, JSON.stringify(value));
+                } catch (e) {
+                    console.error("localStorage quota exceeded for local_writable", e);
+                }
             }
             set(value);
         },
@@ -224,7 +295,11 @@ function local_writable(key, initialValue) {
             update(currentValue => {
                 const newValue = fn(currentValue);
                 if (browser) {
-                    localStorage.setItem(key, JSON.stringify(newValue));
+                    try {
+                        localStorage.setItem(key, JSON.stringify(newValue));
+                    } catch (e) {
+                        console.error("localStorage quota exceeded for local_writable", e);
+                    }
                 }
                 return newValue;
             });
