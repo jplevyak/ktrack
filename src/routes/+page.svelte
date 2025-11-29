@@ -101,6 +101,7 @@
     }
     if (edit != undefined) {
       document.getElementById("done").onclick = function () {
+        save_day();
         edit_store.set(undefined);
         goto("/history");
       };
