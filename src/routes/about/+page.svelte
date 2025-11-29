@@ -52,7 +52,7 @@
 
   function download_json(filename, data) {
     if (!data) return;
-    const blob = new Blob([JSON.stringify(data, null, 2)], {
+    const blob = new Blob([JSON.stringify(data.getData(), null, 2)], {
       type: "application/json",
     });
     const url = URL.createObjectURL(blob);
