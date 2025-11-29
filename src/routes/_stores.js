@@ -86,16 +86,22 @@ export function synced_store(key, initialValue, sync, fromJSON) {
       }
 
       // Notify Svelte of mutated value.
-      // Note: standard writable skips notification if object reference is same.
-      // We force update by passing a new reference if possible, or relying on Svelte 5 signals/proxies if applicable.
-      // For Svelte 4/standard stores, we might need to trigger a change.
-      // However, since we are just fixing the corruption issue, we focus on persistence.
-      svelteSet(currentValue);
-
-      if (browser) {
-        localStorage.setItem(key, JSON.stringify(currentValue));
-        localStorage.setItem(dirtyKey, 'false');
+      if (fromJSON) {
+          // Recreate object to force Svelte update (change reference)
+          const newValue = fromJSON(currentValue.toJSON());
+          svelteSet(newValue);
+          if (browser) {
+            localStorage.setItem(key, JSON.stringify(newValue));
+            localStorage.setItem(dirtyKey, 'false');
+          }
+      } else {
+          svelteSet(currentValue);
+          if (browser) {
+            localStorage.setItem(key, JSON.stringify(currentValue));
+            localStorage.setItem(dirtyKey, 'false');
+          }
       }
+      
       isDirty = false;
       status.set('idle');
       console.log('Sync successful', key);
