@@ -333,12 +333,8 @@ export class CollabJSON {
   }
 
   updateItem(path, newData) {
-    if (!path || path.length === 0) {
-        this.root = this._plainToCrdt(newData); // Overwrite root
-        return;
-    }
-
-    this._applyAndStore({ type: 'UPDATE_ITEM', path, data: newData, timestamp: this._tick() });
+    const p = path || [];
+    this._applyAndStore({ type: 'UPDATE_ITEM', path: p, data: newData, timestamp: this._tick() });
   }
 
   prune(pruneFn, clientRequestData) {
@@ -457,6 +453,10 @@ export class CollabJSON {
         break;
 
       case 'UPDATE_ITEM':
+        if (op.path.length === 0) {
+            this.root = this._plainToCrdt(op.data);
+            break;
+        }
         const updateRes = this._traverse(op.path);
         if (updateRes && updateRes.parent) {
             const { parent, key, node } = updateRes;

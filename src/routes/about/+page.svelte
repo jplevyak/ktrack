@@ -65,6 +65,24 @@
     URL.revokeObjectURL(url);
   }
 
+  function upload_json(store, file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        store.update((doc) => {
+          doc.updateItem([], data);
+          return doc;
+        });
+      } catch (error) {
+        console.error("Error uploading JSON:", error);
+        alert("Failed to upload JSON. Check console for details.");
+      }
+    };
+    reader.readAsText(file);
+  }
+
   onMount(async () => {
     let username_input = document.getElementById("username");
     let password_input = document.getElementById("password");
@@ -126,21 +144,78 @@ is lost.
 <br /><br />
 Today
 <button on:click={() => download_json("today.json", today)}>Download</button>
+<input
+  type="file"
+  id="upload_today"
+  style="display:none"
+  accept=".json"
+  on:change={(e) => upload_json(today_store, e.target.files[0])}
+/>
+<button on:click={() => document.getElementById("upload_today").click()}
+  >Upload</button
+>
 <ul>
-  <li> Server Check Time: {today.checked ? new Date(today.checked).toString() : "unsynced"} </li>
-  <li> Server Sync Time: {today.synced ? new Date(today.synced).toString() : "unsynced"} </li>
+  <li>
+    Server Check Time: {today.checked
+      ? new Date(today.checked).toString()
+      : "unsynced"}
+  </li>
+  <li>
+    Server Sync Time: {today.synced
+      ? new Date(today.synced).toString()
+      : "unsynced"}
+  </li>
 </ul>
 Favorites
-<button on:click={() => download_json("favorites.json", favorites)}>Download</button>
+<button on:click={() => download_json("favorites.json", favorites)}
+  >Download</button
+>
+<input
+  type="file"
+  id="upload_favorites"
+  style="display:none"
+  accept=".json"
+  on:change={(e) => upload_json(favorites_store, e.target.files[0])}
+/>
+<button on:click={() => document.getElementById("upload_favorites").click()}
+  >Upload</button
+>
 <ul>
-  <li> Server Check Time: {favorites.checked ? new Date(favorites.checked).toString() : "unsynced"} </li>
-  <li> Server Sync Time: {favorites.synced ? new Date(favorites.synced).toString() : "unsynced"} </li>
+  <li>
+    Server Check Time: {favorites.checked
+      ? new Date(favorites.checked).toString()
+      : "unsynced"}
+  </li>
+  <li>
+    Server Sync Time: {favorites.synced
+      ? new Date(favorites.synced).toString()
+      : "unsynced"}
+  </li>
 </ul>
 History
-<button on:click={() => download_json("history.json", history)}>Download</button>
+<button on:click={() => download_json("history.json", history)}>Download</button
+>
+<input
+  type="file"
+  id="upload_history"
+  style="display:none"
+  accept=".json"
+  on:change={(e) => upload_json(history_store, e.target.files[0])}
+/>
+<button on:click={() => document.getElementById("upload_history").click()}
+  >Upload</button
+>
 <ul>
-  <li> Server Check Time: {history.checked ? new Date(history.checked).toString() : "unsynced"} </li>
-  <li> Server Sync Time: {history.synced ? new Date(history.synced).toString() : "unsynced"} </li>
+  <li>
+    Server Check Time: {history.checked
+      ? new Date(history.checked).toString()
+      : "unsynced"}
+  </li>
+  <li>
+    Server Sync Time: {history.synced
+      ? new Date(history.synced).toString()
+      : "unsynced"}
+  </li>
 </ul>
 
 <style>
