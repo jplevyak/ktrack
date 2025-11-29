@@ -380,7 +380,7 @@ export const history_store = synced_store("history", make_history(), sync_histor
 
 export function add_item(item, today, edit, profile) {
   if (edit != undefined) {
-    let edit_data = edit.toData();
+    let edit_data = edit.getData();
     if (Date.now() - edit_data.start_edit > 10 * 60 * 1000) { // 10 min.
       edit_store.set(undefined);
       edit = undefined;
