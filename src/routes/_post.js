@@ -87,3 +87,49 @@ export async function do_post(req, dbname, db, prune, defaultJSON) {
   }
   return await do_post_internal(req, syncRequest, username, dbname, db, prune, defaultJSON);
 }
+
+export async function do_upload(req, dbname, db, prune, defaultJSON) {
+  const username = req.url.searchParams.get("username");
+  const password = req.url.searchParams.get("password");
+
+  if (!username || !password) {
+    return new Response(JSON.stringify({ err: "Missing username or password" }), { status: 401 });
+  }
+
+  let p;
+  try {
+    const value = await profile.get(username);
+    p = JSON.parse(value);
+  } catch (e) {
+    return new Response(JSON.stringify({ err: "Authentication failed" }), { status: 401 });
+  }
+
+  if (p.username != username || p.password != password) {
+    return new Response(JSON.stringify({ err: "Authentication failed" }), { status: 401 });
+  }
+
+  let data;
+  try {
+    data = await req.request.json();
+  } catch (e) {
+    return new Response(JSON.stringify({ err: "Invalid JSON body" }), { status: 400 });
+  }
+
+  let db_value_str;
+  try {
+    db_value_str = await db.get(username);
+  } catch (e) {
+    if (e.code === 'LEVEL_NOT_FOUND') {
+      db_value_str = undefined;
+    } else {
+      throw e;
+    }
+  }
+
+  let server_doc = CollabJSON.loadOrInit(db_value_str, null, defaultJSON, { clientId: 'server' });
+  server_doc.updateItem([], data);
+
+  await db.put(username, JSON.stringify(server_doc.toJSON()));
+
+  return new Response(JSON.stringify({ ok: true }));
+}
