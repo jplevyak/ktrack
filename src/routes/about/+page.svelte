@@ -154,6 +154,7 @@ Today
 <button on:click={() => document.getElementById("upload_today").click()}
   >Upload</button
 >
+<button on:click={() => today_store.sync()}>Sync</button>
 <ul>
   <li>
     Server Check Time: {today.checked
@@ -180,6 +181,7 @@ Favorites
 <button on:click={() => document.getElementById("upload_favorites").click()}
   >Upload</button
 >
+<button on:click={() => favorites_store.sync()}>Sync</button>
 <ul>
   <li>
     Server Check Time: {favorites.checked
@@ -205,6 +207,7 @@ History
 <button on:click={() => document.getElementById("upload_history").click()}
   >Upload</button
 >
+<button on:click={() => history_store.sync()}>Sync</button>
 <ul>
   <li>
     Server Check Time: {history.checked
