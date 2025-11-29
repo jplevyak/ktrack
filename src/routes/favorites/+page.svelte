@@ -85,7 +85,7 @@
     results = [];
     for (let f in found) {
       results_map.set(f, found[f].ref);
-      results.push(favorites_data.get[found[f].ref]);
+      results.push(favorites_data[found[f].ref]);
     }
   }
 
