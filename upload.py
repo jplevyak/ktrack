@@ -6,8 +6,8 @@ def upload(url, username, password, filename):
     with open(filename, 'r') as f:
         data = json.load(f)
     
-    full_url = f"{url}?username={username}&password={password}"
-    response = requests.put(full_url, json=data)
+    # Use HTTP Basic Authentication
+    response = requests.put(url, json=data, auth=(username, password))
     
     if response.status_code == 200:
         print(f"Successfully uploaded {filename}")

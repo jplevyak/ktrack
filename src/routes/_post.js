@@ -89,11 +89,20 @@ export async function do_post(req, dbname, db, prune, defaultJSON) {
 }
 
 export async function do_upload(req, dbname, db, prune, defaultJSON) {
-  const username = req.url.searchParams.get("username");
-  const password = req.url.searchParams.get("password");
+  const authHeader = req.request.headers.get("Authorization");
+  if (!authHeader || !authHeader.startsWith("Basic ")) {
+    return new Response(JSON.stringify({ err: "Missing or invalid Authorization header" }), { 
+      status: 401, 
+      headers: { 'WWW-Authenticate': 'Basic realm="KTrack"' } 
+    });
+  }
+
+  const base64Credentials = authHeader.split(" ")[1];
+  const credentials = atob(base64Credentials);
+  const [username, password] = credentials.split(":");
 
   if (!username || !password) {
-    return new Response(JSON.stringify({ err: "Missing username or password" }), { status: 401 });
+    return new Response(JSON.stringify({ err: "Invalid credentials format" }), { status: 401 });
   }
 
   let p;
