@@ -86,20 +86,10 @@ export function synced_store(key, initialValue, sync, fromJSON) {
       }
 
       // Notify Svelte of mutated value.
-      if (fromJSON) {
-          // Recreate object to force Svelte update (change reference)
-          const newValue = fromJSON(currentValue.toJSON());
-          svelteSet(newValue);
-          if (browser) {
-            localStorage.setItem(key, JSON.stringify(newValue));
-            localStorage.setItem(dirtyKey, 'false');
-          }
-      } else {
-          svelteSet(currentValue);
-          if (browser) {
-            localStorage.setItem(key, JSON.stringify(currentValue));
-            localStorage.setItem(dirtyKey, 'false');
-          }
+      svelteSet(currentValue);
+      if (browser) {
+        localStorage.setItem(key, JSON.stringify(currentValue));
+        localStorage.setItem(dirtyKey, 'false');
       }
       
       isDirty = false;
