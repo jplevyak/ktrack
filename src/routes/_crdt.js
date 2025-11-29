@@ -517,6 +517,8 @@ export class CollabJSON {
       dvv: Object.fromEntries(this.dvv),
       snapshot: this.snapshot,
       snapshotDvv: Object.fromEntries(this.snapshotDvv),
+      checked: this.checked,
+      synced: this.synced
     };
   }
 
@@ -535,6 +537,9 @@ export class CollabJSON {
     if (state.clock !== undefined) {
         doc.clock = state.clock;
     }
+
+    if (state.checked !== undefined) doc.checked = state.checked;
+    if (state.synced !== undefined) doc.synced = state.synced;
 
     if (state.history) {
         doc.history = state.history || [];
