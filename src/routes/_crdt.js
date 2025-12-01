@@ -61,7 +61,7 @@ export class CollabJSON {
     return mid;
   }
 
-  _plainToCrdt(data) {
+  _plainToCrdt(data, timestamp = 0) {
     if (Array.isArray(data)) {
         const crdtArray = { [CRDT_ARRAY_MARKER]: true, items: {}, metadata: {} };
         let sortKey = 1.0;
@@ -69,9 +69,9 @@ export class CollabJSON {
             const itemId = this._generateId();
             crdtArray.items[itemId] = {
                 id: itemId,
-                data: this._plainToCrdt(itemData),
+                data: this._plainToCrdt(itemData, timestamp),
                 sortKey: sortKey,
-                updated: 0,
+                updated: timestamp,
                 _deleted: false
             };
             sortKey += 1.0;
@@ -80,8 +80,8 @@ export class CollabJSON {
     } else if (typeof data === 'object' && data !== null) {
         const newObj = { metadata: {} };
         for (const key in data) {
-            newObj[key] = this._plainToCrdt(data[key]);
-            newObj.metadata[key] = { updated: 0, _deleted: false };
+            newObj[key] = this._plainToCrdt(data[key], timestamp);
+            newObj.metadata[key] = { updated: timestamp, _deleted: false };
         }
         return newObj;
     }
@@ -426,7 +426,7 @@ export class CollabJSON {
             item = targetArray.items[op.itemId] = { id: op.itemId };
         }
         if (!item.updated || op.timestamp >= item.updated) {
-            item.data = this._plainToCrdt(op.data);
+            item.data = this._plainToCrdt(op.data, op.timestamp);
             item.sortKey = op.sortKey;
             item.updated = op.timestamp;
             item._deleted = false;
@@ -463,7 +463,7 @@ export class CollabJSON {
 
       case 'UPDATE_ITEM':
         if (op.path.length === 0) {
-            this.root = this._plainToCrdt(op.data);
+            this.root = this._plainToCrdt(op.data, op.timestamp);
             break;
         }
         const updateRes = this._traverse(op.path);
@@ -473,11 +473,11 @@ export class CollabJSON {
             if (itemToUpdate && op.timestamp <= (itemToUpdate.updated || 0)) break;
 
             if (parent[CRDT_ARRAY_MARKER]) {
-                node.data = this._plainToCrdt(op.data);
+                node.data = this._plainToCrdt(op.data, op.timestamp);
                 node.updated = op.timestamp;
                 node._deleted = false;
             } else {
-                parent[key] = this._plainToCrdt(op.data);
+                parent[key] = this._plainToCrdt(op.data, op.timestamp);
                 if (!parent.metadata) parent.metadata = {};
                 parent.metadata[key] = { updated: op.timestamp, _deleted: false };
             }
@@ -491,7 +491,7 @@ export class CollabJSON {
                 }
 
                 if (!Object.prototype.hasOwnProperty.call(container, segment) || typeof container[segment] !== 'object' || container[segment] === null) {
-                    container[segment] = this._plainToCrdt({});
+                    container[segment] = this._plainToCrdt({}, op.timestamp);
                     if (!container.metadata) container.metadata = {};
                     container.metadata[segment] = { updated: op.timestamp, _deleted: false };
                 }
@@ -506,7 +506,7 @@ export class CollabJSON {
 
             if (typeof parentContainer !== 'object' || parentContainer === null) break;
 
-            parentContainer[finalKey] = this._plainToCrdt(op.data);
+            parentContainer[finalKey] = this._plainToCrdt(op.data, op.timestamp);
             if (!parentContainer.metadata) parentContainer.metadata = {};
             parentContainer.metadata[finalKey] = { updated: op.timestamp, _deleted: false };
         }
