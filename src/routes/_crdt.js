@@ -61,27 +61,114 @@ export class CollabJSON {
     return mid;
   }
 
-  _plainToCrdt(data, timestamp = 0) {
+  _plainToCrdt(data, timestamp = 0, existingNode = null) {
     if (Array.isArray(data)) {
         const crdtArray = { [CRDT_ARRAY_MARKER]: true, items: {}, metadata: {} };
+        
+        // Get all existing items (including deleted) sorted by sortKey
+        let existingItems = [];
+        if (existingNode && existingNode[CRDT_ARRAY_MARKER]) {
+            existingItems = Object.values(existingNode.items)
+                .sort((a, b) => a.sortKey - b.sortKey || (a.id < b.id ? -1 : 1));
+            Object.assign(crdtArray.metadata, existingNode.metadata);
+        }
+
         let sortKey = 1.0;
+        let searchIdx = 0;
+
         data.forEach(itemData => {
-            const itemId = this._generateId();
-            crdtArray.items[itemId] = {
-                id: itemId,
-                data: this._plainToCrdt(itemData, timestamp),
-                sortKey: sortKey,
-                updated: timestamp,
-                _deleted: false
-            };
+            let matchIdx = -1;
+            
+            // Search for a content match in existing items
+            for (let i = searchIdx; i < existingItems.length; i++) {
+                const existingItem = existingItems[i];
+                const existingPlain = this._crdtToPlain(existingItem.data);
+                if (JSON.stringify(existingPlain) === JSON.stringify(itemData)) {
+                    matchIdx = i;
+                    break;
+                }
+            }
+
+            if (matchIdx !== -1) {
+                // Found a match. Process skipped items as deleted.
+                for (let i = searchIdx; i < matchIdx; i++) {
+                    const skipped = existingItems[i];
+                    crdtArray.items[skipped.id] = {
+                        ...skipped,
+                        updated: timestamp,
+                        _deleted: true
+                    };
+                }
+
+                // Reuse the matched item
+                const matched = existingItems[matchIdx];
+                // Heuristic: If it was deleted and content matches, keep it deleted (stale upload).
+                // Otherwise, it's present.
+                const shouldBeDeleted = matched._deleted; 
+
+                crdtArray.items[matched.id] = {
+                    id: matched.id,
+                    data: this._plainToCrdt(itemData, timestamp, matched.data),
+                    sortKey: sortKey,
+                    updated: timestamp,
+                    _deleted: shouldBeDeleted
+                };
+
+                searchIdx = matchIdx + 1;
+            } else {
+                // No match found. Create new item.
+                const itemId = this._generateId();
+                crdtArray.items[itemId] = {
+                    id: itemId,
+                    data: this._plainToCrdt(itemData, timestamp),
+                    sortKey: sortKey,
+                    updated: timestamp,
+                    _deleted: false
+                };
+            }
             sortKey += 1.0;
         });
+
+        // Process remaining existing items as deleted
+        for (let i = searchIdx; i < existingItems.length; i++) {
+            const remaining = existingItems[i];
+            crdtArray.items[remaining.id] = {
+                ...remaining,
+                updated: timestamp,
+                _deleted: true
+            };
+        }
+
         return crdtArray;
     } else if (typeof data === 'object' && data !== null) {
         const newObj = { metadata: {} };
+        const existingMeta = (existingNode && existingNode.metadata) ? existingNode.metadata : {};
+        
+        Object.assign(newObj.metadata, existingMeta);
+
         for (const key in data) {
-            newObj[key] = this._plainToCrdt(data[key], timestamp);
-            newObj.metadata[key] = { updated: timestamp, _deleted: false };
+            const existingChild = (existingNode && existingNode[key]) ? existingNode[key] : null;
+            
+            let isDeleted = false;
+            if (existingMeta[key] && existingMeta[key]._deleted) {
+                 const existingPlain = existingChild ? this._crdtToPlain(existingChild) : undefined;
+                 if (JSON.stringify(existingPlain) === JSON.stringify(data[key])) {
+                     isDeleted = true;
+                 }
+            }
+
+            newObj[key] = this._plainToCrdt(data[key], timestamp, existingChild);
+            newObj.metadata[key] = { updated: timestamp, _deleted: isDeleted };
+        }
+        
+        if (existingNode) {
+            for (const key in existingNode) {
+                if (key === 'metadata') continue;
+                if (!(key in data)) {
+                    newObj[key] = existingNode[key];
+                    newObj.metadata[key] = { updated: timestamp, _deleted: true };
+                }
+            }
         }
         return newObj;
     }
@@ -463,7 +550,7 @@ export class CollabJSON {
 
       case 'UPDATE_ITEM':
         if (op.path.length === 0) {
-            this.root = this._plainToCrdt(op.data, op.timestamp);
+            this.root = this._plainToCrdt(op.data, op.timestamp, this.root);
             break;
         }
         const updateRes = this._traverse(op.path);
@@ -473,11 +560,11 @@ export class CollabJSON {
             if (itemToUpdate && op.timestamp <= (itemToUpdate.updated || 0)) break;
 
             if (parent[CRDT_ARRAY_MARKER]) {
-                node.data = this._plainToCrdt(op.data, op.timestamp);
+                node.data = this._plainToCrdt(op.data, op.timestamp, node.data);
                 node.updated = op.timestamp;
                 node._deleted = false;
             } else {
-                parent[key] = this._plainToCrdt(op.data, op.timestamp);
+                parent[key] = this._plainToCrdt(op.data, op.timestamp, parent[key]);
                 if (!parent.metadata) parent.metadata = {};
                 parent.metadata[key] = { updated: op.timestamp, _deleted: false };
             }
@@ -506,7 +593,7 @@ export class CollabJSON {
 
             if (typeof parentContainer !== 'object' || parentContainer === null) break;
 
-            parentContainer[finalKey] = this._plainToCrdt(op.data, op.timestamp);
+            parentContainer[finalKey] = this._plainToCrdt(op.data, op.timestamp, parentContainer[finalKey]);
             if (!parentContainer.metadata) parentContainer.metadata = {};
             parentContainer.metadata[finalKey] = { updated: op.timestamp, _deleted: false };
         }
