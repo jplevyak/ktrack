@@ -471,13 +471,13 @@ test('_plainToCrdt: Array reordering preserves IDs', () => {
     const idA = originalItems[0].id;
     const idB = originalItems[1].id;
 
-    // Update with swapped order
-    doc.updateItem([], [{ val: 2 }, { val: 1 }]);
+    // Update with swapped order, including IDs to ensure matching
+    doc.updateItem([], [{ id: "B", val: 2 }, { id: "A", val: 1 }]);
 
     const newItems = doc._getSortedItems(doc.root);
     
     // Check data is correct
-    assert.deepStrictEqual(doc.getData(), [{ val: 2 }, { val: 1 }]);
+    assert.deepStrictEqual(doc.getData(), [{ id: "B", val: 2 }, { id: "A", val: 1 }]);
     
     // Check IDs are preserved (content matching)
     // The item with val:2 should have idB

@@ -62,6 +62,16 @@ export class CollabJSON {
   }
 
   _plainToCrdt(data, timestamp = 0, existingNode = null) {
+    // Check for type mismatch between data and existingNode
+    if (existingNode) {
+        const isExistingArray = !!existingNode[CRDT_ARRAY_MARKER];
+        const isDataArray = Array.isArray(data);
+        // If types differ, treat existingNode as null (replacement)
+        if (isExistingArray !== isDataArray) {
+            existingNode = null;
+        }
+    }
+
     if (Array.isArray(data)) {
         const crdtArray = { [CRDT_ARRAY_MARKER]: true, items: {}, metadata: {} };
         
