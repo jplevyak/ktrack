@@ -153,14 +153,22 @@ export class CollabJSON {
 
         return crdtArray;
     } else if (typeof data === 'object' && data !== null) {
-        const newObj = { metadata: {} };
+        // Optimization: Store default timestamp for the object to avoid redundant metadata
+        const newObj = { metadata: { _ts: timestamp } };
         const existingMeta = (existingNode && existingNode.metadata) ? existingNode.metadata : {};
         
         Object.assign(newObj.metadata, existingMeta);
+        // Ensure _ts is updated to current timestamp if we are refreshing the object
+        newObj.metadata._ts = timestamp;
 
         for (const key in data) {
             const existingChild = (existingNode && existingNode[key]) ? existingNode[key] : null;
-            const meta = existingMeta[key];
+            
+            // Resolve existing metadata, handling default _ts
+            let meta = existingMeta[key];
+            if (!meta && existingChild && existingMeta._ts) {
+                meta = { updated: existingMeta._ts, _deleted: false };
+            }
             
             if (meta && meta.updated > timestamp) {
                 // Local is newer. Keep local value.
@@ -169,7 +177,7 @@ export class CollabJSON {
             } else {
                 // Incoming is newer.
                 newObj[key] = this._plainToCrdt(data[key], timestamp, existingChild);
-                newObj.metadata[key] = { updated: timestamp, _deleted: false };
+                // Optimization: Don't set metadata[key] if it matches the default { updated: timestamp, _deleted: false }
             }
         }
         
@@ -177,7 +185,11 @@ export class CollabJSON {
             for (const key in existingNode) {
                 if (key === 'metadata') continue;
                 if (!(key in data)) {
-                    const meta = existingNode.metadata ? existingNode.metadata[key] : undefined;
+                    let meta = existingMeta[key];
+                    if (!meta && existingMeta._ts) {
+                        meta = { updated: existingMeta._ts, _deleted: false };
+                    }
+
                     if (meta && meta.updated > timestamp) {
                         // Local is newer (and present). Keep it.
                         newObj[key] = existingNode[key];
@@ -575,12 +587,28 @@ export class CollabJSON {
         } else {
             // For objects, use the key from the path
             const key = op.path[op.path.length - 1];
-            if (container.metadata && container.metadata[key]) {
+            
+            // Resolve metadata (explicit or default)
+            let targetUpdated = 0;
+            if (container.metadata) {
+                if (container.metadata[key]) {
+                    targetUpdated = container.metadata[key].updated;
+                } else if (container.metadata._ts && container[key]) {
+                    targetUpdated = container.metadata._ts;
+                }
+            }
+
+            if (op.timestamp > targetUpdated) {
+                if (!container.metadata) container.metadata = {};
+                // Materialize metadata if it was implicit
+                if (!container.metadata[key]) {
+                    container.metadata[key] = { updated: targetUpdated, _deleted: false };
+                }
                 targetMeta = container.metadata[key];
             }
         }
 
-        if (targetMeta && op.timestamp > (targetMeta.updated || 0)) {
+        if (targetMeta) {
             targetMeta._deleted = true;
             targetMeta.updated = op.timestamp;
         }
@@ -594,8 +622,20 @@ export class CollabJSON {
         const updateRes = this._traverse(op.path);
         if (updateRes && updateRes.parent) {
             const { parent, key, node } = updateRes;
-            const itemToUpdate = parent[CRDT_ARRAY_MARKER] ? node : parent.metadata[key];
-            if (itemToUpdate && op.timestamp <= (itemToUpdate.updated || 0)) break;
+            
+            let itemUpdated = 0;
+            if (parent[CRDT_ARRAY_MARKER]) {
+                itemUpdated = node ? node.updated : 0;
+            } else {
+                // Resolve metadata for object property
+                if (parent.metadata && parent.metadata[key]) {
+                    itemUpdated = parent.metadata[key].updated;
+                } else if (parent.metadata && parent.metadata._ts && parent[key]) {
+                    itemUpdated = parent.metadata._ts;
+                }
+            }
+
+            if (itemUpdated && op.timestamp <= itemUpdated) break;
 
             if (parent[CRDT_ARRAY_MARKER]) {
                 node.data = this._plainToCrdt(op.data, op.timestamp, node.data);
