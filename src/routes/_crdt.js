@@ -732,7 +732,8 @@ export class CollabJSON {
     if (state.history) {
         doc.history = state.history || [];
         doc.dvv = new Map(Object.entries(state.dvv || {}));
-        doc.history.forEach(op => doc.applyOp(op));
+        // Do not re-apply history ops here. The 'root' (snapshot) is assumed to be the result of applying these ops.
+        // Re-applying them can be destructive if the ops contain plain data (without IDs) and overwrite existing items.
     }
     return doc;
   }
@@ -757,7 +758,13 @@ export class CollabJSON {
   static loadOrInit(stateString, syncRequest, defaultJson, options = {}) {
     const opts = { ...options, clientId: 'server' };
     if (stateString) {
-        return CollabJSON.fromJSON(JSON.parse(stateString), opts);
+        const parsed = JSON.parse(stateString);
+        // Heuristic to check if it's a CRDT state object
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && (parsed.root || parsed.clock !== undefined)) {
+             return CollabJSON.fromJSON(parsed, opts);
+        }
+        // Otherwise treat as plain JSON data
+        return new CollabJSON(stateString, { ...opts, id: syncRequest ? syncRequest.docId : undefined });
     }
     if (syncRequest && syncRequest.snapshot) {
         return CollabJSON.fromSnapshot(syncRequest.snapshot, syncRequest.snapshotDvv, syncRequest.docId, opts);
