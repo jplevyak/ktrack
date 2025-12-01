@@ -420,6 +420,7 @@ test('Upload: Client ops predating upload are overwritten (LWW)', () => {
 
     // Server receives upload (Timestamp T2 > T1)
     // We ensure server clock is ahead or we rely on tick() incrementing
+    server.clock = client.clock + 10;
     server.updateItem([], { key: 'server' });
 
     // Client syncs

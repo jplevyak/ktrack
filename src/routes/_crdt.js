@@ -74,60 +74,42 @@ export class CollabJSON {
         }
 
         let sortKey = 1.0;
-        let searchIdx = 0;
+        const usedIds = new Set();
 
+        // Step 1: Process new items, trying to match with existing ones
         data.forEach(itemData => {
-            let matchIdx = -1;
-            
-            // Search for a content match in existing items
-            for (let i = searchIdx; i < existingItems.length; i++) {
-                const existingItem = existingItems[i];
+            let matchedItem = null;
+
+            // Search for a content match in existing items that haven't been used yet
+            for (const existingItem of existingItems) {
+                if (usedIds.has(existingItem.id)) continue;
+
                 const existingPlain = this._crdtToPlain(existingItem.data);
                 if (JSON.stringify(existingPlain) === JSON.stringify(itemData)) {
-                    matchIdx = i;
+                    matchedItem = existingItem;
                     break;
                 }
             }
 
-            if (matchIdx !== -1) {
-                // Found a match. Process skipped items.
-                for (let i = searchIdx; i < matchIdx; i++) {
-                    const skipped = existingItems[i];
-                    if (skipped.updated > timestamp) {
-                        // Local item is newer, preserve it as is.
-                        crdtArray.items[skipped.id] = skipped;
-                    } else {
-                        // Incoming update is newer (implicit delete).
-                        crdtArray.items[skipped.id] = {
-                            ...skipped,
-                            updated: timestamp,
-                            _deleted: true
-                        };
-                    }
-                }
-
-                // Reuse the matched item
-                const matched = existingItems[matchIdx];
+            if (matchedItem) {
+                usedIds.add(matchedItem.id);
                 
-                if (matched.updated > timestamp) {
-                    // Local item is newer. Preserve its state (including _deleted status).
-                    // We update sortKey to match the incoming list structure, but keep the item's data/status.
-                    crdtArray.items[matched.id] = {
-                        ...matched,
+                if (matchedItem.updated > timestamp) {
+                    // Local item is newer. Preserve its data and deleted status, but update sortKey to match new order.
+                    crdtArray.items[matchedItem.id] = {
+                        ...matchedItem,
                         sortKey: sortKey
                     };
                 } else {
-                    // Incoming update is newer. Overwrite.
-                    crdtArray.items[matched.id] = {
-                        id: matched.id,
-                        data: this._plainToCrdt(itemData, timestamp, matched.data),
+                    // Incoming update is newer. Overwrite (resurrect if deleted).
+                    crdtArray.items[matchedItem.id] = {
+                        id: matchedItem.id,
+                        data: this._plainToCrdt(itemData, timestamp, matchedItem.data),
                         sortKey: sortKey,
                         updated: timestamp,
                         _deleted: false
                     };
                 }
-
-                searchIdx = matchIdx + 1;
             } else {
                 // No match found. Create new item.
                 const itemId = this._generateId();
@@ -142,16 +124,17 @@ export class CollabJSON {
             sortKey += 1.0;
         });
 
-        // Process remaining existing items
-        for (let i = searchIdx; i < existingItems.length; i++) {
-            const remaining = existingItems[i];
-            if (remaining.updated > timestamp) {
+        // Step 2: Process remaining existing items (deletions)
+        for (const existingItem of existingItems) {
+            if (usedIds.has(existingItem.id)) continue;
+
+            if (existingItem.updated > timestamp) {
                 // Local is newer, preserve.
-                crdtArray.items[remaining.id] = remaining;
+                crdtArray.items[existingItem.id] = existingItem;
             } else {
                 // Incoming is newer (implicit delete).
-                crdtArray.items[remaining.id] = {
-                    ...remaining,
+                crdtArray.items[existingItem.id] = {
+                    ...existingItem,
                     updated: timestamp,
                     _deleted: true
                 };
@@ -184,7 +167,7 @@ export class CollabJSON {
             for (const key in existingNode) {
                 if (key === 'metadata') continue;
                 if (!(key in data)) {
-                    const meta = existingNode.metadata[key];
+                    const meta = existingNode.metadata ? existingNode.metadata[key] : undefined;
                     if (meta && meta.updated > timestamp) {
                         // Local is newer (and present). Keep it.
                         newObj[key] = existingNode[key];
