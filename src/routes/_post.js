@@ -139,12 +139,18 @@ export async function do_upload(req, dbname, db, prune, defaultJSON) {
   }
 
   let server_doc = CollabJSON.loadOrInit(db_value_str, null, defaultJSON, { clientId: 'server' });
-  server_doc.updateItem([], data);
+  
+  // Only update if the data has actually changed. This prevents generating redundant operations
+  // (and thus redundant sync traffic) if the upload endpoint is called repeatedly with the same data.
+  const currentData = server_doc.getData();
+  if (JSON.stringify(currentData) !== JSON.stringify(data)) {
+    server_doc.updateItem([], data);
 
-  // Commit ops to history and update DVV before saving.
-  server_doc.commitOps();
+    // Commit ops to history and update DVV before saving.
+    server_doc.commitOps();
 
-  await db.put(username, JSON.stringify(server_doc.toJSON()));
+    await db.put(username, JSON.stringify(server_doc.toJSON()));
+  }
 
   return new Response(JSON.stringify({ ok: true }));
 }
