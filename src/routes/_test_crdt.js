@@ -618,5 +618,76 @@ test('Upload: Regression check - Client receives upload op but LWW preserves new
     assert.deepStrictEqual(client.getData(), { key: 'client' });
 });
 
+test('Upload: Clients can exchange array updates after upload', () => {
+    const docId = 'upload-array-exchange';
+    const server = new CollabJSON("[]", { clientId: 'server', id: docId });
+    const client1 = new CollabJSON("[]", { clientId: 'c1', id: docId });
+    const client2 = new CollabJSON("[]", { clientId: 'c2', id: docId });
+
+    // 1. Upload happens (Server sets initial state)
+    server.updateItem([], [{ id: 'item1', val: 'uploaded' }]);
+    server.commitOps();
+
+    // 2. Clients sync to get upload
+    // Client 1 sync
+    let req1 = client1.getSyncRequest();
+    let res1 = server.getSyncResponse(req1);
+    client1.applySyncResponse(res1);
+
+    // Client 2 sync
+    let req2 = client2.getSyncRequest();
+    let res2 = server.getSyncResponse(req2);
+    client2.applySyncResponse(res2);
+
+    assert.deepStrictEqual(client1.getData(), [{ id: 'item1', val: 'uploaded' }]);
+    assert.deepStrictEqual(client2.getData(), [{ id: 'item1', val: 'uploaded' }]);
+
+    // 3. Client 1 adds an item at the end
+    client1.addItem([1], { id: 'item2', val: 'c1-add' });
+
+    // 4. Client 2 deletes the uploaded item (index 0) and adds another at the beginning
+    client2.deleteItem([0]); 
+    client2.addItem([0], { id: 'item3', val: 'c2-add' });
+
+    // 5. Sync Client 1 -> Server
+    req1 = client1.getSyncRequest();
+    res1 = server.getSyncResponse(req1); 
+    client1.applySyncResponse(res1); // C1 gets nothing new yet
+
+    // 6. Sync Client 2 -> Server
+    req2 = client2.getSyncRequest();
+    res2 = server.getSyncResponse(req2); // Server gets C2 ops, sends C1 ops to C2
+    client2.applySyncResponse(res2);
+
+    // 7. Sync Client 1 -> Server (to get C2's ops)
+    req1 = client1.getSyncRequest();
+    res1 = server.getSyncResponse(req1); // Server sends C2 ops to C1
+    client1.applySyncResponse(res1);
+
+    // 8. Verify convergence
+    const serverData = server.getData();
+    const c1Data = client1.getData();
+    const c2Data = client2.getData();
+
+    assert.deepStrictEqual(c1Data, c2Data);
+    assert.deepStrictEqual(c1Data, serverData);
+
+    // Verify content
+    assert.strictEqual(c1Data.length, 2);
+    const item2 = c1Data.find(i => i.id === 'item2');
+    const item3 = c1Data.find(i => i.id === 'item3');
+    assert.ok(item2, 'Item 2 should exist');
+    assert.ok(item3, 'Item 3 should exist');
+    assert.strictEqual(item2.val, 'c1-add');
+    assert.strictEqual(item3.val, 'c2-add');
+    assert.ok(!c1Data.find(i => i.id === 'item1'), 'Item 1 should be deleted');
+    
+    // Expected order: item3 (sortKey 0.5), item2 (sortKey 2.0)
+    assert.deepStrictEqual(c1Data, [
+        { id: 'item3', val: 'c2-add' },
+        { id: 'item2', val: 'c1-add' }
+    ]);
+});
+
 // Run all tests
 runTests();
