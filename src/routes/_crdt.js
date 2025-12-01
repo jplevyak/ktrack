@@ -748,10 +748,6 @@ export class CollabJSON {
     return req;
   }
 
-  requiresReset(syncRequest) {
-    return !!(this.id && syncRequest && syncRequest.docId && this.id !== syncRequest.docId);
-  }
-
   getResetResponse() {
     return {
       snapshot: this._getSnapshotData(),
@@ -787,9 +783,17 @@ export class CollabJSON {
     this.synced = Date.now();
   }
 
-  getSyncResponse({ dvv: clientDvv, ops: clientOps, clientId }) {
+  getSyncResponse(syncRequest) {
+    const { dvv: clientDvv, ops: clientOps, clientId, docId } = syncRequest;
+
+    // 1. Check for Document ID mismatch
+    if (this.id && docId && this.id !== docId) {
+        return this.getResetResponse();
+    }
+
     const clientDvvMap = new Map(Object.entries(clientDvv));
 
+    // 2. Check for History Gap (Pruning)
     if (this.snapshot) {
         let needsReset = false;
         for (const [cId, ts] of this.snapshotDvv.entries()) {
@@ -799,10 +803,12 @@ export class CollabJSON {
             }
         }
         if (needsReset) {
-            return { id: this.id, snapshot: this.snapshot, snapshotDvv: Object.fromEntries(this.snapshotDvv), reset: true };
+            // Send current state as reset
+            return this.getResetResponse();
         }
     }
 
+    // 3. Normal Sync
     clientOps.forEach(op => {
         this.applyOp(op);
         this.history.push(op);
