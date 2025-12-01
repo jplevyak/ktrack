@@ -495,7 +495,6 @@ export function check_for_new_day(t, profile) {
     const newData = new_day.getData();
 
     if (newData.timestamp) {
-        t.updateItem(['items'], '[]');
         t.updateItem(['timestamp'], newData.timestamp);
     }
 

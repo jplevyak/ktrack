@@ -648,6 +648,7 @@ export class CollabJSON {
       clientId: this.clientId,
       clock: this.clock,
       history: this.history,
+      ops: this.ops,
       dvv: Object.fromEntries(this.dvv),
       snapshot: this.snapshot,
       snapshotDvv: Object.fromEntries(this.snapshotDvv),
@@ -674,6 +675,10 @@ export class CollabJSON {
 
     if (state.checked !== undefined) doc.checked = state.checked;
     if (state.synced !== undefined) doc.synced = state.synced;
+
+    if (state.ops) {
+        doc.ops = state.ops;
+    }
 
     if (state.history) {
         doc.history = state.history || [];
