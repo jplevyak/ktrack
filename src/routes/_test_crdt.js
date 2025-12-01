@@ -388,6 +388,167 @@ test('Sync with a pruned server sends snapshot', () => {
     assert.deepStrictEqual(client2.getData(), server.getData());
 });
 
+// --- Upload / Server Overwrite Tests ---
+
+test('Upload: Server overwrite propagates to client', () => {
+    const docId = 'upload-doc-1';
+    const server = new CollabJSON('{"list": ["a"]}', { clientId: 'server', id: docId });
+    const client = new CollabJSON('{"list": ["a"]}', { clientId: 'c1', id: docId });
+
+    // Simulate upload: Server replaces root content
+    const newData = { list: ['b'] };
+    server.updateItem([], newData);
+    
+    // Client syncs
+    const req = client.getSyncRequest();
+    const res = server.getSyncResponse(req);
+    client.applySyncResponse(res);
+
+    assert.deepStrictEqual(client.getData(), newData);
+});
+
+test('Upload: Client ops predating upload are overwritten (LWW)', () => {
+    const docId = 'upload-doc-2';
+    const server = new CollabJSON('{"key": "initial"}', { clientId: 'server', id: docId });
+    const client = new CollabJSON('{"key": "initial"}', { clientId: 'c1', id: docId });
+
+    // Sync initial state
+    client.applySyncResponse(server.getSyncResponse(client.getSyncRequest()));
+
+    // Client makes a change (Timestamp T1)
+    client.updateItem(['key'], 'client');
+
+    // Server receives upload (Timestamp T2 > T1)
+    // We ensure server clock is ahead or we rely on tick() incrementing
+    server.updateItem([], { key: 'server' });
+
+    // Client syncs
+    const req = client.getSyncRequest();
+    const res = server.getSyncResponse(req);
+    client.applySyncResponse(res);
+
+    // Since server op (upload) is newer, it should win
+    assert.deepStrictEqual(client.getData(), { key: 'server' });
+});
+
+test('Upload: Client ops postdating upload persist', () => {
+    const docId = 'upload-doc-3';
+    const server = new CollabJSON('{"key": "initial"}', { clientId: 'server', id: docId });
+    const client = new CollabJSON('{"key": "initial"}', { clientId: 'c1', id: docId });
+
+    // Server receives upload (Timestamp T1)
+    server.updateItem([], { key: 'server' });
+
+    // Client syncs and gets the upload state
+    let req = client.getSyncRequest();
+    let res = server.getSyncResponse(req);
+    client.applySyncResponse(res);
+    assert.deepStrictEqual(client.getData(), { key: 'server' });
+
+    // Client makes a change (Timestamp T2 > T1)
+    client.updateItem(['key'], 'client');
+
+    // Client syncs again
+    req = client.getSyncRequest();
+    res = server.getSyncResponse(req);
+    client.applySyncResponse(res);
+
+    // Server should accept client's newer change
+    server.applyOp(req.ops[0]); // Simulate server processing request
+    
+    assert.deepStrictEqual(server.getData(), { key: 'client' });
+    assert.deepStrictEqual(client.getData(), { key: 'client' });
+});
+
+// --- _plainToCrdt Logic Tests ---
+
+test('_plainToCrdt: Array reordering preserves IDs', () => {
+    const doc = new CollabJSON('[{ "id": "A", "val": 1 }, { "id": "B", "val": 2 }]');
+    
+    // Get original IDs
+    const originalItems = doc._getSortedItems(doc.root);
+    const idA = originalItems[0].id;
+    const idB = originalItems[1].id;
+
+    // Update with swapped order
+    doc.updateItem([], [{ val: 2 }, { val: 1 }]);
+
+    const newItems = doc._getSortedItems(doc.root);
+    
+    // Check data is correct
+    assert.deepStrictEqual(doc.getData(), [{ val: 2 }, { val: 1 }]);
+    
+    // Check IDs are preserved (content matching)
+    // The item with val:2 should have idB
+    assert.strictEqual(newItems[0].id, idB);
+    // The item with val:1 should have idA
+    assert.strictEqual(newItems[1].id, idA);
+});
+
+test('_plainToCrdt: Array item deletion', () => {
+    const doc = new CollabJSON('[{ "val": 1 }, { "val": 2 }]');
+    
+    // Update with one item removed
+    doc.updateItem([], [{ val: 1 }]);
+
+    assert.deepStrictEqual(doc.getData(), [{ val: 1 }]);
+    
+    // Verify internal deletion (tombstone)
+    const root = doc._traverse([]).node;
+    const items = Object.values(root.items);
+    const deletedItem = items.find(i => i._deleted);
+    assert.ok(deletedItem, 'Should have a deleted item tombstone');
+    assert.deepStrictEqual(doc._crdtToPlain(deletedItem.data), { val: 2 });
+});
+
+test('_plainToCrdt: Object key deletion', () => {
+    const doc = new CollabJSON('{"a": 1, "b": 2}');
+    
+    // Update with key 'b' removed
+    doc.updateItem([], { a: 1 });
+
+    assert.deepStrictEqual(doc.getData(), { a: 1 });
+
+    // Verify tombstone
+    const root = doc._traverse([]).node;
+    assert.ok(root.metadata.b._deleted, 'Metadata for b should be marked deleted');
+});
+
+test('_plainToCrdt: Nested object updates', () => {
+    const doc = new CollabJSON('{"a": {"x": 1, "y": 2}}');
+    
+    // Update nested object: change x, remove y, add z
+    doc.updateItem([], { a: { x: 10, z: 3 } });
+
+    assert.deepStrictEqual(doc.getData(), { a: { x: 10, z: 3 } });
+});
+
+test('_plainToCrdt: Type switching (Object to Array)', () => {
+    const doc = new CollabJSON('{"a": 1}');
+    
+    // Overwrite object with array
+    doc.updateItem([], [1, 2]);
+
+    assert.deepStrictEqual(doc.getData(), [1, 2]);
+    
+    // Verify internal structure changed
+    const root = doc._traverse([]).node;
+    assert.ok(root['_crdt_array_'], 'Root should be marked as CRDT array');
+});
+
+test('_plainToCrdt: Type switching (Array to Object)', () => {
+    const doc = new CollabJSON('[1, 2]');
+    
+    // Overwrite array with object
+    doc.updateItem([], { a: 1 });
+
+    assert.deepStrictEqual(doc.getData(), { a: 1 });
+    
+    // Verify internal structure changed
+    const root = doc._traverse([]).node;
+    assert.ok(!root['_crdt_array_'], 'Root should NOT be marked as CRDT array');
+});
+
 
 // Run all tests
 runTests();
