@@ -137,12 +137,13 @@
       if (!y) return;
       let i = index;
       if (results_map != undefined) i = results_map.get(index);
-      favorites.deleteItem([i]);
+      favorites.deleteItem([Number(i)]);
       save(favorites);
     } else if (change == "edit") {
       editing_replace_index = index;
       if (results_map != undefined)
         editing_replace_index = results_map.get(index);
+      editing_replace_index = Number(editing_replace_index);
       let edit = { ...item };
       edit.source = "custom";
       editing = edit;
@@ -154,6 +155,7 @@
     } else if (change == "up") {
       let i = index;
       if (results_map != undefined) i = results_map.get(index);
+      i = Number(i);
       let j = i - 1;
       if (j >= 0) {
         favorites.moveItem([], i, i-1);
@@ -163,6 +165,7 @@
     } else if (change == "down") {
       let i = index;
       if (results_map != undefined) i = results_map.get(index);
+      i = Number(i);
       let j = i + 1;
       if (j < favorites.getData().length) {
         favorites.moveItem([], i, i+1);
