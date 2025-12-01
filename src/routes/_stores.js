@@ -1,6 +1,7 @@
 import { readable, writable, get } from "svelte/store";
 import { browser } from '$app/environment';
 import { CollabJSON } from "./_crdt.js";
+import { v4 as uuidv4 } from 'uuid';
 import {
   compare_date,
   get_date_info,
@@ -59,6 +60,22 @@ async function dbSet(key, value) {
   } catch (e) {
     console.error("DB Set Error", e);
   }
+}
+// ------------------------
+
+// --- Global Client ID ---
+let globalClientId;
+if (browser) {
+    globalClientId = localStorage.getItem('ktrack_client_id');
+    if (!globalClientId) {
+        globalClientId = uuidv4();
+        localStorage.setItem('ktrack_client_id', globalClientId);
+    }
+} else {
+    // For SSR, we don't have a persistent ID, but we can generate one or use a placeholder.
+    // Since SSR shouldn't be generating ops that persist to the client in this architecture,
+    // a random one is acceptable or 'server-render'.
+    globalClientId = uuidv4();
 }
 // ------------------------
 
@@ -371,12 +388,21 @@ async function sync_history(history) {
 function collab_from_json(parsed) {
     // Gracefully handle null/undefined if localStorage is empty.
     if (!parsed) return null;
-    return CollabJSON.fromJSON(parsed);
+    // Override clientId with global one
+    return CollabJSON.fromJSON(parsed, { clientId: globalClientId });
 }
 
-export const today_store = synced_store("today", make_today(), sync_today, collab_from_json);
-export const favorites_store = synced_store("favorites", make_favorites(), sync_favorites, collab_from_json);
-export const history_store = synced_store("history", make_history(), sync_history, collab_from_json);
+function init_store_value(maker) {
+    const doc = maker();
+    if (doc instanceof CollabJSON && globalClientId) {
+        doc.clientId = globalClientId;
+    }
+    return doc;
+}
+
+export const today_store = synced_store("today", init_store_value(make_today), sync_today, collab_from_json);
+export const favorites_store = synced_store("favorites", init_store_value(make_favorites), sync_favorites, collab_from_json);
+export const history_store = synced_store("history", init_store_value(make_history), sync_history, collab_from_json);
 
 export function add_item(item, today, edit, profile) {
   if (edit != undefined) {

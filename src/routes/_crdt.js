@@ -96,19 +96,6 @@ export class CollabJSON {
                 matchedItem = existingItems.find(i => i.id === targetId);
             }
 
-            // Strategy B: Match by Content (if no ID match found yet)
-            if (!matchedItem) {
-                for (const existingItem of existingItems) {
-                    if (usedIds.has(existingItem.id)) continue;
-
-                    const existingPlain = this._crdtToPlain(existingItem.data);
-                    if (JSON.stringify(existingPlain) === JSON.stringify(itemData)) {
-                        matchedItem = existingItem;
-                        break;
-                    }
-                }
-            }
-
             if (matchedItem) {
                 usedIds.add(matchedItem.id);
                 
@@ -716,7 +703,8 @@ export class CollabJSON {
     const doc = new CollabJSON(undefined, {
         ...options,
         id: state ? state.id : undefined,
-        clientId: (state && state.clientId) ? state.clientId : options.clientId
+        // Prioritize options.clientId if provided (e.g. global device ID), otherwise fallback to state or generate new
+        clientId: options.clientId || ((state && state.clientId) ? state.clientId : undefined)
     });
     if (!state) return doc;
 
