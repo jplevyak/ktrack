@@ -683,7 +683,10 @@ export class CollabJSON {
       this.dvv.set(clientId, Math.max(this.dvv.get(clientId) || 0, maxTs));
     }
 
-    const opsForClient = this.history.filter(op => (clientDvvMap.get(op.clientId) || 0) < op.timestamp);
+    const opsForClient = this.history.filter(op => {
+        if (op.clientId === clientId) return false;
+        return (clientDvvMap.get(op.clientId) || 0) < op.timestamp;
+    });
     return { ops: opsForClient, dvv: Object.fromEntries(this.dvv) };
   }
 }
