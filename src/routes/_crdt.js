@@ -757,7 +757,12 @@ export class CollabJSON {
   static loadOrInit(stateString, syncRequest, defaultJson, options = {}) {
     const opts = { ...options, clientId: 'server' };
     if (stateString) {
-        return CollabJSON.fromJSON(JSON.parse(stateString), opts);
+        const parsed = JSON.parse(stateString);
+        // Check if it looks like a serialized CRDT state
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && parsed.clock !== undefined && parsed.dvv) {
+            return CollabJSON.fromJSON(parsed, opts);
+        }
+        return new CollabJSON(stateString, { ...opts, id: syncRequest ? syncRequest.docId : undefined });
     }
     if (syncRequest && syncRequest.snapshot) {
         return CollabJSON.fromSnapshot(syncRequest.snapshot, syncRequest.snapshotDvv, syncRequest.docId, opts);
