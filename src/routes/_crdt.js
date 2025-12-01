@@ -90,14 +90,22 @@ export class CollabJSON {
         data.forEach(itemData => {
             let matchedItem = null;
 
-            // Search for a content match in existing items that haven't been used yet
-            for (const existingItem of existingItems) {
-                if (usedIds.has(existingItem.id)) continue;
+            // Strategy A: Match by ID (if provided in data)
+            if (itemData && typeof itemData === 'object' && itemData.id !== undefined) {
+                const targetId = String(itemData.id);
+                matchedItem = existingItems.find(i => i.id === targetId);
+            }
 
-                const existingPlain = this._crdtToPlain(existingItem.data);
-                if (JSON.stringify(existingPlain) === JSON.stringify(itemData)) {
-                    matchedItem = existingItem;
-                    break;
+            // Strategy B: Match by Content (if no ID match found yet)
+            if (!matchedItem) {
+                for (const existingItem of existingItems) {
+                    if (usedIds.has(existingItem.id)) continue;
+
+                    const existingPlain = this._crdtToPlain(existingItem.data);
+                    if (JSON.stringify(existingPlain) === JSON.stringify(itemData)) {
+                        matchedItem = existingItem;
+                        break;
+                    }
                 }
             }
 
@@ -122,7 +130,14 @@ export class CollabJSON {
                 }
             } else {
                 // No match found. Create new item.
-                const itemId = this._generateId();
+                // Use itemData.id as internal ID if available, otherwise generate one.
+                let itemId;
+                if (itemData && typeof itemData === 'object' && itemData.id !== undefined) {
+                    itemId = String(itemData.id);
+                } else {
+                    itemId = this._generateId();
+                }
+
                 crdtArray.items[itemId] = {
                     id: itemId,
                     data: this._plainToCrdt(itemData, timestamp),
