@@ -718,6 +718,9 @@ test('Upload: Deleted item from upload is not seen by new client', () => {
     // Verify server state
     assert.deepStrictEqual(server.getData(), [{ id: 'item2', val: 'B' }]);
 
+    // Verify client 1 state
+    assert.deepStrictEqual(client1.getData(), [{ id: 'item2', val: 'B' }]);
+
     // 5. Client 2 is created
     const client2 = new CollabJSON("[]", { clientId: 'c2', id: docId });
 
