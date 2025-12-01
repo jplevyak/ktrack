@@ -576,7 +576,10 @@ export class CollabJSON {
         const parentPath = op.path.slice(0, -1);
         const parentRes = this._traverse(parentPath);
         
-        if (!parentRes || !parentRes.node) break;
+        if (!parentRes || !parentRes.node) {
+          console.log('parentRes', parentRes);
+          break;
+        }
         const container = parentRes.node;
         
         let targetMeta = null;
@@ -585,6 +588,9 @@ export class CollabJSON {
             // For arrays, use itemId to identify the item to delete
             if (op.itemId && container.items[op.itemId]) {
                 targetMeta = container.items[op.itemId];
+                console.log('targetMeta', targetMeta);
+            } else {
+                console.log('targetMeta not found', op.itemId, JSON.stringify(parentRes));
             }
         } else {
             // For objects, use the key from the path
@@ -853,6 +859,7 @@ export class CollabJSON {
 
     // 3. Normal Sync
     clientOps.forEach(op => {
+        console.log(JSON.stringify(op));
         this.applyOp(op);
         this.history.push(op);
     });
