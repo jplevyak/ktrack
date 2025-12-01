@@ -689,5 +689,45 @@ test('Upload: Clients can exchange array updates after upload', () => {
     ]);
 });
 
+test('Upload: Deleted item from upload is not seen by new client', () => {
+    const docId = 'upload-delete-new-client';
+    const server = new CollabJSON("[]", { clientId: 'server', id: docId });
+    const client1 = new CollabJSON("[]", { clientId: 'c1', id: docId });
+
+    // 1. Upload happens (Server sets initial state with 2 items)
+    server.updateItem([], [{ id: 'item1', val: 'A' }, { id: 'item2', val: 'B' }]);
+    server.commitOps();
+
+    // 2. Client 1 syncs to get upload
+    let req1 = client1.getSyncRequest();
+    let res1 = server.getSyncResponse(req1);
+    client1.applySyncResponse(res1);
+
+    assert.deepStrictEqual(client1.getData(), [{ id: 'item1', val: 'A' }, { id: 'item2', val: 'B' }]);
+
+    // 3. Client 1 deletes item1
+    // item1 should be at index 0 because _plainToCrdt assigns sortKeys 1.0, 2.0
+    client1.deleteItem([0]); 
+
+    // 4. Client 1 syncs deletion to server
+    req1 = client1.getSyncRequest();
+    res1 = server.getSyncResponse(req1);
+    client1.applySyncResponse(res1); // Ack
+
+    // Verify server state
+    assert.deepStrictEqual(server.getData(), [{ id: 'item2', val: 'B' }]);
+
+    // 5. Client 2 is created
+    const client2 = new CollabJSON("[]", { clientId: 'c2', id: docId });
+
+    // 6. Client 2 syncs
+    let req2 = client2.getSyncRequest();
+    let res2 = server.getSyncResponse(req2);
+    client2.applySyncResponse(res2);
+
+    // 7. Verify Client 2 state
+    assert.deepStrictEqual(client2.getData(), [{ id: 'item2', val: 'B' }]);
+});
+
 // Run all tests
 runTests();
