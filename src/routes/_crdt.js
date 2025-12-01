@@ -397,6 +397,15 @@ export class CollabJSON {
     this.ops = [];
   }
 
+  commitOps() {
+    if (this.ops.length > 0) {
+      const maxTs = this.ops.reduce((max, op) => Math.max(max, op.timestamp), 0);
+      this.ops.forEach(op => this.history.push(op));
+      this.dvv.set(this.clientId, Math.max(this.dvv.get(this.clientId) || 0, maxTs));
+      this.ops = [];
+    }
+  }
+
   // --- Sync Function ---
 
   applyOp(op) {
