@@ -398,6 +398,7 @@ test('Upload: Server overwrite propagates to client', () => {
     // Simulate upload: Server replaces root content
     const newData = { list: ['b'] };
     server.updateItem([], newData);
+    server.commitOps(); // Commit to history so it's available for sync
     
     // Client syncs
     const req = client.getSyncRequest();
@@ -422,6 +423,7 @@ test('Upload: Client ops predating upload are overwritten (LWW)', () => {
     // We ensure server clock is ahead or we rely on tick() incrementing
     server.clock = client.clock + 10;
     server.updateItem([], { key: 'server' });
+    server.commitOps(); // Commit to history
 
     // Client syncs
     const req = client.getSyncRequest();
@@ -439,6 +441,7 @@ test('Upload: Client ops postdating upload persist', () => {
 
     // Server receives upload (Timestamp T1)
     server.updateItem([], { key: 'server' });
+    server.commitOps(); // Commit to history
 
     // Client syncs and gets the upload state
     let req = client.getSyncRequest();
