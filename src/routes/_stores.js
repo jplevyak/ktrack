@@ -198,7 +198,7 @@ export function synced_store(key, initialValue, sync, fromJSON) {
 
 export async function sync_profile(profile) {
   if (profile.password == "") {
-    profile_store.set(make_profile());
+    logout();
     console.log("logout");
     return;
   }
