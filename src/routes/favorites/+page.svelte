@@ -135,20 +135,20 @@
     if (change == "del") {
       let y = confirm("Do you want to delete the favorite?");
       if (!y) return;
-      // Remove item from favorites. (TODO)
+      let i = index;
+      if (results_map != undefined) i = results_map.get(index);
+      favorites.deleteItem([i]);
       save(favorites);
     } else if (change == "edit") {
       editing_replace_index = index;
       if (results_map != undefined)
         editing_replace_index = results_map.get(index);
       let edit = { ...item };
-      delete edit.del;
       edit.source = "custom";
       editing = edit;
     } else if (change == "dup") {
       let edit = { ...item };
       edit.name = edit.name + " (dup)";
-      delete edit.del;
       edit.source = "custom";
       editing = edit;
     } else if (change == "up") {
