@@ -18,7 +18,6 @@ async function do_post_internal(req, syncRequest, username, dbname, db, prune, d
     }
   }
 
-  console.log(dbname, 'sync request from user', username, syncRequest, 'db value exists:', db_value_str);
   let server_doc = CollabJSON.loadOrInit(db_value_str, syncRequest, defaultJSON);
 
   // Allow special logic to run (e.g. for 'today' store) and handle pruning.
@@ -29,7 +28,6 @@ async function do_post_internal(req, syncRequest, username, dbname, db, prune, d
   // has a fresh (e.g., post-login) or stale copy and needs to be reset with the
   // server's authoritative state.
   if (server_doc.requiresReset(syncRequest)) {
-    console.log(dbname, 'requires reset for user', username, server_doc.getResetResponse());
     return new Response(JSON.stringify(server_doc.getResetResponse()));
   }
 
@@ -37,7 +35,6 @@ async function do_post_internal(req, syncRequest, username, dbname, db, prune, d
 
   await db.put(username, JSON.stringify(server_doc.toJSON()));
 
-  console.log(dbname, 'sync response to user', username, JSON.stringify(sync_response));
   return new Response(JSON.stringify(sync_response));
 }
 
