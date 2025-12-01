@@ -577,7 +577,6 @@ export class CollabJSON {
         const parentRes = this._traverse(parentPath);
         
         if (!parentRes || !parentRes.node) {
-          console.log('parentRes', parentRes);
           break;
         }
         const container = parentRes.node;
@@ -588,9 +587,6 @@ export class CollabJSON {
             // For arrays, use itemId to identify the item to delete
             if (op.itemId && container.items[op.itemId]) {
                 targetMeta = container.items[op.itemId];
-                console.log('targetMeta', targetMeta);
-            } else {
-                console.log('targetMeta not found', op.itemId, JSON.stringify(parentRes));
             }
         } else {
             // For objects, use the key from the path
@@ -758,13 +754,7 @@ export class CollabJSON {
   static loadOrInit(stateString, syncRequest, defaultJson, options = {}) {
     const opts = { ...options, clientId: 'server' };
     if (stateString) {
-        const parsed = JSON.parse(stateString);
-        // Heuristic to check if it's a CRDT state object
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && (parsed.root || parsed.clock !== undefined)) {
-             return CollabJSON.fromJSON(parsed, opts);
-        }
-        // Otherwise treat as plain JSON data
-        return new CollabJSON(stateString, { ...opts, id: syncRequest ? syncRequest.docId : undefined });
+        return CollabJSON.fromJSON(JSON.parse(stateString), opts);
     }
     if (syncRequest && syncRequest.snapshot) {
         return CollabJSON.fromSnapshot(syncRequest.snapshot, syncRequest.snapshotDvv, syncRequest.docId, opts);
@@ -866,7 +856,6 @@ export class CollabJSON {
 
     // 3. Normal Sync
     clientOps.forEach(op => {
-        console.log(JSON.stringify(op));
         this.applyOp(op);
         this.history.push(op);
     });
