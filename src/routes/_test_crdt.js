@@ -490,19 +490,20 @@ test('_plainToCrdt: Array reordering preserves IDs', () => {
 });
 
 test('_plainToCrdt: Array item deletion', () => {
-    const doc = new CollabJSON('[{ "val": 1 }, { "val": 2 }]');
+    // We use explicit IDs because content-based matching was removed to avoid ambiguity.
+    const doc = new CollabJSON('[{ "id": "A", "val": 1 }, { "id": "B", "val": 2 }]');
     
     // Update with one item removed
-    doc.updateItem([], [{ val: 1 }]);
+    doc.updateItem([], [{ "id": "A", "val": 1 }]);
 
-    assert.deepStrictEqual(doc.getData(), [{ val: 1 }]);
+    assert.deepStrictEqual(doc.getData(), [{ "id": "A", "val": 1 }]);
     
     // Verify internal deletion (tombstone)
     const root = doc._traverse([]).node;
     const items = Object.values(root.items);
     const deletedItem = items.find(i => i._deleted);
     assert.ok(deletedItem, 'Should have a deleted item tombstone');
-    assert.deepStrictEqual(doc._crdtToPlain(deletedItem.data), { val: 2 });
+    assert.deepStrictEqual(doc._crdtToPlain(deletedItem.data), { "id": "B", "val": 2 });
 });
 
 test('_plainToCrdt: Object key deletion', () => {
