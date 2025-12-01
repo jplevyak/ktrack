@@ -553,6 +553,69 @@ test('_plainToCrdt: Type switching (Array to Object)', () => {
     assert.ok(!root['_crdt_array_'], 'Root should NOT be marked as CRDT array');
 });
 
+test('Sync: Server ops are filtered if client has seen them', () => {
+    const docId = 'filter-test';
+    const server = new CollabJSON("{}", { clientId: 'server', id: docId });
+    const client = new CollabJSON("{}", { clientId: 'c1', id: docId });
+
+    // Server generates op
+    server.updateItem(['key'], 'value');
+    server.commitOps(); // Important: commit to history and update DVV
+
+    // Client syncs 1
+    let req = client.getSyncRequest();
+    let res = server.getSyncResponse(req);
+    client.applySyncResponse(res);
+
+    assert.deepStrictEqual(client.getData(), { key: 'value' });
+    // Verify client has server in DVV
+    assert.ok(client.dvv.has('server'));
+    assert.strictEqual(client.dvv.get('server'), server.clock);
+
+    // Client syncs 2
+    req = client.getSyncRequest();
+    // Verify request DVV has server
+    assert.ok('server' in req.dvv);
+    
+    res = server.getSyncResponse(req);
+    
+    // Should receive NO ops
+    assert.strictEqual(res.ops.length, 0, 'Client should not receive already seen server ops');
+});
+
+test('Upload: Regression check - Client receives upload op but LWW preserves newer local change', () => {
+    const docId = 'upload-regression';
+    const server = new CollabJSON('{"key": "initial"}', { clientId: 'server', id: docId });
+    const client = new CollabJSON('{"key": "initial"}', { clientId: 'c1', id: docId });
+
+    // 1. Client syncs to get initial state
+    client.applySyncResponse(server.getSyncResponse(client.getSyncRequest()));
+
+    // 2. Server receives upload (Timestamp T1)
+    // We simulate upload by updating server directly
+    server.updateItem([], { key: 'server' });
+    server.commitOps();
+    const uploadOp = server.history[server.history.length - 1];
+
+    // 3. Client makes a change (Timestamp T2 > T1)
+    // Ensure client clock is ahead
+    client.clock = server.clock + 10;
+    client.updateItem(['key'], 'client');
+
+    // 4. Client syncs
+    // Client DVV does NOT contain T1 yet (because it hasn't synced since upload)
+    const req = client.getSyncRequest();
+    const res = server.getSyncResponse(req);
+
+    // Server SHOULD send the upload op because client hasn't seen it
+    assert.ok(res.ops.find(op => op.timestamp === uploadOp.timestamp), 'Server should send upload op');
+
+    // 5. Client applies sync response
+    client.applySyncResponse(res);
+
+    // 6. Verify LWW: Client change (T2) should win over Upload (T1)
+    assert.deepStrictEqual(client.getData(), { key: 'client' });
+});
 
 // Run all tests
 runTests();
