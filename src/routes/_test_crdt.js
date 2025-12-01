@@ -570,7 +570,8 @@ test('Sync: Server ops are filtered if client has seen them', () => {
     assert.deepStrictEqual(client.getData(), { key: 'value' });
     // Verify client has server in DVV
     assert.ok(client.dvv.has('server'));
-    assert.strictEqual(client.dvv.get('server'), server.clock);
+    // Fix: Compare against server's DVV, not server's internal clock counter
+    assert.strictEqual(client.dvv.get('server'), server.dvv.get('server'));
 
     // Client syncs 2
     req = client.getSyncRequest();
