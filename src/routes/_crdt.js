@@ -32,11 +32,18 @@ export class CollabJSON {
 
   // --- Private Helper Functions ---
 
+  _uuidToFloat(uuid) {
+    const hex = uuid.replace(/-/g, '');
+    const chunk = hex.substring(0, 16);
+    const bigIntVal = BigInt('0x' + chunk);
+    const max64 = 2n ** 64n;
+    return Number(bigIntVal) / Number(max64);
+  }
+
   _tick() {
-    // Hybrid logical clock: integer counter + client ID tie-breaker (simulated via random here for simplicity,
-    // but ideally should use clientId for strict determinism).
+    // Hybrid logical clock: integer counter + client ID tie-breaker
     this.clock = Math.floor(this.clock) + 1;
-    return this.clock + (Math.random() * 0.99);
+    return this.clock + this._uuidToFloat(this.id);
   }
 
   _mergeClock(remoteTimestamp) {

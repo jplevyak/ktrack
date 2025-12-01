@@ -37,6 +37,8 @@
   const unsubscribe_today = today_store.subscribe((t) => { today = t; });
   const unsubscribe_edit = edit_store.subscribe((e) => { edit = e; });
 
+  const favorites_status = favorites_store.status;
+
   $: today, check_for_new_day(today, profile);
 
   onDestroy(() => {
@@ -189,6 +191,9 @@
   <button type="button" id="clear_input">Clear</button>
   <button type="button" id="create">Create New Favorite</button>
   &nbsp;&nbsp; Added: {added_count}
+  {#if $favorites_status && $favorites_status != 'idle'}
+      🟡 Unsaved changes: {$favorites_status}
+  {/if}
   <br /><br />
   {#if favorites != undefined}
     {#each results as f, i}

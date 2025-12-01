@@ -35,6 +35,9 @@
   const unsubscribe_today = today_store.subscribe((t) => { today = t; });
   const unsubscribe_edit = edit_store.subscribe((value) => { edit = value; });
   const unsubscribe_history = history_store.subscribe((value) => { history = value; });
+
+  const history_status = history_store.status;
+
   onDestroy(() => {
     unsubscribe_profile();
     unsubscribe_today();
@@ -97,6 +100,9 @@ Averages [3, 5, 7] days: [{averages[0].toFixed(1)}, {averages[1].toFixed(1)}, {a
 )}]<br />
 Number of days to view <input type="number" id="limit" value={limit} />
 &nbsp;&nbsp; Added: {added_count}
+{#if $history_status && $history_status != 'idle'}
+  🟡 Unsaved changes: {$history_status}
+{/if}
 <br /><br />
 
 {#each results as day, e}

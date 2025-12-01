@@ -172,9 +172,6 @@
   <title>KTrack - Day</title>
 </svelte:head>
 
-{#if $today_status && $today_status != 'idle'}
-  <span>🟡 Unsaved changes: {$today_status} </span> <br>
-{/if}
 Averages [3, 5, 7] days: [{(averages[0]||0).toFixed(1)}, {(averages[1]||0).toFixed(1)}, {(averages[2]||0).toFixed(
   1
 )}]<br />
@@ -184,6 +181,9 @@ Averages [3, 5, 7] days: [{(averages[0]||0).toFixed(1)}, {(averages[1]||0).toFix
   {date_info.date}, {date_info.year}{/if}
   {#if edit != undefined}<span style="color:red">Editing History</span>
     <button type="button" id="done">done</button>{/if}
+{#if $today_status && $today_status != 'idle'}
+  🟡 Unsaved changes: {$today_status}
+{/if}
 </b><br /><br />
 {#if editing == undefined}
   {#each food_items as f, i}
