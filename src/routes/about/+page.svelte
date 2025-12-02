@@ -3,7 +3,7 @@
   import {
     logout,
     profile_store,
-    sync_profile,
+    save_profile,
     today_store,
     favorites_store,
     history_store,
@@ -121,8 +121,7 @@
         profile.username = username_input.value;
         profile.password = password_input.value;
         profile.old_password = old_password_input.value;
-        await sync_profile(profile);
-        profile = profile;
+        await save_profile(profile);
       }
     }
     save.onclick = changed;

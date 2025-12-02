@@ -213,9 +213,8 @@ export function synced_store(key, initialValue, sync, fromJSON) {
   };
 }
 
-export async function sync_profile(profile) {
+async function sync_profile(profile) {
   if (profile.password == "") {
-    console.log("logout skipped for empty profile");
     return true;
   }
   let data = {
@@ -468,6 +467,11 @@ export function save_history(day, profile) {
 
     return history;
   });
+}
+
+export async function save_profile(profile) {
+  profile_store.set(profile);
+  await sync_profile(profile);
 }
 
 export function save_today(today, profile) {
