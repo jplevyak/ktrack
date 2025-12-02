@@ -775,5 +775,36 @@ test('Upload from client: seen by all clients', () => {
 
 });
 
+test('replaceData: Resets server state and forces client reset', () => {
+    const docId = 'replace-data-doc';
+    const server = new CollabJSON('{"key": "initial"}', { clientId: 'server', id: docId });
+    const client = new CollabJSON('{"key": "initial"}', { clientId: 'c1', id: docId });
+
+    // 1. Sync initial state
+    client.applySyncResponse(server.getSyncResponse(client.getSyncRequest()));
+
+    // 2. Client makes changes
+    client.updateItem(['key'], 'client-value');
+    
+    // 3. Server replaces data
+    server.replaceData('{"key": "replaced", "new": "value"}');
+
+    // 4. Client syncs
+    const req = client.getSyncRequest();
+    const res = server.getSyncResponse(req);
+
+    // 5. Verify reset
+    assert.strictEqual(res.reset, true, 'Server should request reset');
+    assert.ok(res.snapshot, 'Server should send snapshot');
+
+    client.applySyncResponse(res);
+
+    // 6. Verify client state matches replaced data
+    assert.deepStrictEqual(client.getData(), { key: 'replaced', new: 'value' });
+    
+    // 7. Verify client history/ops cleared (implicit in reset handling)
+    assert.strictEqual(client.ops.length, 0);
+});
+
 // Run all tests
 runTests();

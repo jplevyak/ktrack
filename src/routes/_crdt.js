@@ -986,6 +986,32 @@ export class CollabJSON {
     this.synced = Date.now();
   }
 
+  replaceData(jsonString) {
+    const data = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
+
+    // Advance clock to ensure this state is newer than any previous state
+    this._tick();
+
+    // Re-initialize root with new data at the current timestamp
+    this.root = this._plainToCrdt(data, this.clock);
+
+    // Purge history
+    this.history = [];
+    this.ops = [];
+
+    // Reset DVV: We are the authority now.
+    // We keep our own clock, but discard knowledge of others since we wiped their history.
+    this.dvv.clear();
+    this.dvv.set(this.clientId, this.clock);
+
+    // Set snapshot
+    this.snapshot = this.root;
+    this.snapshotDvv = new Map(this.dvv);
+
+    this.checked = Date.now();
+    this.synced = Date.now();
+  }
+
   getSyncResponse(syncRequest) {
     const {dvv: clientDvv, ops: clientOps, clientId, docId} = syncRequest;
 
