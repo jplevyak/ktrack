@@ -137,11 +137,7 @@ export async function do_upload(req, dbname, db, prune, defaultJSON) {
   // (and thus redundant sync traffic) if the upload endpoint is called repeatedly with the same data.
   const currentData = server_doc.getData();
   if (JSON.stringify(currentData) !== JSON.stringify(data)) {
-    server_doc.updateItem([], data);
-
-    // Commit ops to history and update DVV before saving.
-    server_doc.commitOps();
-
+    server_doc.replaceData(data);
     await db.put(username, JSON.stringify(server_doc.toJSON()));
   }
 
