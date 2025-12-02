@@ -733,5 +733,47 @@ test('Upload: Deleted item from upload is not seen by new client', () => {
     assert.deepStrictEqual(client2.getData(), [{ id: 'item2', val: 'B' }]);
 });
 
+test('Upload from client: seen by all clients', () => {
+    const docId = 'upload-delete-new-client';
+    const server = new CollabJSON("[]", { clientId: 'server', id: docId });
+    const client1 = new CollabJSON("[]", { clientId: 'c1', id: docId });
+    const client2 = new CollabJSON("[]", { clientId: 'c2', id: docId });
+
+    // 1. Upload happens (Server sets initial state with 2 items)
+    server.updateItem([], [{ id: 'item1', val: 'A' }, { id: 'item2', val: 'B' }]);
+    server.commitOps();
+
+    // 2. Client 1 syncs to get upload
+    let req1 = client1.getSyncRequest();
+    let res1 = server.getSyncResponse(req1);
+    client1.applySyncResponse(res1);
+
+    assert.deepStrictEqual(client1.getData(), [{ id: 'item1', val: 'A' }, { id: 'item2', val: 'B' }]);
+
+    // 3. Client 2 syncs to get upload
+    let req2 = client2.getSyncRequest();
+    let res2 = server.getSyncResponse(req2);
+    client2.applySyncResponse(res2);
+
+    assert.deepStrictEqual(client2.getData(), [{ id: 'item1', val: 'A' }, { id: 'item2', val: 'B' }]);
+
+    // 4. Client 2 uploads and syncs to the server
+    client2.updateItem([], [{ id: 'item1', val: 'B' }, { id: 'item2', val: 'A' }]);
+    req1 = client1.getSyncRequest();
+    res1 = server.getSyncResponse(req1);
+    client1.applySyncResponse(res1);
+
+    // 5. Client 1 syncs to get upload
+    req1 = client1.getSyncRequest();
+    res1 = server.getSyncResponse(req1);
+    client1.applySyncResponse(res1);
+
+    assert.deepStrictEqual(client1.getData(), [{ id: 'item1', val: 'B' }, { id: 'item2', val: 'A' }]);
+
+    // Verify server state
+    assert.deepStrictEqual(server.getData(), [{ id: 'item1', val: 'B' }, { id: 'item2', val: 'A' }]);
+
+});
+
 // Run all tests
 runTests();
