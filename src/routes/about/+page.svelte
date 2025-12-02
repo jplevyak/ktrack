@@ -65,16 +65,33 @@
     URL.revokeObjectURL(url);
   }
 
-  function upload_json(store, file) {
+  function upload_json(name, store, file) {
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const data = JSON.parse(e.target.result);
-        store.update((doc) => {
-          doc.updateItem([], data);
-          return doc;
-        });
+        if (profile && profile.username && profile.password) {
+          const credentials = btoa(`${profile.username}:${profile.password}`);
+          const response = await fetch(`/api/${name}`, {
+            method: "PUT",
+            headers: {
+              Authorization: `Basic ${credentials}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(data),
+          });
+          if (response.ok) {
+            store.sync();
+          } else {
+            alert("Upload failed");
+          }
+        } else {
+          store.update((doc) => {
+            doc.updateItem([], data);
+            return doc;
+          });
+        }
       } catch (error) {
         console.error("Error uploading JSON:", error);
         alert("Failed to upload JSON. Check console for details.");
@@ -149,7 +166,7 @@ Today
   id="upload_today"
   style="display:none"
   accept=".json"
-  on:change={(e) => upload_json(today_store, e.target.files[0])}
+  on:change={(e) => upload_json("today", today_store, e.target.files[0])}
 />
 <button on:click={() => document.getElementById("upload_today").click()}
   >Upload</button
@@ -176,7 +193,7 @@ Favorites
   id="upload_favorites"
   style="display:none"
   accept=".json"
-  on:change={(e) => upload_json(favorites_store, e.target.files[0])}
+  on:change={(e) => upload_json("favorites", favorites_store, e.target.files[0])}
 />
 <button on:click={() => document.getElementById("upload_favorites").click()}
   >Upload</button
@@ -202,7 +219,7 @@ History
   id="upload_history"
   style="display:none"
   accept=".json"
-  on:change={(e) => upload_json(history_store, e.target.files[0])}
+  on:change={(e) => upload_json("history", history_store, e.target.files[0])}
 />
 <button on:click={() => document.getElementById("upload_history").click()}
   >Upload</button
