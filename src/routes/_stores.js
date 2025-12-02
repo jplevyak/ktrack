@@ -215,9 +215,8 @@ export function synced_store(key, initialValue, sync, fromJSON) {
 
 export async function sync_profile(profile) {
   if (profile.password == "") {
-    logout();
-    console.log("logout");
-    return;
+    console.log("logout skipped for empty profile");
+    return true;
   }
   let data = {
     username: profile.username,
