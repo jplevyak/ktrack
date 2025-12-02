@@ -759,9 +759,9 @@ test('Upload from client: seen by all clients', () => {
 
     // 4. Client 2 uploads and syncs to the server
     client2.updateItem([], [{ id: 'item1', val: 'B' }, { id: 'item2', val: 'A' }]);
-    req1 = client1.getSyncRequest();
-    res1 = server.getSyncResponse(req1);
-    client1.applySyncResponse(res1);
+    req2 = client2.getSyncRequest();
+    res2 = server.getSyncResponse(req2);
+    client2.applySyncResponse(res2);
 
     // 5. Client 1 syncs to get upload
     req1 = client1.getSyncRequest();
