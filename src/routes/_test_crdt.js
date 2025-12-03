@@ -37,10 +37,10 @@ test('Initialization', () => {
 
 test('Constructor initializes with nested data', () => {
     const objDoc = new CollabJSON('{"a": 1, "b": {"c": [10, 20]}}');
-    assert.deepStrictEqual(objDoc.getData(), {"a": 1, "b": {"c": [10, 20]}});
+    assert.deepStrictEqual(objDoc.getData(), { "a": 1, "b": { "c": [10, 20] } });
 
     const arrDoc = new CollabJSON('[{"a": 1}, {"b": 2}]');
-    assert.deepStrictEqual(arrDoc.getData(), [{"a": 1}, {"b": 2}]);
+    assert.deepStrictEqual(arrDoc.getData(), [{ "a": 1 }, { "b": 2 }]);
 });
 
 test('Top-level Array: addItem at beginning, middle, and end', () => {
@@ -172,19 +172,19 @@ test('Successive updates to the same item are compressed', () => {
 
 test('Arbitrarily nested operations are CRDT-native', () => {
     const doc = new CollabJSON("{}");
-    doc.updateItem(['a'], { b: { c: [ { d: 1 }, { d: 2 } ] } });
+    doc.updateItem(['a'], { b: { c: [{ d: 1 }, { d: 2 }] } });
 
     // Nested addItem
     doc.addItem(['a', 'b', 'c', 1], { d: 1.5 });
-    assert.deepStrictEqual(doc.getData().a.b.c, [ { d: 1 }, { d: 1.5 }, { d: 2 } ]);
+    assert.deepStrictEqual(doc.getData().a.b.c, [{ d: 1 }, { d: 1.5 }, { d: 2 }]);
 
     // Nested deleteItem on an array
     doc.deleteItem(['a', 'b', 'c', 0]);
-    assert.deepStrictEqual(doc.getData().a.b.c, [ { d: 1.5 }, { d: 2 } ]);
+    assert.deepStrictEqual(doc.getData().a.b.c, [{ d: 1.5 }, { d: 2 }]);
 
     // Nested updateItem
     doc.updateItem(['a', 'b', 'c', 1, 'd'], 2.5);
-    assert.deepStrictEqual(doc.getData().a.b.c, [ { d: 1.5 }, { d: 2.5 } ]);
+    assert.deepStrictEqual(doc.getData().a.b.c, [{ d: 1.5 }, { d: 2.5 }]);
 
     // Add a new key to a nested object
     doc.updateItem(['a', 'b', 'newKey'], 'newValue');
@@ -215,9 +215,9 @@ test('Garbage collection removes tombstones', () => {
 // --- Synchronization Tests ---
 
 test('Concurrent top-level array adds converge', () => {
-    const doc1 = new CollabJSON("[]", {clientId: 'c1'});
+    const doc1 = new CollabJSON("[]", { clientId: 'c1' });
     doc1.addItem([0], { text: 'common' });
-    const doc2 = new CollabJSON("[]", {id: doc1.id, clientId: 'c2'});
+    const doc2 = new CollabJSON("[]", { id: doc1.id, clientId: 'c2' });
     doc2.applyOp(doc1.ops[0]);
 
     // Concurrent adds
@@ -234,9 +234,9 @@ test('Concurrent top-level array adds converge', () => {
 });
 
 test('Concurrent nested array adds converge', () => {
-    const doc1 = new CollabJSON("{}", {clientId: 'c1'});
+    const doc1 = new CollabJSON("{}", { clientId: 'c1' });
     doc1.updateItem(['list'], ['common']);
-    const doc2 = new CollabJSON("{}", {id: doc1.id, clientId: 'c2'});
+    const doc2 = new CollabJSON("{}", { id: doc1.id, clientId: 'c2' });
     doc2.applyOp(doc1.ops[0]);
 
     // Concurrent adds to nested list
@@ -254,9 +254,9 @@ test('Concurrent nested array adds converge', () => {
 
 
 test('Concurrent sets converge', () => {
-    const doc1 = new CollabJSON("{}", {clientId: 'c1'});
+    const doc1 = new CollabJSON("{}", { clientId: 'c1' });
     doc1.updateItem(['common'], { text: 'value' });
-    const doc2 = new CollabJSON("{}", {id: doc1.id, clientId: 'c2'});
+    const doc2 = new CollabJSON("{}", { id: doc1.id, clientId: 'c2' });
     doc2.applyOp(doc1.ops[0]);
 
     // Concurrent adds
@@ -273,8 +273,8 @@ test('Concurrent sets converge', () => {
 });
 
 test('Concurrent update (LWW)', () => {
-    const doc1 = new CollabJSON('{"item1": "original"}', {clientId: 'c1'});
-    const doc2 = new CollabJSON('{"item1": "original"}', {id: doc1.id, clientId: 'c2'});
+    const doc1 = new CollabJSON('{"item1": "original"}', { clientId: 'c1' });
+    const doc2 = new CollabJSON('{"item1": "original"}', { id: doc1.id, clientId: 'c2' });
 
     doc1.clock = 10;
     doc1.updateItem(['item1'], 'update from 1'); // This one is later
@@ -291,8 +291,8 @@ test('Concurrent update (LWW)', () => {
 });
 
 test('Concurrent delete and update converge', () => {
-    const doc1 = new CollabJSON('{"item1": "original"}', {clientId: 'c1'});
-    const doc2 = new CollabJSON('{"item1": "original"}', {id: doc1.id, clientId: 'c2'});
+    const doc1 = new CollabJSON('{"item1": "original"}', { clientId: 'c1' });
+    const doc2 = new CollabJSON('{"item1": "original"}', { id: doc1.id, clientId: 'c2' });
 
     doc1.clock = 10;
     doc1.deleteItem(['item1']); // delete wins (later timestamp)
@@ -370,7 +370,7 @@ test('Sync with a pruned server sends snapshot', () => {
     let req1 = client1.getSyncRequest();
     server.getSyncResponse(req1);
 
-    server.prune(() => {});
+    server.prune(() => { });
     assert.strictEqual(server.history.length, 50);
     assert.ok(server.snapshot);
 
@@ -398,8 +398,7 @@ test('Upload: Server overwrite propagates to client', () => {
     // Simulate upload: Server replaces root content
     const newData = { list: ['b'] };
     server.updateItem([], newData);
-    server.commitOps(); // Commit to history so it's available for sync
-    
+
     // Client syncs
     const req = client.getSyncRequest();
     const res = server.getSyncResponse(req);
@@ -423,7 +422,6 @@ test('Upload: Client ops predating upload are overwritten (LWW)', () => {
     // We ensure server clock is ahead or we rely on tick() incrementing
     server.clock = client.clock + 10;
     server.updateItem([], { key: 'server' });
-    server.commitOps(); // Commit to history
 
     // Client syncs
     const req = client.getSyncRequest();
@@ -441,7 +439,6 @@ test('Upload: Client ops postdating upload persist', () => {
 
     // Server receives upload (Timestamp T1)
     server.updateItem([], { key: 'server' });
-    server.commitOps(); // Commit to history
 
     // Client syncs and gets the upload state
     let req = client.getSyncRequest();
@@ -459,7 +456,7 @@ test('Upload: Client ops postdating upload persist', () => {
 
     // Server should accept client's newer change
     server.applyOp(req.ops[0]); // Simulate server processing request
-    
+
     assert.deepStrictEqual(server.getData(), { key: 'client' });
     assert.deepStrictEqual(client.getData(), { key: 'client' });
 });
@@ -468,7 +465,7 @@ test('Upload: Client ops postdating upload persist', () => {
 
 test('_plainToCrdt: Array reordering preserves IDs', () => {
     const doc = new CollabJSON('[{ "id": "A", "val": 1 }, { "id": "B", "val": 2 }]');
-    
+
     // Get original IDs
     const originalItems = doc._getSortedItems(doc.root);
     const idA = originalItems[0].id;
@@ -478,10 +475,10 @@ test('_plainToCrdt: Array reordering preserves IDs', () => {
     doc.updateItem([], [{ id: "B", val: 2 }, { id: "A", val: 1 }]);
 
     const newItems = doc._getSortedItems(doc.root);
-    
+
     // Check data is correct
     assert.deepStrictEqual(doc.getData(), [{ id: "B", val: 2 }, { id: "A", val: 1 }]);
-    
+
     // Check IDs are preserved (content matching)
     // The item with val:2 should have idB
     assert.strictEqual(newItems[0].id, idB);
@@ -492,12 +489,12 @@ test('_plainToCrdt: Array reordering preserves IDs', () => {
 test('_plainToCrdt: Array item deletion', () => {
     // We use explicit IDs because content-based matching was removed to avoid ambiguity.
     const doc = new CollabJSON('[{ "id": "A", "val": 1 }, { "id": "B", "val": 2 }]');
-    
+
     // Update with one item removed
     doc.updateItem([], [{ "id": "A", "val": 1 }]);
 
     assert.deepStrictEqual(doc.getData(), [{ "id": "A", "val": 1 }]);
-    
+
     // Verify internal deletion (tombstone)
     const root = doc._traverse([]).node;
     const items = Object.values(root.items);
@@ -508,7 +505,7 @@ test('_plainToCrdt: Array item deletion', () => {
 
 test('_plainToCrdt: Object key deletion', () => {
     const doc = new CollabJSON('{"a": 1, "b": 2}');
-    
+
     // Update with key 'b' removed
     doc.updateItem([], { a: 1 });
 
@@ -521,7 +518,7 @@ test('_plainToCrdt: Object key deletion', () => {
 
 test('_plainToCrdt: Nested object updates', () => {
     const doc = new CollabJSON('{"a": {"x": 1, "y": 2}}');
-    
+
     // Update nested object: change x, remove y, add z
     doc.updateItem([], { a: { x: 10, z: 3 } });
 
@@ -530,12 +527,12 @@ test('_plainToCrdt: Nested object updates', () => {
 
 test('_plainToCrdt: Type switching (Object to Array)', () => {
     const doc = new CollabJSON('{"a": 1}');
-    
+
     // Overwrite object with array
     doc.updateItem([], [1, 2]);
 
     assert.deepStrictEqual(doc.getData(), [1, 2]);
-    
+
     // Verify internal structure changed
     const root = doc._traverse([]).node;
     assert.ok(root['_crdt_array_'], 'Root should be marked as CRDT array');
@@ -543,12 +540,12 @@ test('_plainToCrdt: Type switching (Object to Array)', () => {
 
 test('_plainToCrdt: Type switching (Array to Object)', () => {
     const doc = new CollabJSON('[1, 2]');
-    
+
     // Overwrite array with object
     doc.updateItem([], { a: 1 });
 
     assert.deepStrictEqual(doc.getData(), { a: 1 });
-    
+
     // Verify internal structure changed
     const root = doc._traverse([]).node;
     assert.ok(!root['_crdt_array_'], 'Root should NOT be marked as CRDT array');
@@ -561,7 +558,6 @@ test('Sync: Server ops are filtered if client has seen them', () => {
 
     // Server generates op
     server.updateItem(['key'], 'value');
-    server.commitOps(); // Important: commit to history and update DVV
 
     // Client syncs 1
     let req = client.getSyncRequest();
@@ -578,9 +574,9 @@ test('Sync: Server ops are filtered if client has seen them', () => {
     req = client.getSyncRequest();
     // Verify request DVV has server
     assert.ok('server' in req.dvv);
-    
+
     res = server.getSyncResponse(req);
-    
+
     // Should receive NO ops
     assert.strictEqual(res.ops.length, 0, 'Client should not receive already seen server ops');
 });
@@ -596,7 +592,6 @@ test('Upload: Regression check - Client receives upload op but LWW preserves new
     // 2. Server receives upload (Timestamp T1)
     // We simulate upload by updating server directly
     server.updateItem([], { key: 'server' });
-    server.commitOps();
     const uploadOp = server.history[server.history.length - 1];
 
     // 3. Client makes a change (Timestamp T2 > T1)
@@ -627,7 +622,6 @@ test('Upload: Clients can exchange array updates after upload', () => {
 
     // 1. Upload happens (Server sets initial state)
     server.updateItem([], [{ id: 'item1', val: 'uploaded' }]);
-    server.commitOps();
 
     // 2. Clients sync to get upload
     // Client 1 sync
@@ -647,12 +641,12 @@ test('Upload: Clients can exchange array updates after upload', () => {
     client1.addItem([1], { id: 'item2', val: 'c1-add' });
 
     // 4. Client 2 deletes the uploaded item (index 0) and adds another at the beginning
-    client2.deleteItem([0]); 
+    client2.deleteItem([0]);
     client2.addItem([0], { id: 'item3', val: 'c2-add' });
 
     // 5. Sync Client 1 -> Server
     req1 = client1.getSyncRequest();
-    res1 = server.getSyncResponse(req1); 
+    res1 = server.getSyncResponse(req1);
     client1.applySyncResponse(res1); // C1 gets nothing new yet
 
     // 6. Sync Client 2 -> Server
@@ -682,7 +676,7 @@ test('Upload: Clients can exchange array updates after upload', () => {
     assert.strictEqual(item2.val, 'c1-add');
     assert.strictEqual(item3.val, 'c2-add');
     assert.ok(!c1Data.find(i => i.id === 'item1'), 'Item 1 should be deleted');
-    
+
     // Expected order: item3 (sortKey 0.5), item2 (sortKey 2.0)
     assert.deepStrictEqual(c1Data, [
         { id: 'item3', val: 'c2-add' },
@@ -697,7 +691,6 @@ test('Upload: Deleted item from upload is not seen by new client', () => {
 
     // 1. Upload happens (Server sets initial state with 2 items)
     server.updateItem([], [{ id: 'item1', val: 'A' }, { id: 'item2', val: 'B' }]);
-    server.commitOps();
 
     // 2. Client 1 syncs to get upload
     let req1 = client1.getSyncRequest();
@@ -708,7 +701,7 @@ test('Upload: Deleted item from upload is not seen by new client', () => {
 
     // 3. Client 1 deletes item1
     // item1 should be at index 0 because _plainToCrdt assigns sortKeys 1.0, 2.0
-    client1.deleteItem([0]); 
+    client1.deleteItem([0]);
 
     // 4. Client 1 syncs deletion to server
     req1 = client1.getSyncRequest();
@@ -741,7 +734,6 @@ test('Upload from client: seen by all clients', () => {
 
     // 1. Upload happens (Server sets initial state with 2 items)
     server.updateItem([], [{ id: 'item1', val: 'A' }, { id: 'item2', val: 'B' }]);
-    server.commitOps();
 
     // 2. Client 1 syncs to get upload
     let req1 = client1.getSyncRequest();
@@ -785,7 +777,7 @@ test('replaceData: Resets server state and forces client reset', () => {
 
     // 2. Client makes changes
     client.updateItem(['key'], 'client-value');
-    
+
     // 3. Server replaces data
     server.replaceData('{"key": "replaced", "new": "value"}');
 
@@ -801,7 +793,7 @@ test('replaceData: Resets server state and forces client reset', () => {
 
     // 6. Verify client state matches replaced data
     assert.deepStrictEqual(client.getData(), { key: 'replaced', new: 'value' });
-    
+
     // 7. Verify client history/ops cleared (implicit in reset handling)
     assert.strictEqual(client.ops.length, 0);
 });

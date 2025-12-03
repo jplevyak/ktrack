@@ -3,7 +3,7 @@
  * It uses Lamport timestamps for causal ordering, Last-Write-Wins (LWW)
  * for atomic updates, and fractional indexing for list ordering.
  */
-import {v4 as uuidv4} from 'uuid';
+import { v4 as uuidv4 } from 'uuid';
 
 const HISTORY_PRUNE_LIMIT = 100;
 const HISTORY_PRUNE_WINDOW = 50;
@@ -96,7 +96,7 @@ export class CollabJSON {
     }
 
     if (Array.isArray(data)) {
-      const crdtArray = {[CRDT_ARRAY_MARKER]: true, items: {}, metadata: {}};
+      const crdtArray = { [CRDT_ARRAY_MARKER]: true, items: {}, metadata: {} };
 
       // Get all existing items (including deleted) sorted by sortKey
       let existingItems = [];
@@ -180,7 +180,7 @@ export class CollabJSON {
 
     if (typeof data === 'object' && data !== null) {
       // Optimization: Store default timestamp for the object to avoid redundant metadata
-      const newObject = {metadata: {_ts: timestamp}};
+      const newObject = { metadata: { _ts: timestamp } };
       const existingMeta = (existingNode && existingNode.metadata) ? existingNode.metadata : {};
 
       Object.assign(newObject.metadata, existingMeta);
@@ -193,7 +193,7 @@ export class CollabJSON {
         // Resolve existing metadata, handling default _ts
         let meta = existingMeta[key];
         if (!meta && existingChild && existingMeta._ts) {
-          meta = {updated: existingMeta._ts, _deleted: false};
+          meta = { updated: existingMeta._ts, _deleted: false };
         }
 
         if (meta && meta.updated > timestamp) {
@@ -216,7 +216,7 @@ export class CollabJSON {
           if (!(key in data)) {
             let meta = existingMeta[key];
             if (!meta && existingMeta._ts) {
-              meta = {updated: existingMeta._ts, _deleted: false};
+              meta = { updated: existingMeta._ts, _deleted: false };
             }
 
             if (meta && meta.updated > timestamp) {
@@ -226,7 +226,7 @@ export class CollabJSON {
             } else {
               // Incoming (missing) is newer. Delete it.
               newObject[key] = existingNode[key];
-              newObject.metadata[key] = {updated: timestamp, _deleted: true};
+              newObject.metadata[key] = { updated: timestamp, _deleted: true };
             }
           }
         }
@@ -306,7 +306,7 @@ export class CollabJSON {
       }
     }
 
-    return {parent, key: finalKey, node: current};
+    return { parent, key: finalKey, node: current };
   }
 
   _applyAndStore(op) {
@@ -324,6 +324,10 @@ export class CollabJSON {
 
     this.applyOp(op);
     this.ops.push(op);
+
+    if (this.clientId === 'server') {
+      this.commitOps();
+    }
   }
 
   _getSnapshotData() {
@@ -540,8 +544,8 @@ export class CollabJSON {
       return;
     } // Idempotent
 
-    const {parent, key, node} = result;
-    const op = {type: 'DELETE_ITEM', path, timestamp: this._tick()};
+    const { parent, key, node } = result;
+    const op = { type: 'DELETE_ITEM', path, timestamp: this._tick() };
 
     if (parent[CRDT_ARRAY_MARKER]) {
       op.itemId = node.id;
@@ -646,7 +650,7 @@ export class CollabJSON {
     // Common traversal for most ops
     // Note: For MOVE_ITEM, path points to the array, not the item
     const traversePath = (op.type === 'MOVE_ITEM') ? op.path : op.path.slice(0, -1);
-    const {parent, node} = this._traverse(traversePath) || {};
+    const { parent, node } = this._traverse(traversePath) || {};
 
     switch (op.type) {
       case 'ADD_ITEM': {
@@ -656,7 +660,7 @@ export class CollabJSON {
         }
 
         let item = targetArray.items[op.itemId];
-        item ||= targetArray.items[op.itemId] = {id: op.itemId};
+        item ||= targetArray.items[op.itemId] = { id: op.itemId };
 
         if (!item.updated || op.timestamp >= item.updated) {
           item.data = this._plainToCrdt(op.data, op.timestamp);
@@ -727,7 +731,7 @@ export class CollabJSON {
             container.metadata ||= {};
             // Materialize metadata if it was implicit
             if (!container.metadata[key]) {
-              container.metadata[key] = {updated: targetUpdated, _deleted: false};
+              container.metadata[key] = { updated: targetUpdated, _deleted: false };
             }
 
             targetMeta = container.metadata[key];
@@ -750,7 +754,7 @@ export class CollabJSON {
 
         const updateRes = this._traverse(op.path);
         if (updateRes && updateRes.parent) {
-          const {parent, key, node} = updateRes;
+          const { parent, key, node } = updateRes;
 
           let itemUpdated = 0;
           if (parent[CRDT_ARRAY_MARKER]) {
@@ -775,7 +779,7 @@ export class CollabJSON {
           } else {
             parent[key] = this._plainToCrdt(op.data, op.timestamp, parent[key]);
             parent.metadata ||= {};
-            parent.metadata[key] = {updated: op.timestamp, _deleted: false};
+            parent.metadata[key] = { updated: op.timestamp, _deleted: false };
           }
         } else if (op.path.length > 0) { // Create path (upsert)
           let current = this.root;
@@ -789,7 +793,7 @@ export class CollabJSON {
             if (!Object.hasOwn(container, segment) || typeof container[segment] !== 'object' || container[segment] === null) {
               container[segment] = this._plainToCrdt({}, op.timestamp);
               container.metadata ||= {};
-              container.metadata[segment] = {updated: op.timestamp, _deleted: false};
+              container.metadata[segment] = { updated: op.timestamp, _deleted: false };
             }
 
             current = container[segment];
@@ -807,7 +811,7 @@ export class CollabJSON {
 
           parentContainer[finalKey] = this._plainToCrdt(op.data, op.timestamp, parentContainer[finalKey]);
           parentContainer.metadata ||= {};
-          parentContainer.metadata[finalKey] = {updated: op.timestamp, _deleted: false};
+          parentContainer.metadata[finalKey] = { updated: op.timestamp, _deleted: false };
         }
 
         break;
@@ -875,7 +879,7 @@ export class CollabJSON {
   }
 
   static fromSnapshot(snapshot, snapshotDvv, docId, options = {}) {
-    const doc = new CollabJSON(undefined, {...options, id: docId});
+    const doc = new CollabJSON(undefined, { ...options, id: docId });
     doc.root = snapshot || {};
     doc.snapshot = snapshot || {};
     doc.snapshotDvv = new Map(Object.entries(snapshotDvv || {}));
@@ -895,7 +899,7 @@ export class CollabJSON {
   }
 
   static loadOrInit(stateString, syncRequest, defaultJson, options = {}) {
-    const options_ = {...options, clientId: 'server'};
+    const options_ = { ...options, clientId: 'server' };
     if (stateString) {
       return CollabJSON.fromJSON(JSON.parse(stateString), options_);
     }
@@ -904,7 +908,7 @@ export class CollabJSON {
       return CollabJSON.fromSnapshot(syncRequest.snapshot, syncRequest.snapshotDvv, syncRequest.docId, options_);
     }
 
-    return new CollabJSON(defaultJson, {...options_, id: syncRequest ? syncRequest.docId : undefined});
+    return new CollabJSON(defaultJson, { ...options_, id: syncRequest ? syncRequest.docId : undefined });
   }
 
   static fromOps(ops) {
@@ -954,7 +958,7 @@ export class CollabJSON {
     };
   }
 
-  applySyncResponse({ops, dvv, snapshot, snapshotDvv, reset, id}) {
+  applySyncResponse({ ops, dvv, snapshot, snapshotDvv, reset, id }) {
     if (reset) {
       this.ops = [];
       this.id = id;
@@ -1013,7 +1017,7 @@ export class CollabJSON {
   }
 
   getSyncResponse(syncRequest) {
-    const {dvv: clientDvv, ops: clientOps, clientId, docId} = syncRequest;
+    const { dvv: clientDvv, ops: clientOps, clientId, docId } = syncRequest;
 
     // 1. Check for Document ID mismatch
     if (this.id && docId && this.id !== docId) {
@@ -1056,6 +1060,6 @@ export class CollabJSON {
 
       return (clientDvvMap.get(op.clientId) || 0) < op.timestamp;
     });
-    return {ops: opsForClient, dvv: Object.fromEntries(this.dvv)};
+    return { ops: opsForClient, dvv: Object.fromEntries(this.dvv) };
   }
 }

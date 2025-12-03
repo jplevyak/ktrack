@@ -77,9 +77,7 @@ Finds the path to a node with a specific ID (for array items) or key.
 
 Resets the document to an empty state. This clears the root data, history, vector clocks, and snapshots.
 
-### `commitOps()`
 
-*(Server-side)* Moves pending operations to the history log and updates the vector clock. This is typically called after a batch of updates (e.g., an upload or a set of local changes) to make them available for synchronization.
 
 ### `applyOp(op)`
 
