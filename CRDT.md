@@ -26,9 +26,11 @@ Creates a new `CollabJSON` document.
     *   `id` (String): A unique identifier for the document. If two instances share an `id`, they are considered replicas of the same document. Defaults to a new UUID.
     *   `clientId` (String): A unique identifier for the current replica (client or server). Defaults to a new UUID.
 
-### `getData()`
+### `getData(path)`
 
 Returns the current state of the document as a plain JavaScript object or array. This is useful for rendering the data in a UI.
+
+*   `path` (Array, optional): A path array to retrieve a specific subtree or value. If omitted, returns the entire document.
 
 ### `addItem(path, data)`
 
@@ -56,9 +58,34 @@ Marks an item in an array or a property on an object as deleted.
 
 *   `path` (Array of strings and numbers): The path to the item to be deleted.
 
+### `moveItem(path, fromIndex, toIndex)`
+
+Moves an item within a CRDT-native array.
+
+*   `path` (Array): The path to the array containing the item.
+*   `fromIndex` (Number): The current index of the item to move.
+*   `toIndex` (Number): The new index for the item.
+
+### `findPath(targetId)`
+
+Finds the path to a node with a specific ID (for array items) or key.
+
+*   `targetId` (String): The ID or key to search for.
+*   Returns `Array` (the path) or `null` if not found.
+
 ### `clear()`
 
 Resets the document to an empty state. This clears the root data, history, vector clocks, and snapshots.
+
+### `commitOps()`
+
+*(Server-side)* Moves pending operations to the history log and updates the vector clock. This is typically called after a batch of updates (e.g., an upload or a set of local changes) to make them available for synchronization.
+
+### `applyOp(op)`
+
+Applies a single operation to the document. This is used during synchronization to apply remote operations.
+
+*   `op` (Object): The operation object.
 
 ### `prune(pruneFn, clientRequestData)`
 
@@ -112,12 +139,11 @@ Creates a temporary `CollabJSON` instance from the operations contained in a syn
 
 *(Client-side)* Gathers all local operations that have not yet been acknowledged by the server and prepares a sync request payload. This method is repeatable; it can be called multiple times without losing data if a network request fails.
 
-### `requiresReset(syncRequest)`
+### `replaceData(jsonString)`
 
-*(Server-side)* Checks if the server's document ID differs from the client's document ID in the sync request. If they differ, the client likely needs to be reset.
+*(Server-side)* Replaces the entire document data with new data from a JSON string. This is treated as a new state that supersedes all previous history. It resets the history and vector clocks, effectively making this replica the authority.
 
-*   `syncRequest` (Object): The incoming sync request.
-*   Returns `true` if a reset is required, `false` otherwise.
+*   `jsonString` (String): The new JSON data.
 
 ### `getResetResponse()`
 
@@ -220,19 +246,13 @@ async function handleSyncRequest(req, res) {
   // 3. Load or initialize the server's copy of the document
   const serverDoc = CollabJSON.loadOrInit(docStateString, syncRequest, defaultJson);
 
-  // 4. Check if client needs a reset (e.g. ID mismatch)
-  if (serverDoc.requiresReset(syncRequest)) {
-      res.json(serverDoc.getResetResponse());
-      return;
-  }
-
-  // 5. Process the client's request and generate a response
+  // 4. Process the client's request and generate a response
   const syncResponse = serverDoc.getSyncResponse(syncRequest);
 
-  // 6. Save the updated document state back to the database
+  // 5. Save the updated document state back to the database
   await db.put(username, JSON.stringify(serverDoc.toJSON()));
 
-  // 7. Send the response back to the client
+  // 6. Send the response back to the client
   res.json(syncResponse);
 }
 ```
