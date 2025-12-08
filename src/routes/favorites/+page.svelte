@@ -95,36 +95,31 @@
     favorites_store.set(favs);
   }
 
-  afterUpdate(() => {
-    if (editing == undefined) {
-      let search_box = document.getElementById("search_string");
-      function search_results() {
-        search_value = search_box.value;
-        update_results();
-      }
-      search_box.onchange = search_results;
-      document.getElementById("search").onclick = search_results;
-      document.getElementById("create").onclick = function () {
-        editing = make_item();
-      };
-      document.getElementById("clear_input").onclick = () => {
-        document.getElementById("search_string").value = "";
-        search_value = "";
-        update_results();
-      };
-    } else {
-      document.getElementById("cancel").onclick = function () {
-        editing_replace_index = undefined;
-        editing = undefined;
-      };
-      document.getElementById("save").onclick = function () {
-        let edited = { ...editing };
-        save_favorite(edited, profile, editing_replace_index);
-        editing_replace_index = undefined;
-        editing = undefined;
-      };
-    }
-  });
+  function search_results() {
+    // search_value is bound to the input, so just update results
+    update_results();
+  }
+
+  function create_favorite() {
+    editing = make_item();
+  }
+
+  function clear_search() {
+    search_value = "";
+    update_results();
+  }
+
+  function cancel_edit() {
+    editing_replace_index = undefined;
+    editing = undefined;
+  }
+
+  function save_edit() {
+    let edited = { ...editing };
+    save_favorite(edited, profile, editing_replace_index);
+    editing_replace_index = undefined;
+    editing = undefined;
+  }
 
   function do_msg(event) {
     if (event.status == "completed") return;
@@ -186,10 +181,10 @@
 </svelte:head>
 
 {#if editing == undefined}
-  Search <input type="text" id="search_string" />
-  <button type="button" id="search">Search</button>
-  <button type="button" id="clear_input">Clear</button>
-  <button type="button" id="create">Create New Favorite</button>
+  Search <input type="text" id="search_string" bind:value={search_value} on:input={search_results} />
+  <button type="button" id="search" on:click={search_results}>Search</button>
+  <button type="button" id="clear_input" on:click={clear_search}>Clear</button>
+  <button type="button" id="create" on:click={create_favorite}>Create New Favorite</button>
   &nbsp;&nbsp; Added: {added_count}
   {#if $favorites_status && $favorites_status != 'idle'}
       🟡 Unsaved changes: {$favorites_status}
@@ -260,8 +255,8 @@
     >
   </tbody>
   </table>
-  <br /><button type="button" id="cancel">cancel</button>
-  <button type="button" id="save">save</button>
+  <br /><button type="button" id="cancel" on:click={cancel_edit}>cancel</button>
+  <button type="button" id="save" on:click={save_edit}>save</button>
 {/if}
 
 <style>

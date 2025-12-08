@@ -88,25 +88,21 @@
     }
   }
 
-  afterUpdate(() => {
-    if (editing != undefined) {
-      document.getElementById("cancel").onclick = function () {
-        editing = undefined;
-      };
-      document.getElementById("save").onclick = function () {
-        day.updateItem(['items', editing_index], editing);
-        save_day();
-        editing = undefined;
-      };
-    }
-    if (edit != undefined) {
-      document.getElementById("done").onclick = function () {
-        save_day();
-        edit_store.set(undefined);
-        goto("/history");
-      };
-    }
-  });
+  function cancel_edit() {
+    editing = undefined;
+  }
+
+  function save_edit() {
+    day.updateItem(['items', editing_index], editing);
+    save_day();
+    editing = undefined;
+  }
+
+  function done_edit() {
+    save_day();
+    edit_store.set(undefined);
+    goto("/history");
+  }
 
   // Move to p2 if between p1 and p2.
   function fix_change(x, p1, p2) {
@@ -180,7 +176,7 @@ Averages [3, 5, 7] days: [{(averages[0]||0).toFixed(1)}, {(averages[1]||0).toFix
   {months[date_info.month]}
   {date_info.date}, {date_info.year}{/if}
   {#if edit != undefined}<span style="color:red">Editing History</span>
-    <button type="button" id="done">done</button>{/if}
+    <button type="button" id="done" on:click={done_edit}>done</button>{/if}
 {#if $today_status && $today_status != 'idle'}
   🟡 Unsaved changes: {$today_status}
 {/if}
@@ -218,6 +214,6 @@ Averages [3, 5, 7] days: [{(averages[0]||0).toFixed(1)}, {(averages[1]||0).toFix
     <tr><th>Source</th><th ><input class="val" type="text" bind:value={editing.source} readonly /></th></tr>
     </tbody>
   </table>
-  <br /><button type="button" id="cancel">cancel</button>
-  <button type="button" id="save">save</button>
+  <br /><button type="button" id="cancel" on:click={cancel_edit}>cancel</button>
+  <button type="button" id="save" on:click={save_edit}>save</button>
 {/if}

@@ -48,13 +48,6 @@
   $: results = history.getData().slice(0, limit);
   $: averages = compute_averages(history.getData());
 
-  onMount(() => {
-    let box = document.getElementById("limit");
-    box.onchange = function () {
-      limit = box.value;
-    };
-  });
-
   function do_msg(event) {
     if (event.status == "completed") return;
     let entry = event.detail.entry;
@@ -98,7 +91,7 @@
 Averages [3, 5, 7] days: [{averages[0].toFixed(1)}, {averages[1].toFixed(1)}, {averages[2].toFixed(
   1
 )}]<br />
-Number of days to view <input type="number" id="limit" value={limit} />
+Number of days to view <input type="number" id="limit" bind:value={limit} />
 &nbsp;&nbsp; Added: {added_count}
 {#if $history_status && $history_status != 'idle'}
   🟡 Unsaved changes: {$history_status}
