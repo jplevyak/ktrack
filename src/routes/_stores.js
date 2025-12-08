@@ -89,8 +89,8 @@ function debounce(func, wait) {
 }
 
 export function synced_store(key, initialValue, sync, fromJSON) {
-  const SYNC_INTERVAL = 1000 * 60 * 5; // 5 minutes
-  const DEBOUNCE_WAIT = 2000; // 2 seconds
+  const SYNC_INTERVAL = 2000;
+  const DEBOUNCE_WAIT = 500;
 
   // We store an object in IDB: { data: serializedData, dirty: boolean }
   
