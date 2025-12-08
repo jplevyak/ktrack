@@ -63,11 +63,11 @@ export class CollabJSON {
 
   _generateSortKey(previousKey, nextKey) {
     if (previousKey === null && nextKey === null) {
-      return 0.5;
-    } // Start in middle of 0..1
+      return 1;
+    } // Start at 1 to match _plainToCrdt default
 
     if (previousKey === null) {
-      return nextKey / 2;
+      return nextKey - 1;
     }
 
     if (nextKey === null) {
