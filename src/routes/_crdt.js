@@ -412,7 +412,7 @@ export class CollabJSON {
 
   // --- Operation Generators (Public API) ---
 
-  addItem(path, data) {
+  addItem(path, data, id) {
     const parentPath = path.slice(0, -1);
     const keyOrIndex = path.at(-1);
 
@@ -449,7 +449,7 @@ export class CollabJSON {
     const nextKey = nextItem ? nextItem.sortKey : null;
 
     const newSortKey = this._generateSortKey(previousKey, nextKey);
-    const newItemId = this._generateId();
+    const newItemId = id || this._generateId();
 
     this._applyAndStore({
       type: 'ADD_ITEM', path: parentPath, itemId: newItemId, data, sortKey: newSortKey, timestamp: this._tick(),

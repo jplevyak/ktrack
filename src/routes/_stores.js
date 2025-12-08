@@ -453,7 +453,7 @@ export function save_history(day, profile) {
       history.updateItem([existing_index], day_data);
     } else {
       const insert_index = history_data.findIndex(d => d && d.timestamp < day_data.timestamp);
-      history.addItem([insert_index === -1 ? history_data.length : insert_index], day_data);
+      history.addItem([insert_index === -1 ? history_data.length : insert_index], day_data, day_date.timestamp);
     }
 
     const limit = merge_history_limit || 50;
