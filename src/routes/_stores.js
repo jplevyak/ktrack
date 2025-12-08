@@ -540,6 +540,7 @@ export function check_for_new_day(t, profile) {
     save_today(t, profile);
     return t;
   }
+  save_history(t, profile);
   return t;
 }
 
