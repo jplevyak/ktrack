@@ -438,7 +438,7 @@ export function add_item(item, today, edit, profile) {
     item = { ...item };
     if (item.servings == undefined)
       item.servings = 1.0;
-    day.addItem(['items', data.items.length], item);
+    day.addItem(['items', data.items.length], item, item.name);
 
     if (edit == undefined) {
       save_history(day, profile);
