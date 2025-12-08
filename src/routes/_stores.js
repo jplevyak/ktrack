@@ -89,8 +89,8 @@ function debounce(func, wait) {
 }
 
 export function synced_store(key, initialValue, sync, fromJSON) {
-  const SYNC_INTERVAL = 1000 * 60 * 5; // 5 minutes
-  const DEBOUNCE_WAIT = 2000; // 2 seconds
+  const SYNC_INTERVAL = 2000;
+  const DEBOUNCE_WAIT = 500;
 
   // We store an object in IDB: { data: serializedData, dirty: boolean }
   
@@ -453,7 +453,7 @@ export function save_history(day, profile) {
       history.updateItem([existing_index], day_data);
     } else {
       const insert_index = history_data.findIndex(d => d && d.timestamp < day_data.timestamp);
-      history.addItem([insert_index === -1 ? history_data.length : insert_index], day_data);
+      history.addItem([insert_index === -1 ? history_data.length : insert_index], day_data, day_date.timestamp);
     }
 
     const limit = merge_history_limit || 50;
