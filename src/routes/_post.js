@@ -1,7 +1,7 @@
 import LevelPkg from "level";
 const { Level } = LevelPkg;
 import { error } from "@sveltejs/kit";
-import { CollabJSON, history_prune_limit } from "./_crdt.js";
+import { CollabJSON } from "./_crdt.js";
 
 export var profile = new Level("./profile");
 
