@@ -73,11 +73,17 @@ Finds the path to a node with a specific ID (for array items) or key.
 *   `targetId` (String): The ID or key to search for.
 *   Returns `Array` (the path) or `null` if not found.
 
+### `findPathIn(subPath, targetId)`
+
+Finds the path to a node with a specific ID within a sub-tree of the document. This is useful for resolving ambiguity when IDs are not globally unique.
+
+*   `subPath` (Array): The path to the root of the sub-tree to search in.
+*   `targetId` (String): The ID or key to search for.
+*   Returns `Array` (the absolute path) or `null` if not found.
+
 ### `clear()`
 
 Resets the document to an empty state. This clears the root data, history, vector clocks, and snapshots.
-
-
 
 ### `applyOp(op)`
 
@@ -252,5 +258,50 @@ async function handleSyncRequest(req, res) {
 
   // 6. Send the response back to the client
   res.json(syncResponse);
+}
+```
+
+## 5. Best Practices: ID Selection & Management
+
+### Deterministic IDs (Natural Keys) vs. Random UUIDs
+
+When adding items to a collection, you have a choice on how to identify them:
+
+1.  **Random UUIDs** (Default): If you don't provide an ID, `CollabJSON` generates a UUID.
+    *   *Pros*: Guaranteed uniqueness.
+    *   *Cons*: If two clients add the "same" item (conceptually) at the same time, they will result in **duplicates**.
+2.  **Deterministic IDs** (Recommended): Using a "Natural Key" (e.g., a username, date/time string, or item name) as the ID.
+    *   *Pros*: Enables **Upsert** (Update-or-Insert) behavior. If two clients add an item with `id: 'apple'` concurrently, the CRDT will merge them into a single 'apple' item, applying Last-Write-Wins to any conflicting properties.
+    *   *Cons*: Requires care to ensure the ID is truly unique within its scope.
+
+**Example**:
+```javascript
+// BAD: Risk of duplicates if multiple clients add "Apple" simultaneously
+doc.addItem(['food'], { name: 'Apple', calories: 95 });
+
+// GOOD: Deterministic ID ensures merging
+doc.addItem(['food'], { id: 'Apple', name: 'Apple', calories: 95 });
+```
+
+### Scope and Ambiguity
+
+In `CollabJSON`, IDs are used as internal keys for nodes in the tree.
+*   **Unique Scope**: IDs must be unique within their immediate parent container (e.g., items in a list).
+*   **Global ambiguity**: If you reuse the same ID (e.g., 'Apple') in different lists (e.g., `History['day1']` and `History['day2']`), `findPath('Apple')` will be ambiguous because it searches the entire tree and returns the **first** match it finds.
+
+**Recommendation**:
+*   Use `findPath(id)` only for globally unique IDs (like User IDs or Day Timestamps).
+*   Use `findPathIn(subPath, id)` for locally unique IDs (like Items within a Day).
+
+### Schema Enforcement
+
+Since `CollabJSON` is schema-flexible, it is best practice to enforce your ID strategy at the **input boundary** (e.g., when uploading files or processing user input).
+
+```javascript
+// Example: Pre-processing data before adding to CRDT
+function addFoodItem(doc, dayPath, item) {
+    // Enforce: Item ID must match its Name
+    const cleanItem = { ...item, id: item.name };
+    doc.addItem(dayPath, cleanItem);
 }
 ```

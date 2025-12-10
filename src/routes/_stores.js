@@ -438,7 +438,9 @@ export function add_item(item, today, edit, profile) {
     item = { ...item };
     if (item.servings == undefined)
       item.servings = 1.0;
-    day.addItem(['items', data.items.length], item, item.name);
+
+    // Inject ID for deterministic conflict resolution
+    day.addItem(['items', data.items.length], { ...item, id: item.name });
 
     if (edit == undefined) {
       save_history(day, profile);
@@ -461,7 +463,7 @@ export function save_history(day, profile) {
       history.updateItem([existing_index], day_data);
     } else {
       const insert_index = history_data.findIndex(d => d && d.timestamp < day_data.timestamp);
-      history.addItem([insert_index === -1 ? history_data.length : insert_index], day_data, day_data.timestamp);
+      history.addItem([insert_index === -1 ? history_data.length : insert_index], { ...day_data, id: day_data.timestamp });
     }
 
     const limit = merge_history_limit || 50;

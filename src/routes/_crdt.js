@@ -359,7 +359,19 @@ export class CollabJSON {
    * Finds the path to a node with a specific ID (for array items) or key.
    * This is a DFS search.
    */
-  findPath(targetId, currentPath = [], currentNode = this.root) {
+  findPath(targetId) {
+    return this._findPathRecursive(targetId, [], this.root);
+  }
+
+  findPathIn(subPath, targetId) {
+    const result = this._traverse(subPath);
+    if (!result || !result.node) {
+      return null;
+    }
+    return this._findPathRecursive(targetId, subPath, result.node);
+  }
+
+  _findPathRecursive(targetId, currentPath = [], currentNode = this.root) {
     if (!currentNode) {
       return null;
     }
@@ -385,7 +397,7 @@ export class CollabJSON {
           return [...currentPath, i];
         }
 
-        const res = this.findPath(targetId, [...currentPath, i], item);
+        const res = this._findPathRecursive(targetId, [...currentPath, i], item);
         if (res) {
           return res;
         }
@@ -404,7 +416,7 @@ export class CollabJSON {
           return [...currentPath, key];
         } // Found by key name
 
-        const res = this.findPath(targetId, [...currentPath, key], actualNode[key]);
+        const res = this._findPathRecursive(targetId, [...currentPath, key], actualNode[key]);
         if (res) {
           return res;
         }
@@ -416,7 +428,7 @@ export class CollabJSON {
 
   // --- Operation Generators (Public API) ---
 
-  addItem(path, data, id) {
+  addItem(path, data) {
     const parentPath = path.slice(0, -1);
     const keyOrIndex = path.at(-1);
 
@@ -453,7 +465,8 @@ export class CollabJSON {
     const nextKey = nextItem ? nextItem.sortKey : null;
 
     const newSortKey = this._generateSortKey(previousKey, nextKey);
-    const newItemId = id || this._generateId();
+    // Use data.id if present, otherwise generate one.
+    const newItemId = (data && typeof data === 'object' && data.id !== undefined) ? String(data.id) : this._generateId();
 
     this._applyAndStore({
       type: 'ADD_ITEM', path: parentPath, itemId: newItemId, data, sortKey: newSortKey, timestamp: this._tick(),

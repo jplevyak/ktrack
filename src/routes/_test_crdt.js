@@ -799,4 +799,53 @@ test('replaceData: Resets server state and forces client reset', () => {
 });
 
 // Run all tests
+
+test('addItem uses data.id if present', () => {
+    const doc = new CollabJSON('{}');
+    doc.updateItem(['list'], []);
+
+    // Add item with explicit ID in data
+    doc.addItem(['list', 0], { id: 'explicit-id', value: 'foo' });
+
+    const data = doc.getData();
+    assert.equal(data.list.length, 1);
+    assert.equal(data.list[0].value, 'foo');
+
+    // Verify internal ID usage (white-box test)
+    // Traverse to list array
+    const result = doc._traverse(['list']);
+    const listNode = result.node;
+
+    // Check if the item is stored under 'explicit-id'
+    assert.ok(listNode.items['explicit-id']);
+    assert.equal(listNode.items['explicit-id'].data.value, 'foo');
+});
+
+test('findPathIn supports scoped search', () => {
+    const doc = new CollabJSON('{}');
+    // Create two lists
+    doc.updateItem(['listA'], []);
+    doc.updateItem(['listB'], []);
+
+    // Add item with same ID 'item1' to both lists
+    doc.addItem(['listA', 0], { id: 'item1', value: 'A' });
+    doc.addItem(['listB', 0], { id: 'item1', value: 'B' });
+
+    // Global findPath should find the first one (DFS order)
+    const globalPath = doc.findPath('item1');
+    assert.deepStrictEqual(globalPath, ['listA', 0]);
+
+    // Scoped search in listA
+    const pathA = doc.findPathIn(['listA'], 'item1');
+    assert.deepStrictEqual(pathA, ['listA', 0]);
+
+    // Scoped search in listB
+    const pathB = doc.findPathIn(['listB'], 'item1');
+    assert.deepStrictEqual(pathB, ['listB', 0]); // Should find the one in listB
+
+    // Search in non-existent path
+    const pathFail = doc.findPathIn(['nonexistent'], 'item1');
+    assert.strictEqual(pathFail, null);
+});
+
 runTests();

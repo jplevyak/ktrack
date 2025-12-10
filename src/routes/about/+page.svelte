@@ -65,12 +65,40 @@
     URL.revokeObjectURL(url);
   }
 
+  function preprocess_data(name, data) {
+    if (name === "history") {
+      if (Array.isArray(data)) {
+        data.forEach((day) => {
+          if (day.timestamp) day.id = day.timestamp;
+          if (day.items && Array.isArray(day.items)) {
+            day.items.forEach((item) => {
+              if (item.name) item.id = item.name;
+            });
+          }
+        });
+      }
+    } else if (name === "today") {
+      if (data.items && Array.isArray(data.items)) {
+        data.items.forEach((item) => {
+          if (item.name) item.id = item.name;
+        });
+      }
+    } else if (name === "favorites") {
+      if (Array.isArray(data)) {
+        data.forEach((item) => {
+          if (item.name) item.id = item.name;
+        });
+      }
+    }
+    return data;
+  }
+
   function upload_json(name, store, file) {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = async (e) => {
       try {
-        const data = JSON.parse(e.target.result);
+        let data = JSON.parse(e.target.result);
         if (profile && profile.username && profile.password) {
           const credentials = btoa(`${profile.username}:${profile.password}`);
           const response = await fetch(`/api/${name}`, {
@@ -87,6 +115,7 @@
             alert("Upload failed");
           }
         } else {
+          data = preprocess_data(name, data);
           store.update((doc) => {
             doc.updateItem([], data);
             return doc;
@@ -192,7 +221,8 @@ Favorites
   id="upload_favorites"
   style="display:none"
   accept=".json"
-  on:change={(e) => upload_json("favorites", favorites_store, e.target.files[0])}
+  on:change={(e) =>
+    upload_json("favorites", favorites_store, e.target.files[0])}
 />
 <button on:click={() => document.getElementById("upload_favorites").click()}
   >Upload</button
