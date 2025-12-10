@@ -99,6 +99,10 @@
     reader.onload = async (e) => {
       try {
         let data = JSON.parse(e.target.result);
+
+        // Always preprocess to inject deterministic IDs, regardless of auth status
+        data = preprocess_data(name, data);
+
         if (profile && profile.username && profile.password) {
           const credentials = btoa(`${profile.username}:${profile.password}`);
           const response = await fetch(`/api/${name}`, {
@@ -115,7 +119,6 @@
             alert("Upload failed");
           }
         } else {
-          data = preprocess_data(name, data);
           store.update((doc) => {
             doc.updateItem([], data);
             return doc;
