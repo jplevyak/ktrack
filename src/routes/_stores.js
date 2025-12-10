@@ -494,7 +494,8 @@ export function save_favorite(item, profile, replace_index) {
     if (favorites == undefined)
       favorites = make_favorites();
 
-    item = { ...item };
+    // Inject ID for deterministic conflict resolution
+    item = { ...item, id: item.name };
 
     const favorites_data = favorites.getData();
 
