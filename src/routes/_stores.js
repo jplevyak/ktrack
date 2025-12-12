@@ -126,8 +126,11 @@ export function synced_store(key, initialValue, sync, fromJSON) {
           isDirty = record.dirty || false;
           status.set(isDirty ? 'dirty' : 'idle');
 
-          // If we loaded a dirty state, try to sync
-          if (isDirty) syncToServer();
+          // if (isDirty) syncToServer(); // OLD: Only synced if dirty
+
+          // NEW: Always sync on load to get fresh server state (Pull-to-Refresh behavior on reload)
+          // Pass force=true to bypass the (!isDirty) check in syncToServer
+          syncToServer(true);
         } catch (e) {
           console.error(`Error parsing ${key} from IndexedDB`, e);
           status.set('error');
@@ -135,6 +138,8 @@ export function synced_store(key, initialValue, sync, fromJSON) {
       } else {
         // No data in DB, use initialValue
         status.set('idle');
+        // Also sync on first load/empty DB to populate from server
+        syncToServer(true);
       }
     });
   }
