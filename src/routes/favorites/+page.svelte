@@ -135,7 +135,7 @@
     if (change == "del") {
       let y = confirm("Do you want to delete the favorite?");
       if (!y) return;
-      // Remove item from favorites. (TODO)
+      favorites.deleteItem([i]);
       save(favorites);
     } else if (change == "edit") {
       editing_replace_index = index;
