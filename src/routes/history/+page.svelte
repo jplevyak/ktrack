@@ -31,10 +31,21 @@
   let results = [];
   let added_count = 0;
 
-  const unsubscribe_profile = profile_store.subscribe((p) => { profile = p; });
-  const unsubscribe_today = today_store.subscribe((t) => { today = t; });
-  const unsubscribe_edit = edit_store.subscribe((value) => { edit = value; });
-  const unsubscribe_history = history_store.subscribe((value) => { history = value; });
+  const unsubscribe_profile = profile_store.subscribe((p) => {
+    profile = p;
+  });
+  const unsubscribe_today = today_store.subscribe((t) => {
+    today = t;
+  });
+  const unsubscribe_edit = edit_store.subscribe((value) => {
+    edit = value;
+  });
+  const unsubscribe_history = history_store.subscribe((value) => {
+    history = value;
+  });
+
+  const history_status = history_store.status;
+
   onDestroy(() => {
     unsubscribe_profile();
     unsubscribe_today();
@@ -45,31 +56,29 @@
   $: results = history.getData().slice(0, limit);
   $: averages = compute_averages(history.getData());
 
-  onMount(() => {
-    let box = document.getElementById("limit");
-    box.onchange = function () {
-      limit = box.value;
-    };
-  });
-
   function do_msg(event) {
     if (event.status == "completed") return;
     let entry = event.detail.entry;
-    if (entry < 0 || entry >= history.items.length) {
+    if (entry < 0 || entry >= results.length) {
       return;
     }
-    let day = history.items[entry];
+    let day = results[entry];
+    if (!day || !day.items) return; // Safety check
+
     let index = event.detail.index;
     if (index < 0 || index >= day.items.length) {
       return;
     }
+    let item = day.items[index];
+    if (!item) return; // Safety check
+
     let change = event.detail.change;
     if (change == "fav") {
-      save_favorite(day.items[index], profile);
+      save_favorite(item, profile);
       return;
     }
     if (change > 0) {
-      add_item(day.items[index], today, edit, profile);
+      add_item(item, today, edit, profile);
       added_count += 1;
     }
   }
@@ -82,7 +91,7 @@
       goto("/");
       return;
     }
-    day_doc.addItem(['start_edit'], Date.now());
+    day_doc.addItem(["start_edit"], Date.now());
     edit_store.set(day_doc);
     goto("/");
   }
@@ -93,10 +102,13 @@
 </svelte:head>
 
 Averages [3, 5, 7] days: [{averages[0].toFixed(1)}, {averages[1].toFixed(1)}, {averages[2].toFixed(
-  1
+  1,
 )}]<br />
-Number of days to view <input type="number" id="limit" value={limit} />
+Number of days to view <input type="number" id="limit" bind:value={limit} />
 &nbsp;&nbsp; Added: {added_count}
+{#if $history_status && $history_status != "idle"}
+  🟡 Unsaved changes: {$history_status}
+{/if}
 <br /><br />
 
 {#each results as day, e}
@@ -104,7 +116,8 @@ Number of days to view <input type="number" id="limit" value={limit} />
   <b
     >Date: {weekdays[day_info.day]}
     {months[day_info.month]}
-    {day_info.date}, {day_info.year} <button on:click={() => edit_day(day)}>edit</button>
+    {day_info.date}, {day_info.year}
+    <button on:click={() => edit_day(day)}>edit</button>
   </b><br /><br />
   {#each day.items as f, i}
     <Food
@@ -122,6 +135,11 @@ Number of days to view <input type="number" id="limit" value={limit} />
       on:message={do_msg}
     />
   {/each}
-  Total: {get_total(day.items).toFixed(2)} Total fiber: {get_total_fiber(day.items)[0].toFixed(2)} {#if get_total_fiber(day.items)[1]} * some unknown * {/if}
+  Total: {get_total(day.items).toFixed(2)} Total fiber: {get_total_fiber(
+    day.items,
+  )[0].toFixed(2)}
+  {#if get_total_fiber(day.items)[1]}
+    * some unknown *
+  {/if}
   <br /><br />
 {/each}

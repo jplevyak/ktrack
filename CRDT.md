@@ -26,9 +26,11 @@ Creates a new `CollabJSON` document.
     *   `id` (String): A unique identifier for the document. If two instances share an `id`, they are considered replicas of the same document. Defaults to a new UUID.
     *   `clientId` (String): A unique identifier for the current replica (client or server). Defaults to a new UUID.
 
-### `getData()`
+### `getData(path)`
 
 Returns the current state of the document as a plain JavaScript object or array. This is useful for rendering the data in a UI.
+
+*   `path` (Array, optional): A path array to retrieve a specific subtree or value. If omitted, returns the entire document.
 
 ### `addItem(path, data)`
 
@@ -56,9 +58,38 @@ Marks an item in an array or a property on an object as deleted.
 
 *   `path` (Array of strings and numbers): The path to the item to be deleted.
 
+### `moveItem(path, fromIndex, toIndex)`
+
+Moves an item within a CRDT-native array.
+
+*   `path` (Array): The path to the array containing the item.
+*   `fromIndex` (Number): The current index of the item to move.
+*   `toIndex` (Number): The new index for the item.
+
+### `findPath(targetId)`
+
+Finds the path to a node with a specific ID (for array items) or key.
+
+*   `targetId` (String): The ID or key to search for.
+*   Returns `Array` (the path) or `null` if not found.
+
+### `findPathIn(subPath, targetId)`
+
+Finds the path to a node with a specific ID within a sub-tree of the document. This is useful for resolving ambiguity when IDs are not globally unique.
+
+*   `subPath` (Array): The path to the root of the sub-tree to search in.
+*   `targetId` (String): The ID or key to search for.
+*   Returns `Array` (the absolute path) or `null` if not found.
+
 ### `clear()`
 
 Resets the document to an empty state. This clears the root data, history, vector clocks, and snapshots.
+
+### `applyOp(op)`
+
+Applies a single operation to the document. This is used during synchronization to apply remote operations.
+
+*   `op` (Object): The operation object.
 
 ### `prune(pruneFn, clientRequestData)`
 
@@ -112,12 +143,11 @@ Creates a temporary `CollabJSON` instance from the operations contained in a syn
 
 *(Client-side)* Gathers all local operations that have not yet been acknowledged by the server and prepares a sync request payload. This method is repeatable; it can be called multiple times without losing data if a network request fails.
 
-### `requiresReset(syncRequest)`
+### `replaceData(jsonString)`
 
-*(Server-side)* Checks if the server's document ID differs from the client's document ID in the sync request. If they differ, the client likely needs to be reset.
+*(Server-side)* Replaces the entire document data with new data from a JSON string. This is treated as a new state that supersedes all previous history. It resets the history and vector clocks, effectively making this replica the authority.
 
-*   `syncRequest` (Object): The incoming sync request.
-*   Returns `true` if a reset is required, `false` otherwise.
+*   `jsonString` (String): The new JSON data.
 
 ### `getResetResponse()`
 
@@ -220,19 +250,58 @@ async function handleSyncRequest(req, res) {
   // 3. Load or initialize the server's copy of the document
   const serverDoc = CollabJSON.loadOrInit(docStateString, syncRequest, defaultJson);
 
-  // 4. Check if client needs a reset (e.g. ID mismatch)
-  if (serverDoc.requiresReset(syncRequest)) {
-      res.json(serverDoc.getResetResponse());
-      return;
-  }
-
-  // 5. Process the client's request and generate a response
+  // 4. Process the client's request and generate a response
   const syncResponse = serverDoc.getSyncResponse(syncRequest);
 
-  // 6. Save the updated document state back to the database
+  // 5. Save the updated document state back to the database
   await db.put(username, JSON.stringify(serverDoc.toJSON()));
 
-  // 7. Send the response back to the client
+  // 6. Send the response back to the client
   res.json(syncResponse);
+}
+```
+
+## 5. Best Practices: ID Selection & Management
+
+### Deterministic IDs (Natural Keys) vs. Random UUIDs
+
+When adding items to a collection, you have a choice on how to identify them:
+
+1.  **Random UUIDs** (Default): If you don't provide an ID, `CollabJSON` generates a UUID.
+    *   *Pros*: Guaranteed uniqueness.
+    *   *Cons*: If two clients add the "same" item (conceptually) at the same time, they will result in **duplicates**.
+2.  **Deterministic IDs** (Recommended): Using a "Natural Key" (e.g., a username, date/time string, or item name) as the ID.
+    *   *Pros*: Enables **Upsert** (Update-or-Insert) behavior. If two clients add an item with `id: 'apple'` concurrently, the CRDT will merge them into a single 'apple' item, applying Last-Write-Wins to any conflicting properties.
+    *   *Cons*: Requires care to ensure the ID is truly unique within its scope.
+
+**Example**:
+```javascript
+// BAD: Risk of duplicates if multiple clients add "Apple" simultaneously
+doc.addItem(['food'], { name: 'Apple', calories: 95 });
+
+// GOOD: Deterministic ID ensures merging
+doc.addItem(['food'], { id: 'Apple', name: 'Apple', calories: 95 });
+```
+
+### Scope and Ambiguity
+
+In `CollabJSON`, IDs are used as internal keys for nodes in the tree.
+*   **Unique Scope**: IDs must be unique within their immediate parent container (e.g., items in a list).
+*   **Global ambiguity**: If you reuse the same ID (e.g., 'Apple') in different lists (e.g., `History['day1']` and `History['day2']`), `findPath('Apple')` will be ambiguous because it searches the entire tree and returns the **first** match it finds.
+
+**Recommendation**:
+*   Use `findPath(id)` only for globally unique IDs (like User IDs or Day Timestamps).
+*   Use `findPathIn(subPath, id)` for locally unique IDs (like Items within a Day).
+
+### Schema Enforcement
+
+Since `CollabJSON` is schema-flexible, it is best practice to enforce your ID strategy at the **input boundary** (e.g., when uploading files or processing user input).
+
+```javascript
+// Example: Pre-processing data before adding to CRDT
+function addFoodItem(doc, dayPath, item) {
+    // Enforce: Item ID must match its Name
+    const cleanItem = { ...item, id: item.name };
+    doc.addItem(dayPath, cleanItem);
 }
 ```

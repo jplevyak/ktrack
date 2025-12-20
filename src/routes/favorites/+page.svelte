@@ -37,6 +37,8 @@
   const unsubscribe_today = today_store.subscribe((t) => { today = t; });
   const unsubscribe_edit = edit_store.subscribe((e) => { edit = e; });
 
+  const favorites_status = favorites_store.status;
+
   $: today, check_for_new_day(today, profile);
 
   onDestroy(() => {
@@ -93,36 +95,31 @@
     favorites_store.set(favs);
   }
 
-  afterUpdate(() => {
-    if (editing == undefined) {
-      let search_box = document.getElementById("search_string");
-      function search_results() {
-        search_value = search_box.value;
-        update_results();
-      }
-      search_box.onchange = search_results;
-      document.getElementById("search").onclick = search_results;
-      document.getElementById("create").onclick = function () {
-        editing = make_item();
-      };
-      document.getElementById("clear_input").onclick = () => {
-        document.getElementById("search_string").value = "";
-        search_value = "";
-        update_results();
-      };
-    } else {
-      document.getElementById("cancel").onclick = function () {
-        editing_replace_index = undefined;
-        editing = undefined;
-      };
-      document.getElementById("save").onclick = function () {
-        let edited = { ...editing };
-        save_favorite(edited, profile, editing_replace_index);
-        editing_replace_index = undefined;
-        editing = undefined;
-      };
-    }
-  });
+  function search_results() {
+    // search_value is bound to the input, so just update results
+    update_results();
+  }
+
+  function create_favorite() {
+    editing = make_item();
+  }
+
+  function clear_search() {
+    search_value = "";
+    update_results();
+  }
+
+  function cancel_edit() {
+    editing_replace_index = undefined;
+    editing = undefined;
+  }
+
+  function save_edit() {
+    let edited = { ...editing };
+    save_favorite(edited, profile, editing_replace_index);
+    editing_replace_index = undefined;
+    editing = undefined;
+  }
 
   function do_msg(event) {
     if (event.status == "completed") return;
@@ -135,25 +132,27 @@
     if (change == "del") {
       let y = confirm("Do you want to delete the favorite?");
       if (!y) return;
-      favorites.deleteItem([i]);
+      let i = index;
+      if (results_map != undefined) i = results_map.get(index);
+      favorites.deleteItem([Number(i)]);
       save(favorites);
     } else if (change == "edit") {
       editing_replace_index = index;
       if (results_map != undefined)
         editing_replace_index = results_map.get(index);
+      editing_replace_index = Number(editing_replace_index);
       let edit = { ...item };
-      delete edit.del;
       edit.source = "custom";
       editing = edit;
     } else if (change == "dup") {
       let edit = { ...item };
       edit.name = edit.name + " (dup)";
-      delete edit.del;
       edit.source = "custom";
       editing = edit;
     } else if (change == "up") {
       let i = index;
       if (results_map != undefined) i = results_map.get(index);
+      i = Number(i);
       let j = i - 1;
       if (j >= 0) {
         favorites.moveItem([], i, i-1);
@@ -163,6 +162,7 @@
     } else if (change == "down") {
       let i = index;
       if (results_map != undefined) i = results_map.get(index);
+      i = Number(i);
       let j = i + 1;
       if (j < favorites.getData().length) {
         favorites.moveItem([], i, i+1);
@@ -181,11 +181,14 @@
 </svelte:head>
 
 {#if editing == undefined}
-  Search <input type="text" id="search_string" />
-  <button type="button" id="search">Search</button>
-  <button type="button" id="clear_input">Clear</button>
-  <button type="button" id="create">Create New Favorite</button>
+  Search <input type="text" id="search_string" bind:value={search_value} on:input={search_results} />
+  <button type="button" id="search" on:click={search_results}>Search</button>
+  <button type="button" id="clear_input" on:click={clear_search}>Clear</button>
+  <button type="button" id="create" on:click={create_favorite}>Create New Favorite</button>
   &nbsp;&nbsp; Added: {added_count}
+  {#if $favorites_status && $favorites_status != 'idle'}
+      🟡 Unsaved changes: {$favorites_status}
+  {/if}
   <br /><br />
   {#if favorites != undefined}
     {#each results as f, i}
@@ -252,8 +255,8 @@
     >
   </tbody>
   </table>
-  <br /><button type="button" id="cancel">cancel</button>
-  <button type="button" id="save">save</button>
+  <br /><button type="button" id="cancel" on:click={cancel_edit}>cancel</button>
+  <button type="button" id="save" on:click={save_edit}>save</button>
 {/if}
 
 <style>

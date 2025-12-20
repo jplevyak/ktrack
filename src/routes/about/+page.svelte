@@ -3,7 +3,7 @@
   import {
     logout,
     profile_store,
-    sync_profile,
+    save_profile,
     today_store,
     favorites_store,
     history_store,
@@ -65,16 +65,65 @@
     URL.revokeObjectURL(url);
   }
 
-  function upload_json(store, file) {
+  function preprocess_data(name, data) {
+    if (name === "history") {
+      if (Array.isArray(data)) {
+        data.forEach((day) => {
+          if (day.timestamp) day.id = day.timestamp;
+          if (day.items && Array.isArray(day.items)) {
+            day.items.forEach((item) => {
+              if (item.name) item.id = item.name;
+            });
+          }
+        });
+      }
+    } else if (name === "today") {
+      if (data.items && Array.isArray(data.items)) {
+        data.items.forEach((item) => {
+          if (item.name) item.id = item.name;
+        });
+      }
+    } else if (name === "favorites") {
+      if (Array.isArray(data)) {
+        data.forEach((item) => {
+          if (item.name) item.id = item.name;
+        });
+      }
+    }
+    return data;
+  }
+
+  function upload_json(name, store, file) {
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
-        const data = JSON.parse(e.target.result);
-        store.update((doc) => {
-          doc.updateItem([], data);
-          return doc;
-        });
+        let data = JSON.parse(e.target.result);
+
+        // Always preprocess to inject deterministic IDs, regardless of auth status
+        data = preprocess_data(name, data);
+
+        if (profile && profile.username && profile.password) {
+          const credentials = btoa(`${profile.username}:${profile.password}`);
+          const response = await fetch(`/api/${name}`, {
+            method: "PUT",
+            headers: {
+              Authorization: `Basic ${credentials}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(data),
+          });
+          if (response.ok) {
+            store.sync();
+          } else {
+            alert("Upload failed");
+          }
+        } else {
+          store.update((doc) => {
+            doc.updateItem([], data);
+            return doc;
+          });
+        }
       } catch (error) {
         console.error("Error uploading JSON:", error);
         alert("Failed to upload JSON. Check console for details.");
@@ -104,8 +153,7 @@
         profile.username = username_input.value;
         profile.password = password_input.value;
         profile.old_password = old_password_input.value;
-        await sync_profile(profile);
-        profile = profile;
+        await save_profile(profile);
       }
     }
     save.onclick = changed;
@@ -149,7 +197,7 @@ Today
   id="upload_today"
   style="display:none"
   accept=".json"
-  on:change={(e) => upload_json(today_store, e.target.files[0])}
+  on:change={(e) => upload_json("today", today_store, e.target.files[0])}
 />
 <button on:click={() => document.getElementById("upload_today").click()}
   >Upload</button
@@ -176,7 +224,8 @@ Favorites
   id="upload_favorites"
   style="display:none"
   accept=".json"
-  on:change={(e) => upload_json(favorites_store, e.target.files[0])}
+  on:change={(e) =>
+    upload_json("favorites", favorites_store, e.target.files[0])}
 />
 <button on:click={() => document.getElementById("upload_favorites").click()}
   >Upload</button
@@ -202,7 +251,7 @@ History
   id="upload_history"
   style="display:none"
   accept=".json"
-  on:change={(e) => upload_json(history_store, e.target.files[0])}
+  on:change={(e) => upload_json("history", history_store, e.target.files[0])}
 />
 <button on:click={() => document.getElementById("upload_history").click()}
   >Upload</button

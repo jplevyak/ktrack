@@ -1,6 +1,7 @@
 import { readable, writable, get } from "svelte/store";
 import { browser } from '$app/environment';
 import { CollabJSON } from "./_crdt.js";
+import { v4 as uuidv4 } from 'uuid';
 import {
   compare_date,
   get_date_info,
@@ -62,28 +63,52 @@ async function dbSet(key, value) {
 }
 // ------------------------
 
+// --- Global Client ID ---
+let globalClientId;
+if (browser) {
+  globalClientId = localStorage.getItem('ktrack_client_id');
+  if (!globalClientId) {
+    globalClientId = uuidv4();
+    localStorage.setItem('ktrack_client_id', globalClientId);
+  }
+} else {
+  // For SSR, we don't have a persistent ID, but we can generate one or use a placeholder.
+  // Since SSR shouldn't be generating ops that persist to the client in this architecture,
+  // a random one is acceptable or 'server-render'.
+  globalClientId = uuidv4();
+}
+// ------------------------
+
 function debounce(func, wait) {
   let timeout;
-  return function(...args) {
+  return function (...args) {
     const context = this;
+    const callNow = !timeout;
+
     clearTimeout(timeout);
-    timeout = setTimeout(() => func.apply(context, args), wait);
+
+    timeout = setTimeout(() => {
+      timeout = null;
+      if (!callNow) func.apply(context, args);
+    }, wait);
+
+    if (callNow) func.apply(context, args);
   };
 }
 
 export function synced_store(key, initialValue, sync, fromJSON) {
-  const SYNC_INTERVAL = 1000 * 60 * 5; // 5 minutes
-  const DEBOUNCE_WAIT = 2000; // 2 seconds
+  const SYNC_INTERVAL = 2000;
+  const DEBOUNCE_WAIT = 500;
 
   // We store an object in IDB: { data: serializedData, dirty: boolean }
-  
+
   let isDirty = false;
   const status = writable('loading'); // Start with loading status
 
   // Initialize with default value
   const { subscribe, set: svelteSet, update: svelteUpdate } = writable(initialValue, () => {
     if (!browser) return;
-    
+
     // Setup sync interval
     const intervalId = setInterval(syncToServer, SYNC_INTERVAL);
     return () => clearInterval(intervalId);
@@ -100,9 +125,12 @@ export function synced_store(key, initialValue, sync, fromJSON) {
           svelteSet(value);
           isDirty = record.dirty || false;
           status.set(isDirty ? 'dirty' : 'idle');
-          
-          // If we loaded a dirty state, try to sync
-          if (isDirty) syncToServer();
+
+          // if (isDirty) syncToServer(); // OLD: Only synced if dirty
+
+          // NEW: Always sync on load to get fresh server state (Pull-to-Refresh behavior on reload)
+          // Pass force=true to bypass the (!isDirty) check in syncToServer
+          syncToServer(true);
         } catch (e) {
           console.error(`Error parsing ${key} from IndexedDB`, e);
           status.set('error');
@@ -110,6 +138,8 @@ export function synced_store(key, initialValue, sync, fromJSON) {
       } else {
         // No data in DB, use initialValue
         status.set('idle');
+        // Also sync on first load/empty DB to populate from server
+        syncToServer(true);
       }
     });
   }
@@ -130,8 +160,8 @@ export function synced_store(key, initialValue, sync, fromJSON) {
 
       // Sanity check before sync
       if (fromJSON && !(currentValue instanceof CollabJSON)) {
-         console.error(`Store ${key} corrupted before sync: expected CollabJSON`, currentValue);
-         return;
+        console.error(`Store ${key} corrupted before sync: expected CollabJSON`, currentValue);
+        return;
       }
 
       const ok = await sync(currentValue);
@@ -140,19 +170,19 @@ export function synced_store(key, initialValue, sync, fromJSON) {
 
       // Sanity check after sync
       if (fromJSON && !(currentValue instanceof CollabJSON)) {
-         console.error(`Store ${key} corrupted after sync: expected CollabJSON`, currentValue);
-         return;
+        console.error(`Store ${key} corrupted after sync: expected CollabJSON`, currentValue);
+        return;
       }
 
       // Notify Svelte of mutated value.
       svelteSet(currentValue);
-      
+
       if (browser) {
         // Save clean state to IDB
         const serialized = fromJSON ? currentValue.toJSON() : currentValue;
         await dbSet(key, { data: serialized, dirty: false });
       }
-      
+
       isDirty = false;
       status.set('idle');
       console.log('Sync successful', key);
@@ -169,7 +199,7 @@ export function synced_store(key, initialValue, sync, fromJSON) {
     isDirty = true;
     status.set('dirty');
     svelteSet(newValue);
-    
+
     if (browser) {
       // Save dirty state to IDB
       const serialized = fromJSON ? newValue.toJSON() : newValue;
@@ -177,7 +207,7 @@ export function synced_store(key, initialValue, sync, fromJSON) {
       // but IDB is async. It's "fire and forget" for the UI, but ensures persistence.
       dbSet(key, { data: serialized, dirty: true });
     }
-    
+
     debouncedSync();
   };
 
@@ -196,11 +226,9 @@ export function synced_store(key, initialValue, sync, fromJSON) {
   };
 }
 
-export async function sync_profile(profile) {
+async function sync_profile(profile) {
   if (profile.password == "") {
-    profile_store.set(make_profile());
-    console.log("logout");
-    return;
+    return true;
   }
   let data = {
     username: profile.username,
@@ -262,49 +290,49 @@ export const online = readable(browser ? navigator.onLine : true, (set) => {
 });
 
 function local_writable(key, initialValue) {
-    // Keep local_writable using localStorage for small non-critical UI state (like 'edit')
-    // or switch to IDB if consistency is desired. 
-    // 'edit' is transient, so localStorage is probably fine, but let's keep it simple.
-    let storedValue = initialValue;
-    if (browser) {
-        const fromStorage = localStorage.getItem(key);
-        if (fromStorage && fromStorage !== 'undefined') {
-            try {
-                storedValue = JSON.parse(fromStorage);
-            } catch(e) {
-                console.error(`Could not parse stored value for ${key}`, e);
-            }
-        }
+  // Keep local_writable using localStorage for small non-critical UI state (like 'edit')
+  // or switch to IDB if consistency is desired. 
+  // 'edit' is transient, so localStorage is probably fine, but let's keep it simple.
+  let storedValue = initialValue;
+  if (browser) {
+    const fromStorage = localStorage.getItem(key);
+    if (fromStorage && fromStorage !== 'undefined') {
+      try {
+        storedValue = JSON.parse(fromStorage);
+      } catch (e) {
+        console.error(`Could not parse stored value for ${key}`, e);
+      }
     }
+  }
 
-    const { subscribe, set, update } = writable(storedValue);
+  const { subscribe, set, update } = writable(storedValue);
 
-    return {
-        subscribe,
-        set: (value) => {
-            if (browser) {
-                try {
-                    localStorage.setItem(key, JSON.stringify(value));
-                } catch (e) {
-                    console.error("localStorage quota exceeded for local_writable", e);
-                }
-            }
-            set(value);
-        },
-        update: (fn) => {
-            update(currentValue => {
-                const newValue = fn(currentValue);
-                if (browser) {
-                    try {
-                        localStorage.setItem(key, JSON.stringify(newValue));
-                    } catch (e) {
-                        console.error("localStorage quota exceeded for local_writable", e);
-                    }
-                }
-                return newValue;
-            });
+  return {
+    subscribe,
+    set: (value) => {
+      if (browser) {
+        try {
+          localStorage.setItem(key, JSON.stringify(value));
+        } catch (e) {
+          console.error("localStorage quota exceeded for local_writable", e);
         }
-    };
+      }
+      set(value);
+    },
+    update: (fn) => {
+      update(currentValue => {
+        const newValue = fn(currentValue);
+        if (browser) {
+          try {
+            localStorage.setItem(key, JSON.stringify(newValue));
+          } catch (e) {
+            console.error("localStorage quota exceeded for local_writable", e);
+          }
+        }
+        return newValue;
+      });
+    }
+  };
 }
 
 export const index_store = writable(undefined);
@@ -369,14 +397,23 @@ async function sync_history(history) {
 }
 
 function collab_from_json(parsed) {
-    // Gracefully handle null/undefined if localStorage is empty.
-    if (!parsed) return null;
-    return CollabJSON.fromJSON(parsed);
+  // Gracefully handle null/undefined if localStorage is empty.
+  if (!parsed) return null;
+  // Override clientId with global one
+  return CollabJSON.fromJSON(parsed, { clientId: globalClientId });
 }
 
-export const today_store = synced_store("today", make_today(), sync_today, collab_from_json);
-export const favorites_store = synced_store("favorites", make_favorites(), sync_favorites, collab_from_json);
-export const history_store = synced_store("history", make_history(), sync_history, collab_from_json);
+function init_store_value(maker) {
+  const doc = maker();
+  if (doc instanceof CollabJSON && globalClientId) {
+    doc.clientId = globalClientId;
+  }
+  return doc;
+}
+
+export const today_store = synced_store("today", init_store_value(make_today), sync_today, collab_from_json);
+export const favorites_store = synced_store("favorites", init_store_value(make_favorites), sync_favorites, collab_from_json);
+export const history_store = synced_store("history", init_store_value(make_history), sync_history, collab_from_json);
 
 export function add_item(item, today, edit, profile) {
   if (edit != undefined) {
@@ -406,7 +443,9 @@ export function add_item(item, today, edit, profile) {
     item = { ...item };
     if (item.servings == undefined)
       item.servings = 1.0;
-    day.addItem(['items', data.items.length], item);
+
+    // Inject ID for deterministic conflict resolution
+    day.addItem(['items', data.items.length], { ...item, id: item.name });
 
     if (edit == undefined) {
       save_history(day, profile);
@@ -429,20 +468,25 @@ export function save_history(day, profile) {
       history.updateItem([existing_index], day_data);
     } else {
       const insert_index = history_data.findIndex(d => d && d.timestamp < day_data.timestamp);
-      history.addItem([insert_index === -1 ? history_data.length : insert_index], day_data);
+      history.addItem([insert_index === -1 ? history_data.length : insert_index], { ...day_data, id: day_data.timestamp });
     }
 
     const limit = merge_history_limit || 50;
     const current_items = history.getData();
     if (current_items.length > limit) {
-        // Prune oldest items if history exceeds limit
-        for (let i = limit; i < current_items.length; i++) {
-            history.deleteItem([limit]); // Always delete item at `limit` index as list shrinks
-        }
+      // Prune oldest items if history exceeds limit
+      for (let i = limit; i < current_items.length; i++) {
+        history.deleteItem([limit]); // Always delete item at `limit` index as list shrinks
+      }
     }
 
     return history;
   });
+}
+
+export async function save_profile(profile) {
+  profile_store.set(profile);
+  await sync_profile(profile);
 }
 
 export function save_today(today, profile) {
@@ -455,7 +499,8 @@ export function save_favorite(item, profile, replace_index) {
     if (favorites == undefined)
       favorites = make_favorites();
 
-    item = { ...item };
+    // Inject ID for deterministic conflict resolution
+    item = { ...item, id: item.name };
 
     const favorites_data = favorites.getData();
 
@@ -495,8 +540,7 @@ export function check_for_new_day(t, profile) {
     const newData = new_day.getData();
 
     if (newData.timestamp) {
-        t.updateItem(['items'], '[]');
-        t.updateItem(['timestamp'], newData.timestamp);
+      t.updateItem(['timestamp'], newData.timestamp);
     }
 
     t.updateItem(['items'], []);
@@ -504,6 +548,7 @@ export function check_for_new_day(t, profile) {
     save_today(t, profile);
     return t;
   }
+  save_history(t, profile);
   return t;
 }
 
