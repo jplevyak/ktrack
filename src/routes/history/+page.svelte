@@ -31,18 +31,10 @@
   let results = [];
   let added_count = 0;
 
-  const unsubscribe_profile = profile_store.subscribe((p) => {
-    profile = p;
-  });
-  const unsubscribe_today = today_store.subscribe((t) => {
-    today = t;
-  });
-  const unsubscribe_edit = edit_store.subscribe((value) => {
-    edit = value;
-  });
-  const unsubscribe_history = history_store.subscribe((value) => {
-    history = value;
-  });
+  const unsubscribe_profile = profile_store.subscribe((p) => { profile = p; });
+  const unsubscribe_today = today_store.subscribe((t) => { today = t; });
+  const unsubscribe_edit = edit_store.subscribe((value) => { edit = value; });
+  const unsubscribe_history = history_store.subscribe((value) => { history = value; });
 
   const history_status = history_store.status;
 
@@ -53,6 +45,7 @@
     unsubscribe_history();
   });
 
+  $: today, check_for_new_day(today, profile);
   $: results = history.getData().slice(0, limit);
   $: averages = compute_averages(history.getData());
 
@@ -85,8 +78,7 @@
 
   function edit_day(day) {
     let day_doc = new CollabJSON(JSON.stringify(day));
-    today = check_for_new_day(today, profile);
-    if (compare_date(day_doc, today) == 0) {
+    if (!today || compare_date(day_doc, today) == 0) {
       edit_store.set(undefined);
       goto("/");
       return;

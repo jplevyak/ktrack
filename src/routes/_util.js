@@ -62,20 +62,11 @@ export function get_date_info(day) {
 }
 
 export function compare_date(d1, d2) {
-  const d1_info = get_date_info(d1);
-  const d2_info = get_date_info(d2);
+  const d1_timestamp = d1.getData(['timestamp']);
+  const d2_timestamp = d2.getData(['timestamp']);
 
-  if (!d1_info || !d2_info) {
-    if (d1_info === d2_info) return 0;
-    return d1_info ? 1 : -1;
-  }
-
-  if (d1_info.year > d2_info.year) return 1;
-  if (d1_info.year < d2_info.year) return -1;
-  if (d1_info.month > d2_info.month) return 1;
-  if (d1_info.month < d2_info.month) return -1;
-  if (d1_info.date > d2_info.date) return 1;
-  if (d1_info.date < d2_info.date) return -1;
+  if (d1_timestamp > d2_timestamp) return 1;
+  if (d1_timestamp < d2_timestamp) return -1;
   return 0;
 }
 
@@ -164,7 +155,7 @@ export function prune_today(server_doc, clientSyncRequest) {
   const server_has_date = !!server_data.timestamp;
 
   // If server has no date, or client's date is newer, overwrite server state.
-  if (!server_has_date || compare_date(client_day_temp, server_doc) > 0) {
+  if (!server_has_date || client_day_temp_data.timestamp > serve_data.timestamp) {
     // Reset the server document's state. 
     // getSyncResponse will then build the new state from the client's operations.
     server_doc.clear();

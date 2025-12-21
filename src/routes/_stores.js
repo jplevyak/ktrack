@@ -425,15 +425,11 @@ export function add_item(item, today, edit, profile) {
       edit.updateItem(edit.findPath('start_edit'), Date.now());
       edit_store.set(edit);
     }
+  } else {
+    if (!today) return;
   }
   let store = edit != undefined ? edit_store : today_store;
-  if (edit == undefined) {
-    today = check_for_new_day(today, profile);
-  }
   store.update(function (day) {
-    if (day == undefined)
-      day = make_today();
-
     const data = day.getData();
     const existing_index = data.items.findIndex(i => i.name == item.name);
     if (existing_index !== -1) {
@@ -546,7 +542,6 @@ export function check_for_new_day(t, profile) {
     t.updateItem(['items'], []);
 
     save_today(t, profile);
-    return t;
   }
   save_history(t, profile);
   return t;
