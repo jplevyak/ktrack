@@ -25,7 +25,9 @@
   let today = undefined;
   let edit = undefined;
 
-  const unsubscribe_profile = profile_store.subscribe((p) => { profile = p; });
+  const unsubscribe_profile = profile_store.subscribe((p) => {
+    profile = p;
+  });
   const unsubscribe_favorites = favorites_store.subscribe((value) => {
     if (value == undefined) {
       return;
@@ -34,12 +36,16 @@
     create_index();
     update_results();
   });
-  const unsubscribe_today = today_store.subscribe((t) => { today = t; });
-  const unsubscribe_edit = edit_store.subscribe((e) => { edit = e; });
+  const unsubscribe_today = today_store.subscribe((t) => {
+    today = t;
+  });
+  const unsubscribe_edit = edit_store.subscribe((e) => {
+    edit = e;
+  });
 
   const favorites_status = favorites_store.status;
 
-  $: today, check_for_new_day(today, profile);
+  $: (today, check_for_new_day(today, profile));
 
   onDestroy(() => {
     unsubscribe_today();
@@ -138,8 +144,7 @@
       save(favorites);
     } else if (change == "edit") {
       editing_replace_index = index;
-      if (results_map != undefined)
-        editing_replace_index = results_map.get(index);
+      if (results_map != undefined) editing_replace_index = results_map.get(index);
       editing_replace_index = Number(editing_replace_index);
       let edit = { ...item };
       edit.source = "custom";
@@ -155,7 +160,7 @@
       i = Number(i);
       let j = i - 1;
       if (j >= 0) {
-        favorites.moveItem([], i, i-1);
+        favorites.moveItem([], i, i - 1);
         save(favorites);
         return;
       }
@@ -165,7 +170,7 @@
       i = Number(i);
       let j = i + 1;
       if (j < favorites.getData().length) {
-        favorites.moveItem([], i, i+1);
+        favorites.moveItem([], i, i + 1);
         save(favorites);
         return;
       }
@@ -181,13 +186,18 @@
 </svelte:head>
 
 {#if editing == undefined}
-  Search <input type="text" id="search_string" bind:value={search_value} on:input={search_results} />
+  Search <input
+    type="text"
+    id="search_string"
+    bind:value={search_value}
+    on:input={search_results}
+  />
   <button type="button" id="search" on:click={search_results}>Search</button>
   <button type="button" id="clear_input" on:click={clear_search}>Clear</button>
   <button type="button" id="create" on:click={create_favorite}>Create New Favorite</button>
   &nbsp;&nbsp; Added: {added_count}
-  {#if $favorites_status && $favorites_status != 'idle'}
-      🟡 Unsaved changes: {$favorites_status}
+  {#if $favorites_status && $favorites_status != "idle"}
+    🟡 Unsaved changes: {$favorites_status}
   {/if}
   <br /><br />
   {#if favorites != undefined}
@@ -212,48 +222,20 @@
   {/if}
 {:else}
   <table>
-  <tbody>
-    <tr
-      ><th>Name</th><th
-        ><input class="val" type="text" bind:value={editing.name} /></th
-      ></tr
-    >
-    <tr
-      ><th>Notes</th><th
-        ><input class="val" type="text" bind:value={editing.notes} /></th
-      ></tr
-    >
-    <tr
-      ><th>mcg</th><th>
-        <input class="val" type="number" bind:value={editing.mcg} /></th
-      ></tr
-    >
-    <tr
-      ><th>fiber</th><th>
-        <input class="val" type="number" bind:value={editing.fiber} /></th
-      ></tr
-    >
-    <tr
-      ><th>Unit</th><th
-        ><input class="val" type="text" bind:value={editing.unit} /></th
-      ></tr
-    >
-    <tr
-      ><th>Servings</th><th
-        ><input
-          class="val"
-          type="number"
-          step="0.1"
-          bind:value={editing.servings}
-        /></th
-      ></tr
-    >
-    <tr
-      ><th>Source</th><th
-        ><input class="val" type="text" bind:value={editing.source} /></th
-      ></tr
-    >
-  </tbody>
+    <tbody>
+      <tr><th>Name</th><th><input class="val" type="text" bind:value={editing.name} /></th></tr>
+      <tr><th>Notes</th><th><input class="val" type="text" bind:value={editing.notes} /></th></tr>
+      <tr><th>mcg</th><th> <input class="val" type="number" bind:value={editing.mcg} /></th></tr>
+      <tr><th>fiber</th><th> <input class="val" type="number" bind:value={editing.fiber} /></th></tr
+      >
+      <tr><th>Unit</th><th><input class="val" type="text" bind:value={editing.unit} /></th></tr>
+      <tr
+        ><th>Servings</th><th
+          ><input class="val" type="number" step="0.1" bind:value={editing.servings} /></th
+        ></tr
+      >
+      <tr><th>Source</th><th><input class="val" type="text" bind:value={editing.source} /></th></tr>
+    </tbody>
   </table>
   <br /><button type="button" id="cancel" on:click={cancel_edit}>cancel</button>
   <button type="button" id="save" on:click={save_edit}>save</button>

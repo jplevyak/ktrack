@@ -26,11 +26,17 @@
   let results = [];
   let added_count = 0;
 
-  const unsubscribe_profile = profile_store.subscribe((p) => { profile = p; });
-  const unsubscribe_today = today_store.subscribe((t) => { today = t; });
-  const unsubscribe_edit = edit_store.subscribe((e) => { edit = e; });
+  const unsubscribe_profile = profile_store.subscribe((p) => {
+    profile = p;
+  });
+  const unsubscribe_today = today_store.subscribe((t) => {
+    today = t;
+  });
+  const unsubscribe_edit = edit_store.subscribe((e) => {
+    edit = e;
+  });
 
-  $: today, check_for_new_day(today, profile);
+  $: (today, check_for_new_day(today, profile));
 
   onDestroy(() => {
     unsubscribe_profile();
@@ -81,20 +87,20 @@
 Search <input type="text" id="search_string" />
 <button type="button" id="search">Search</button>
 <button type="button" id="clear_input">Clear</button>
-  &nbsp;&nbsp; Added: {added_count}
-  <br /><br />
+&nbsp;&nbsp; Added: {added_count}
+<br /><br />
 
-  {#each results as f, i}
-    <Food
-      name={f.name}
-      notes={f.notes}
-      index={i}
-      mcg={f.mcg}
-      fiber={f.fiber}
-      unit={f.unit}
-      source={f.source}
-      use_add="true"
-      use_fav="true"
-      on:message={do_msg}
-    />
-  {/each}
+{#each results as f, i}
+  <Food
+    name={f.name}
+    notes={f.notes}
+    index={i}
+    mcg={f.mcg}
+    fiber={f.fiber}
+    unit={f.unit}
+    source={f.source}
+    use_add="true"
+    use_fav="true"
+    on:message={do_msg}
+  />
+{/each}

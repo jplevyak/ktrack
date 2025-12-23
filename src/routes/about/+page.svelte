@@ -174,16 +174,14 @@
 </ul>
 
 <h1>Profile</h1>
-Add username and password to store data on the ktrack server. Users concerned about
-privacy should run their own server. Contact server administration if the password
-is lost.
+Add username and password to store data on the ktrack server. Users concerned about privacy should run
+their own server. Contact server administration if the password is lost.
 <br />
 <br />
 {#if profile != undefined}
   Status: <b>{profile.message}</b><br />
   Username: <input type="text" id="username" value={profile.username} /><br />
-  Password: <input type="password" id="password" value={profile.password} /><br
-  />
+  Password: <input type="password" id="password" value={profile.password} /><br />
   Old Password (when updating Password)
   <input type="text" id="old_password" value={profile.old_password} /><br />
   <button type="button" id="save">Login/Save</button>
@@ -199,53 +197,37 @@ Today
   accept=".json"
   on:change={(e) => upload_json("today", today_store, e.target.files[0])}
 />
-<button on:click={() => document.getElementById("upload_today").click()}
-  >Upload</button
->
+<button on:click={() => document.getElementById("upload_today").click()}>Upload</button>
 <button on:click={() => today_store.sync()}>Sync</button>
 <ul>
   <li>
-    Server Check Time: {today.checked
-      ? new Date(today.checked).toString()
-      : "unsynced"}
+    Server Check Time: {today.checked ? new Date(today.checked).toString() : "unsynced"}
   </li>
   <li>
-    Server Sync Time: {today.synced
-      ? new Date(today.synced).toString()
-      : "unsynced"}
+    Server Sync Time: {today.synced ? new Date(today.synced).toString() : "unsynced"}
   </li>
 </ul>
 Favorites
-<button on:click={() => download_json("favorites.json", favorites)}
-  >Download</button
->
+<button on:click={() => download_json("favorites.json", favorites)}>Download</button>
 <input
   type="file"
   id="upload_favorites"
   style="display:none"
   accept=".json"
-  on:change={(e) =>
-    upload_json("favorites", favorites_store, e.target.files[0])}
+  on:change={(e) => upload_json("favorites", favorites_store, e.target.files[0])}
 />
-<button on:click={() => document.getElementById("upload_favorites").click()}
-  >Upload</button
->
+<button on:click={() => document.getElementById("upload_favorites").click()}>Upload</button>
 <button on:click={() => favorites_store.sync()}>Sync</button>
 <ul>
   <li>
-    Server Check Time: {favorites.checked
-      ? new Date(favorites.checked).toString()
-      : "unsynced"}
+    Server Check Time: {favorites.checked ? new Date(favorites.checked).toString() : "unsynced"}
   </li>
   <li>
-    Server Sync Time: {favorites.synced
-      ? new Date(favorites.synced).toString()
-      : "unsynced"}
+    Server Sync Time: {favorites.synced ? new Date(favorites.synced).toString() : "unsynced"}
   </li>
 </ul>
 History
-<button on:click={() => download_json("history.json", history)}>Download</button
->
+<button on:click={() => download_json("history.json", history)}>Download</button>
 <input
   type="file"
   id="upload_history"
@@ -253,20 +235,14 @@ History
   accept=".json"
   on:change={(e) => upload_json("history", history_store, e.target.files[0])}
 />
-<button on:click={() => document.getElementById("upload_history").click()}
-  >Upload</button
->
+<button on:click={() => document.getElementById("upload_history").click()}>Upload</button>
 <button on:click={() => history_store.sync()}>Sync</button>
 <ul>
   <li>
-    Server Check Time: {history.checked
-      ? new Date(history.checked).toString()
-      : "unsynced"}
+    Server Check Time: {history.checked ? new Date(history.checked).toString() : "unsynced"}
   </li>
   <li>
-    Server Sync Time: {history.synced
-      ? new Date(history.synced).toString()
-      : "unsynced"}
+    Server Sync Time: {history.synced ? new Date(history.synced).toString() : "unsynced"}
   </li>
 </ul>
 

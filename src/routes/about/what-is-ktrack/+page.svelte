@@ -6,13 +6,13 @@
 
 <p>KTrack is a tool to help track your Vitamin K intake.</p>
 <p>
-  It provides a collection of data from public sources (e.g. the US Department
-  of Argiculture) about the estimated amount of Vitamin K in various foods.
+  It provides a collection of data from public sources (e.g. the US Department of Argiculture) about
+  the estimated amount of Vitamin K in various foods.
 </p>
 <p>
   <em
-    >If used for medical purposes, users must verify any estimates and
-    treatments with their physician</em
+    >If used for medical purposes, users must verify any estimates and treatments with their
+    physician</em
   >.
 </p>
 <p>Features include:</p>

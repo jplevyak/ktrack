@@ -38,18 +38,20 @@
   const today_status = today_store.status;
 
   // straddle all small moves.
-  let stops = [
-    0.2, 0.25, 0.3, 0.3333333333, 0.4, 0.5, 0.6, 0.6666666666, 0.7, 0.75, 0.8,
-  ];
+  let stops = [0.2, 0.25, 0.3, 0.3333333333, 0.4, 0.5, 0.6, 0.6666666666, 0.7, 0.75, 0.8];
   let rstops = [...stops].sort((x, y) => y - x);
   let small_stops = [0.0, 0.015625, 0.03125, 0.0625, 0.1, 0.125, 0.2];
   let rsmall_stops = [...small_stops].sort((x, y) => y - x);
 
-  const unsubscribe_profile = profile_store.subscribe((p) => { profile = p; });
+  const unsubscribe_profile = profile_store.subscribe((p) => {
+    profile = p;
+  });
   const unsubscribe_today = today_store.subscribe((t) => {
     today = t;
   });
-  const unsubscribe_history = history_store.subscribe((value) => { history = value; });
+  const unsubscribe_history = history_store.subscribe((value) => {
+    history = value;
+  });
 
   const unsubscribe_edit = edit_store.subscribe((d) => {
     let edit_data = d ? d.getData() : undefined;
@@ -68,15 +70,16 @@
     unsubscribe_history();
   });
 
-  $: today, check_for_new_day(today, profile);
+  $: (today, check_for_new_day(today, profile));
   $: day = edit || today;
   $: date_info = day ? get_date_info(day) : null;
   $: day_data = day ? day.getData() : null;
-  $: all_items = (day && day_data.items) ? day_data.items : [];
-  $: food_items = all_items.filter(item => typeof item.mcg !== 'undefined');
+  $: all_items = day && day_data.items ? day_data.items : [];
+  $: food_items = all_items.filter((item) => typeof item.mcg !== "undefined");
   $: total = get_total(all_items);
   $: [total_fiber, fiber_unknown] = get_total_fiber(all_items);
-  $: averages = (history && history.getData) ? (compute_averages(history.getData()) || [0,0,0]) : [0,0,0];
+  $: averages =
+    history && history.getData ? compute_averages(history.getData()) || [0, 0, 0] : [0, 0, 0];
 
   function save_day() {
     if (day == today) {
@@ -92,7 +95,7 @@
   }
 
   function save_edit() {
-    day.updateItem(['items', editing_index], editing);
+    day.updateItem(["items", editing_index], editing);
     save_day();
     editing = undefined;
   }
@@ -121,8 +124,7 @@
   function get_change(servings, change) {
     let fractional_part = servings - Math.floor(servings);
     let s = change > 0 ? stops : rstops;
-    if (servings <= 0.2 + resolution)
-      s = change > 0 ? small_stops : rsmall_stops;
+    if (servings <= 0.2 + resolution) s = change > 0 ? small_stops : rsmall_stops;
     let r;
     for (let i = 0; i < s.length - 1; i++)
       if ((r = fix_change(fractional_part, s[i], s[i + 1]))) return r;
@@ -133,20 +135,20 @@
 
   function do_msg(event) {
     if (event.status == "completed" || !day) return;
-    
+
     const index_in_food_items = event.detail.index;
     if (index_in_food_items < 0 || index_in_food_items >= food_items.length) {
       return;
     }
 
     const item_data = food_items[index_in_food_items];
-    const original_index = all_items.findIndex(item => item === item_data);
+    const original_index = all_items.findIndex((item) => item === item_data);
     if (original_index === -1) return;
 
     let change = event.detail.change;
-    
+
     if (change == "del") {
-      day.deleteItem(['items', original_index]);
+      day.deleteItem(["items", original_index]);
       save_day();
     } else if (change == "fav") {
       save_favorite(item_data, profile);
@@ -157,7 +159,7 @@
       let servings_change = get_change(item_data.servings, change);
       // round to prevent small errors from accumulating.
       let new_servings = parseFloat((item_data.servings + servings_change).toFixed(6));
-      day.updateItem(['items', original_index, 'servings'], new_servings);
+      day.updateItem(["items", original_index, "servings"], new_servings);
       save_day();
     }
   }
@@ -167,18 +169,18 @@
   <title>KTrack - Day</title>
 </svelte:head>
 
-Averages [3, 5, 7] days: [{(averages[0]||0).toFixed(1)}, {(averages[1]||0).toFixed(1)}, {(averages[2]||0).toFixed(
-  1
-)}]<br />
+Averages [3, 5, 7] days: [{(averages[0] || 0).toFixed(1)}, {(averages[1] || 0).toFixed(1)}, {(
+  averages[2] || 0
+).toFixed(1)}]<br />
 <b
   >Date: {#if date_info}{weekdays[date_info.day]}
-  {months[date_info.month]}
-  {date_info.date}, {date_info.year}{/if}
+    {months[date_info.month]}
+    {date_info.date}, {date_info.year}{/if}
   {#if edit != undefined}<span style="color:red">Editing History</span>
     <button type="button" id="done" on:click={done_edit}>done</button>{/if}
-{#if $today_status && $today_status != 'idle'}
-  🟡 Unsaved changes: {$today_status}
-{/if}
+  {#if $today_status && $today_status != "idle"}
+    🟡 Unsaved changes: {$today_status}
+  {/if}
 </b><br /><br />
 {#if editing == undefined}
   {#each food_items as f, i}
@@ -199,18 +201,42 @@ Averages [3, 5, 7] days: [{(averages[0]||0).toFixed(1)}, {(averages[1]||0).toFix
       on:message={do_msg}
     />
   {/each}
-  Total: {total.toFixed(2)} Total fiber: {total_fiber.toFixed(2)} {#if fiber_unknown} * some unknown * {/if}
+  Total: {total.toFixed(2)} Total fiber: {total_fiber.toFixed(2)}
+  {#if fiber_unknown}
+    * some unknown *
+  {/if}
 {:else}
   <table>
-    <colgroup> <col ><col > </colgroup>
+    <colgroup> <col /><col /> </colgroup>
     <tbody>
-    <tr><th>Name</th><th><input class="val" type="text" bind:value={editing.name} readonly /></th></tr>
-    <tr><th>Notes</th><th><input class="val" type="text" bind:value={editing.notes} /></th></tr>
-    <tr><th>mcg</th><th><input class="val" type="number" bind:value={editing.mcg} readonly /></th></tr>
-    <tr><th>fiber</th><th><input class="val" type="number" bind:value={editing.fiber} readonly /></th></tr>
-    <tr><th>Unit</th><th><input class="val" type="text" bind:value={editing.unit} readonly /></th></tr>
-    <tr><th>Servings</th><th ><input class="val" type="number" step="0.1" bind:value={editing.servings} /></th></tr>
-    <tr><th>Source</th><th ><input class="val" type="text" bind:value={editing.source} readonly /></th></tr>
+      <tr
+        ><th>Name</th><th><input class="val" type="text" bind:value={editing.name} readonly /></th
+        ></tr
+      >
+      <tr><th>Notes</th><th><input class="val" type="text" bind:value={editing.notes} /></th></tr>
+      <tr
+        ><th>mcg</th><th><input class="val" type="number" bind:value={editing.mcg} readonly /></th
+        ></tr
+      >
+      <tr
+        ><th>fiber</th><th
+          ><input class="val" type="number" bind:value={editing.fiber} readonly /></th
+        ></tr
+      >
+      <tr
+        ><th>Unit</th><th><input class="val" type="text" bind:value={editing.unit} readonly /></th
+        ></tr
+      >
+      <tr
+        ><th>Servings</th><th
+          ><input class="val" type="number" step="0.1" bind:value={editing.servings} /></th
+        ></tr
+      >
+      <tr
+        ><th>Source</th><th
+          ><input class="val" type="text" bind:value={editing.source} readonly /></th
+        ></tr
+      >
     </tbody>
   </table>
   <br /><button type="button" id="cancel" on:click={cancel_edit}>cancel</button>

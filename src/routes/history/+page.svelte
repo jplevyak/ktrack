@@ -31,10 +31,18 @@
   let results = [];
   let added_count = 0;
 
-  const unsubscribe_profile = profile_store.subscribe((p) => { profile = p; });
-  const unsubscribe_today = today_store.subscribe((t) => { today = t; });
-  const unsubscribe_edit = edit_store.subscribe((value) => { edit = value; });
-  const unsubscribe_history = history_store.subscribe((value) => { history = value; });
+  const unsubscribe_profile = profile_store.subscribe((p) => {
+    profile = p;
+  });
+  const unsubscribe_today = today_store.subscribe((t) => {
+    today = t;
+  });
+  const unsubscribe_edit = edit_store.subscribe((value) => {
+    edit = value;
+  });
+  const unsubscribe_history = history_store.subscribe((value) => {
+    history = value;
+  });
 
   const history_status = history_store.status;
 
@@ -45,7 +53,7 @@
     unsubscribe_history();
   });
 
-  $: today, check_for_new_day(today, profile);
+  $: (today, check_for_new_day(today, profile));
   $: results = history.getData().slice(0, limit);
   $: averages = compute_averages(history.getData());
 
@@ -127,9 +135,7 @@ Number of days to view <input type="number" id="limit" bind:value={limit} />
       on:message={do_msg}
     />
   {/each}
-  Total: {get_total(day.items).toFixed(2)} Total fiber: {get_total_fiber(
-    day.items,
-  )[0].toFixed(2)}
+  Total: {get_total(day.items).toFixed(2)} Total fiber: {get_total_fiber(day.items)[0].toFixed(2)}
   {#if get_total_fiber(day.items)[1]}
     * some unknown *
   {/if}

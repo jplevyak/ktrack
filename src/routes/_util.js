@@ -155,7 +155,7 @@ export function prune_today(server_doc, clientSyncRequest) {
   const server_has_date = !!server_data.timestamp;
 
   // If server has no date, or client's date is newer, overwrite server state.
-  if (!server_has_date || client_day_temp_data.timestamp > serve_data.timestamp) {
+  if (!server_has_date || client_day_temp_data.timestamp > server_data.timestamp) {
     // Reset the server document's state. 
     // getSyncResponse will then build the new state from the client's operations.
     server_doc.clear();

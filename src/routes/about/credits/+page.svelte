@@ -10,9 +10,7 @@ John Plevyak (jplevyak@gmail.com)
 <h1>Data Sources, retrieved 2019-12-17</h1>
 
 <ul>
-  <li>
-    EFSA: https://www.efsa.europa.eu/en/microstrategy/food-composition-data
-  </li>
+  <li>EFSA: https://www.efsa.europa.eu/en/microstrategy/food-composition-data</li>
 
   <li>
     McCance:

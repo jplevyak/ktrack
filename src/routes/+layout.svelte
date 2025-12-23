@@ -11,7 +11,7 @@
     let touchstartX = 0;
     let startTime = 0;
 
-    const { timeframe = 300, minSwipeDistance = 100, touchAction = 'pan-y' } = options;
+    const { timeframe = 300, minSwipeDistance = 100, touchAction = "pan-y" } = options;
 
     node.style.touchAction = touchAction;
 
@@ -31,18 +31,18 @@
       const deltaX = touchendX - touchstartX;
 
       if (Math.abs(deltaX) > minSwipeDistance) {
-        const direction = deltaX < 0 ? 'left' : 'right';
-        node.dispatchEvent(new CustomEvent('swipe', { detail: { direction } }));
+        const direction = deltaX < 0 ? "left" : "right";
+        node.dispatchEvent(new CustomEvent("swipe", { detail: { direction } }));
       }
     }
 
-    node.addEventListener('touchstart', handleTouchStart, { passive: true });
-    node.addEventListener('touchend', handleTouchEnd, { passive: true });
+    node.addEventListener("touchstart", handleTouchStart, { passive: true });
+    node.addEventListener("touchend", handleTouchEnd, { passive: true });
 
     return {
       destroy() {
-        node.removeEventListener('touchstart', handleTouchStart);
-        node.removeEventListener('touchend', handleTouchEnd);
+        node.removeEventListener("touchstart", handleTouchStart);
+        node.removeEventListener("touchend", handleTouchEnd);
       },
     };
   }
@@ -74,7 +74,7 @@
 </script>
 
 <div
-  use:swipe={{ timeframe: 300, minSwipeDistance: 100, touchAction: 'pan-y' }}
+  use:swipe={{ timeframe: 300, minSwipeDistance: 100, touchAction: "pan-y" }}
   on:swipe={handle_swipe}
   style="height: 100%;"
 >
