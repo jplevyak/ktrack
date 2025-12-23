@@ -1,7 +1,7 @@
 import { readable, writable, get } from "svelte/store";
-import { browser } from '$app/environment';
+import { browser } from "$app/environment";
 import { CollabJSON } from "./_crdt.js";
-import { v4 as uuidv4 } from 'uuid';
+import { v4 as uuidv4 } from "uuid";
 import {
   compare_date,
   get_date_info,
@@ -13,7 +13,7 @@ import {
 } from "./_util.js";
 
 // --- IndexedDB Helper ---
-const DB_NAME = 'KTrackDB';
+const DB_NAME = "KTrackDB";
 const DB_VERSION = 1;
 
 function openDB() {
@@ -24,8 +24,8 @@ function openDB() {
     request.onsuccess = () => resolve(request.result);
     request.onupgradeneeded = (event) => {
       const db = event.target.result;
-      if (!db.objectStoreNames.contains('stores')) {
-        db.createObjectStore('stores');
+      if (!db.objectStoreNames.contains("stores")) {
+        db.createObjectStore("stores");
       }
     };
   });
@@ -35,8 +35,8 @@ async function dbGet(key) {
   try {
     const db = await openDB();
     return new Promise((resolve, reject) => {
-      const transaction = db.transaction('stores', 'readonly');
-      const store = transaction.objectStore('stores');
+      const transaction = db.transaction("stores", "readonly");
+      const store = transaction.objectStore("stores");
       const request = store.get(key);
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
@@ -51,8 +51,8 @@ async function dbSet(key, value) {
   try {
     const db = await openDB();
     return new Promise((resolve, reject) => {
-      const transaction = db.transaction('stores', 'readwrite');
-      const store = transaction.objectStore('stores');
+      const transaction = db.transaction("stores", "readwrite");
+      const store = transaction.objectStore("stores");
       const request = store.put(value, key);
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
@@ -66,10 +66,10 @@ async function dbSet(key, value) {
 // --- Global Client ID ---
 let globalClientId;
 if (browser) {
-  globalClientId = localStorage.getItem('ktrack_client_id');
+  globalClientId = localStorage.getItem("ktrack_client_id");
   if (!globalClientId) {
     globalClientId = uuidv4();
-    localStorage.setItem('ktrack_client_id', globalClientId);
+    localStorage.setItem("ktrack_client_id", globalClientId);
   }
 } else {
   // For SSR, we don't have a persistent ID, but we can generate one or use a placeholder.
@@ -103,10 +103,14 @@ export function synced_store(key, initialValue, sync, fromJSON) {
   // We store an object in IDB: { data: serializedData, dirty: boolean }
 
   let isDirty = false;
-  const status = writable('loading'); // Start with loading status
+  const status = writable("loading"); // Start with loading status
 
   // Initialize with default value
-  const { subscribe, set: svelteSet, update: svelteUpdate } = writable(initialValue, () => {
+  const {
+    subscribe,
+    set: svelteSet,
+    update: svelteUpdate,
+  } = writable(initialValue, () => {
     if (!browser) return;
 
     // Setup sync interval
@@ -116,7 +120,7 @@ export function synced_store(key, initialValue, sync, fromJSON) {
 
   // Load from IndexedDB on initialization
   if (browser) {
-    dbGet(key).then(record => {
+    dbGet(key).then((record) => {
       if (record) {
         try {
           // record.data is the JSON object (CollabJSON.toJSON result)
@@ -124,7 +128,7 @@ export function synced_store(key, initialValue, sync, fromJSON) {
           const value = fromJSON ? fromJSON(parsed) : parsed;
           svelteSet(value);
           isDirty = record.dirty || false;
-          status.set(isDirty ? 'dirty' : 'idle');
+          status.set(isDirty ? "dirty" : "idle");
 
           // if (isDirty) syncToServer(); // OLD: Only synced if dirty
 
@@ -133,11 +137,11 @@ export function synced_store(key, initialValue, sync, fromJSON) {
           syncToServer(true);
         } catch (e) {
           console.error(`Error parsing ${key} from IndexedDB`, e);
-          status.set('error');
+          status.set("error");
         }
       } else {
         // No data in DB, use initialValue
-        status.set('idle');
+        status.set("idle");
         // Also sync on first load/empty DB to populate from server
         syncToServer(true);
       }
@@ -147,13 +151,13 @@ export function synced_store(key, initialValue, sync, fromJSON) {
   async function syncToServer(force = false) {
     if (!browser || (!isDirty && !force) || !get(online)) {
       if (isDirty && !get(online)) {
-        status.set('error'); // Offline but dirty
+        status.set("error"); // Offline but dirty
       }
       return;
     }
 
-    console.log('Syncing to server...', key);
-    status.set('syncing');
+    console.log("Syncing to server...", key);
+    status.set("syncing");
 
     try {
       const currentValue = get({ subscribe });
@@ -166,7 +170,7 @@ export function synced_store(key, initialValue, sync, fromJSON) {
 
       const ok = await sync(currentValue);
 
-      if (!ok) throw new Error('Server sync failed');
+      if (!ok) throw new Error("Server sync failed");
 
       // Sanity check after sync
       if (fromJSON && !(currentValue instanceof CollabJSON)) {
@@ -184,12 +188,11 @@ export function synced_store(key, initialValue, sync, fromJSON) {
       }
 
       isDirty = false;
-      status.set('idle');
-      console.log('Sync successful', key);
-
+      status.set("idle");
+      console.log("Sync successful", key);
     } catch (error) {
       console.error(error.message);
-      status.set('error');
+      status.set("error");
     }
   }
 
@@ -197,13 +200,13 @@ export function synced_store(key, initialValue, sync, fromJSON) {
 
   const set = (newValue) => {
     isDirty = true;
-    status.set('dirty');
+    status.set("dirty");
     svelteSet(newValue);
 
     if (browser) {
       // Save dirty state to IDB
       const serialized = fromJSON ? newValue.toJSON() : newValue;
-      // We don't await this because set() is synchronous in Svelte contract usually, 
+      // We don't await this because set() is synchronous in Svelte contract usually,
       // but IDB is async. It's "fire and forget" for the UI, but ensures persistence.
       dbSet(key, { data: serialized, dirty: true });
     }
@@ -221,8 +224,8 @@ export function synced_store(key, initialValue, sync, fromJSON) {
     update,
     sync: () => syncToServer(true),
     status: {
-      subscribe: status.subscribe
-    }
+      subscribe: status.subscribe,
+    },
   };
 }
 
@@ -236,7 +239,7 @@ async function sync_profile(profile) {
     value: profile,
   };
   try {
-    const response = await fetch('/api/profile', {
+    const response = await fetch("/api/profile", {
       method: "POST",
       body: JSON.stringify(data),
       headers: { "Content-Type": "application/json" },
@@ -280,23 +283,23 @@ export const online = readable(browser ? navigator.onLine : true, (set) => {
 
   const updateOnlineStatus = () => set(navigator.onLine);
 
-  window.addEventListener('online', updateOnlineStatus);
-  window.addEventListener('offline', updateOnlineStatus);
+  window.addEventListener("online", updateOnlineStatus);
+  window.addEventListener("offline", updateOnlineStatus);
 
   return () => {
-    window.removeEventListener('online', updateOnlineStatus);
-    window.removeEventListener('offline', updateOnlineStatus);
+    window.removeEventListener("online", updateOnlineStatus);
+    window.removeEventListener("offline", updateOnlineStatus);
   };
 });
 
 function local_writable(key, initialValue) {
   // Keep local_writable using localStorage for small non-critical UI state (like 'edit')
-  // or switch to IDB if consistency is desired. 
+  // or switch to IDB if consistency is desired.
   // 'edit' is transient, so localStorage is probably fine, but let's keep it simple.
   let storedValue = initialValue;
   if (browser) {
     const fromStorage = localStorage.getItem(key);
-    if (fromStorage && fromStorage !== 'undefined') {
+    if (fromStorage && fromStorage !== "undefined") {
       try {
         storedValue = JSON.parse(fromStorage);
       } catch (e) {
@@ -320,7 +323,7 @@ function local_writable(key, initialValue) {
       set(value);
     },
     update: (fn) => {
-      update(currentValue => {
+      update((currentValue) => {
         const newValue = fn(currentValue);
         if (browser) {
           try {
@@ -331,7 +334,7 @@ function local_writable(key, initialValue) {
         }
         return newValue;
       });
-    }
+    },
   };
 }
 
@@ -357,7 +360,7 @@ async function sync_internal(doc, name) {
   };
 
   try {
-    const response = await fetch('/api/' + name, {
+    const response = await fetch("/api/" + name, {
       method: "POST",
       body: JSON.stringify(data),
       headers: { "Content-Type": "application/json" },
@@ -411,18 +414,34 @@ function init_store_value(maker) {
   return doc;
 }
 
-export const today_store = synced_store("today", init_store_value(make_today), sync_today, collab_from_json);
-export const favorites_store = synced_store("favorites", init_store_value(make_favorites), sync_favorites, collab_from_json);
-export const history_store = synced_store("history", init_store_value(make_history), sync_history, collab_from_json);
+export const today_store = synced_store(
+  "today",
+  init_store_value(make_today),
+  sync_today,
+  collab_from_json,
+);
+export const favorites_store = synced_store(
+  "favorites",
+  init_store_value(make_favorites),
+  sync_favorites,
+  collab_from_json,
+);
+export const history_store = synced_store(
+  "history",
+  init_store_value(make_history),
+  sync_history,
+  collab_from_json,
+);
 
 export function add_item(item, today, edit, profile) {
   if (edit != undefined) {
     let edit_data = edit.getData();
-    if (Date.now() - edit_data.start_edit > 10 * 60 * 1000) { // 10 min.
+    if (Date.now() - edit_data.start_edit > 10 * 60 * 1000) {
+      // 10 min.
       edit_store.set(undefined);
       edit = undefined;
     } else {
-      edit.updateItem(edit.findPath('start_edit'), Date.now());
+      edit.updateItem(edit.findPath("start_edit"), Date.now());
       edit_store.set(edit);
     }
   } else {
@@ -431,17 +450,16 @@ export function add_item(item, today, edit, profile) {
   let store = edit != undefined ? edit_store : today_store;
   store.update(function (day) {
     const data = day.getData();
-    const existing_index = data.items.findIndex(i => i.name == item.name);
+    const existing_index = data.items.findIndex((i) => i.name == item.name);
     if (existing_index !== -1) {
       return day;
     }
 
     item = { ...item };
-    if (item.servings == undefined)
-      item.servings = 1.0;
+    if (item.servings == undefined) item.servings = 1.0;
 
     // Inject ID for deterministic conflict resolution
-    day.addItem(['items', data.items.length], { ...item, id: item.name });
+    day.addItem(["items", data.items.length], { ...item, id: item.name });
 
     if (edit == undefined) {
       save_history(day, profile);
@@ -453,18 +471,20 @@ export function add_item(item, today, edit, profile) {
 export function save_history(day, profile) {
   if (day == undefined) return;
   history_store.update(function (history) {
-    if (history == undefined)
-      history = make_history();
+    if (history == undefined) history = make_history();
     let history_data = history.getData();
     let day_data = day.getData();
 
-    const existing_index = history_data.findIndex(d => d && d.timestamp === day_data.timestamp);
+    const existing_index = history_data.findIndex((d) => d && d.timestamp === day_data.timestamp);
 
     if (existing_index !== -1) {
       history.updateItem([existing_index], day_data);
     } else {
-      const insert_index = history_data.findIndex(d => d && d.timestamp < day_data.timestamp);
-      history.addItem([insert_index === -1 ? history_data.length : insert_index], { ...day_data, id: day_data.timestamp });
+      const insert_index = history_data.findIndex((d) => d && d.timestamp < day_data.timestamp);
+      history.addItem([insert_index === -1 ? history_data.length : insert_index], {
+        ...day_data,
+        id: day_data.timestamp,
+      });
     }
 
     const limit = merge_history_limit || 50;
@@ -492,8 +512,7 @@ export function save_today(today, profile) {
 
 export function save_favorite(item, profile, replace_index) {
   favorites_store.update(function (favorites) {
-    if (favorites == undefined)
-      favorites = make_favorites();
+    if (favorites == undefined) favorites = make_favorites();
 
     // Inject ID for deterministic conflict resolution
     item = { ...item, id: item.name };
@@ -509,7 +528,7 @@ export function save_favorite(item, profile, replace_index) {
       return favorites;
     }
 
-    const existing_index = favorites_data.findIndex(i => i.name == item.name);
+    const existing_index = favorites_data.findIndex((i) => i.name == item.name);
 
     if (existing_index !== -1) {
       favorites.updateItem([existing_index], item);
@@ -536,10 +555,10 @@ export function check_for_new_day(t, profile) {
     const newData = new_day.getData();
 
     if (newData.timestamp) {
-      t.updateItem(['timestamp'], newData.timestamp);
+      t.updateItem(["timestamp"], newData.timestamp);
     }
 
-    t.updateItem(['items'], []);
+    t.updateItem(["items"], []);
 
     save_today(t, profile);
   }

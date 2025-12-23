@@ -12,11 +12,7 @@ function merge_profile(p1, p2) {
     p2.message = "profile created, authenticated";
     return p2;
   }
-  if (
-    p2.password != "" &&
-    p2.old_password != "" &&
-    p2.old_password != undefined
-  ) {
+  if (p2.password != "" && p2.old_password != "" && p2.old_password != undefined) {
     if (p2.old_password != p1.password) {
       p1.message = "old password mismatch, not authenticated";
       p1.updated = Date.now();
@@ -43,7 +39,7 @@ export async function POST(req) {
     const dbValueStr = await profile.get(username);
     value = JSON.parse(dbValueStr);
   } catch (err) {
-    if (err.code === 'LEVEL_NOT_FOUND') {
+    if (err.code === "LEVEL_NOT_FOUND") {
       value = undefined;
     } else if (err instanceof SyntaxError) {
       console.log("bad json");

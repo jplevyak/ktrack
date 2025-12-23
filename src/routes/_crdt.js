@@ -3,11 +3,11 @@
  * It uses Lamport timestamps for causal ordering, Last-Write-Wins (LWW)
  * for atomic updates, and fractional indexing for list ordering.
  */
-import { v4 as uuidv4 } from 'uuid';
+import { v4 as uuidv4 } from "uuid";
 
 const HISTORY_PRUNE_LIMIT = 100;
 const HISTORY_PRUNE_WINDOW = 50;
-const CRDT_ARRAY_MARKER = '_crdt_array_';
+const CRDT_ARRAY_MARKER = "_crdt_array_";
 
 export class CollabJSON {
   constructor(jsonString, options = {}) {
@@ -39,7 +39,7 @@ export class CollabJSON {
       // Hash * 33 + c
       // We use ((hash << 5) + hash) as a fast way to do hash * 33
       // The bitwise operators in JS automatically handle 32-bit wrapping
-      hash = ((hash << 5) + hash) + id.charCodeAt(i);
+      hash = (hash << 5) + hash + id.charCodeAt(i);
     }
     const unsignedHash = hash >>> 0; // Force to unsigned using right shift.
     return unsignedHash / 4294967296;
@@ -77,7 +77,9 @@ export class CollabJSON {
     const mid = (previousKey + nextKey) / 2;
     // Basic precision guard
     if (mid === previousKey || mid === nextKey) {
-      console.warn('CollabJSON: Fractional indexing precision limit reached. Re-sorting recommended.');
+      console.warn(
+        "CollabJSON: Fractional indexing precision limit reached. Re-sorting recommended.",
+      );
       return previousKey + 0.000_000_000_01;
     }
 
@@ -101,8 +103,9 @@ export class CollabJSON {
       // Get all existing items (including deleted) sorted by sortKey
       let existingItems = [];
       if (existingNode && existingNode[CRDT_ARRAY_MARKER]) {
-        existingItems = Object.values(existingNode.items)
-          .sort((a, b) => a.sortKey - b.sortKey || (a.id < b.id ? -1 : 1));
+        existingItems = Object.values(existingNode.items).sort(
+          (a, b) => a.sortKey - b.sortKey || (a.id < b.id ? -1 : 1),
+        );
         Object.assign(crdtArray.metadata, existingNode.metadata);
       }
 
@@ -114,9 +117,9 @@ export class CollabJSON {
         let matchedItem = null;
 
         // Strategy A: Match by ID (if provided in data)
-        if (itemData && typeof itemData === 'object' && itemData.id !== undefined) {
+        if (itemData && typeof itemData === "object" && itemData.id !== undefined) {
           const targetId = String(itemData.id);
-          matchedItem = existingItems.find(i => i.id === targetId);
+          matchedItem = existingItems.find((i) => i.id === targetId);
         }
 
         if (matchedItem) {
@@ -142,7 +145,10 @@ export class CollabJSON {
           // No match found. Create new item.
           // Use itemData.id as internal ID if available, otherwise generate one.
           let itemId;
-          itemId = itemData && typeof itemData === 'object' && itemData.id !== undefined ? String(itemData.id) : this._generateId();
+          itemId =
+            itemData && typeof itemData === "object" && itemData.id !== undefined
+              ? String(itemData.id)
+              : this._generateId();
 
           crdtArray.items[itemId] = {
             id: itemId,
@@ -178,17 +184,17 @@ export class CollabJSON {
       return crdtArray;
     }
 
-    if (typeof data === 'object' && data !== null) {
+    if (typeof data === "object" && data !== null) {
       // Optimization: Store default timestamp for the object to avoid redundant metadata
       const newObject = { metadata: { _ts: timestamp } };
-      const existingMeta = (existingNode && existingNode.metadata) ? existingNode.metadata : {};
+      const existingMeta = existingNode && existingNode.metadata ? existingNode.metadata : {};
 
       Object.assign(newObject.metadata, existingMeta);
       // Ensure _ts is updated to current timestamp if we are refreshing the object
       newObject.metadata._ts = timestamp;
 
       for (const key in data) {
-        const existingChild = (existingNode && existingNode[key]) ? existingNode[key] : null;
+        const existingChild = existingNode && existingNode[key] ? existingNode[key] : null;
 
         // Resolve existing metadata, handling default _ts
         let meta = existingMeta[key];
@@ -209,7 +215,7 @@ export class CollabJSON {
 
       if (existingNode) {
         for (const key in existingNode) {
-          if (key === 'metadata') {
+          if (key === "metadata") {
             continue;
           }
 
@@ -239,14 +245,14 @@ export class CollabJSON {
   }
 
   _crdtToPlain(data) {
-    if (typeof data === 'object' && data !== null) {
+    if (typeof data === "object" && data !== null) {
       if (data[CRDT_ARRAY_MARKER]) {
-        return this._getSortedItems(data).map(item => this._crdtToPlain(item.data));
+        return this._getSortedItems(data).map((item) => this._crdtToPlain(item.data));
       }
 
       const newObject = {};
       for (const key in data) {
-        if (key === 'metadata') {
+        if (key === "metadata") {
           continue;
         }
 
@@ -269,7 +275,7 @@ export class CollabJSON {
     }
 
     return Object.values(crdtArray.items)
-      .filter(item => !item._deleted)
+      .filter((item) => !item._deleted)
       .sort((a, b) => a.sortKey - b.sortKey || (a.id < b.id ? -1 : 1));
   }
 
@@ -280,19 +286,19 @@ export class CollabJSON {
 
     for (const segment of path) {
       let container = current;
-      if (container && container.hasOwnProperty('data') && container.hasOwnProperty('sortKey')) {
+      if (container && container.hasOwnProperty("data") && container.hasOwnProperty("sortKey")) {
         container = container.data;
       }
 
       parent = container;
       finalKey = segment;
-      if (container === null || typeof container !== 'object') {
+      if (container === null || typeof container !== "object") {
         return null;
       }
 
       if (container[CRDT_ARRAY_MARKER]) {
         const sorted = this._getSortedItems(container);
-        if (typeof segment !== 'number' || segment < 0 || segment >= sorted.length) {
+        if (typeof segment !== "number" || segment < 0 || segment >= sorted.length) {
           return null;
         }
 
@@ -312,9 +318,13 @@ export class CollabJSON {
   _applyAndStore(op) {
     op.clientId = this.clientId;
     // Compression: If updating the same item consecutively, merge ops
-    if (op.type === 'UPDATE_ITEM') {
+    if (op.type === "UPDATE_ITEM") {
       const lastOp = this.ops.length > 0 ? this.ops.at(-1) : null;
-      if (lastOp && lastOp.type === 'UPDATE_ITEM' && JSON.stringify(lastOp.path) === JSON.stringify(op.path)) {
+      if (
+        lastOp &&
+        lastOp.type === "UPDATE_ITEM" &&
+        JSON.stringify(lastOp.path) === JSON.stringify(op.path)
+      ) {
         lastOp.data = op.data;
         lastOp.timestamp = op.timestamp;
         this.applyOp(op);
@@ -325,7 +335,7 @@ export class CollabJSON {
     this.applyOp(op);
     this.ops.push(op);
 
-    if (this.clientId === 'server') {
+    if (this.clientId === "server") {
       this.commitOps();
     }
   }
@@ -348,7 +358,11 @@ export class CollabJSON {
 
     let nodeToConvert = result.node;
     // If the traversed node is an item from a CRDT array, we want to convert its `data` property.
-    if (nodeToConvert && nodeToConvert.hasOwnProperty('sortKey') && nodeToConvert.hasOwnProperty('data')) {
+    if (
+      nodeToConvert &&
+      nodeToConvert.hasOwnProperty("sortKey") &&
+      nodeToConvert.hasOwnProperty("data")
+    ) {
       nodeToConvert = nodeToConvert.data;
     }
 
@@ -378,7 +392,7 @@ export class CollabJSON {
 
     // Unwrap array item wrapper
     let actualNode = currentNode;
-    if (currentNode.hasOwnProperty('data') && currentNode.hasOwnProperty('sortKey')) {
+    if (currentNode.hasOwnProperty("data") && currentNode.hasOwnProperty("sortKey")) {
       if (currentNode.id === targetId) {
         return currentPath;
       }
@@ -386,7 +400,7 @@ export class CollabJSON {
       actualNode = currentNode.data;
     }
 
-    if (typeof actualNode !== 'object') {
+    if (typeof actualNode !== "object") {
       return null;
     }
 
@@ -404,7 +418,7 @@ export class CollabJSON {
       }
     } else {
       for (const key in actualNode) {
-        if (key === 'metadata') {
+        if (key === "metadata") {
           continue;
         }
 
@@ -432,13 +446,13 @@ export class CollabJSON {
     const parentPath = path.slice(0, -1);
     const keyOrIndex = path.at(-1);
 
-    if (typeof keyOrIndex === 'string') {
+    if (typeof keyOrIndex === "string") {
       this.updateItem(path, data);
       return;
     }
 
-    if (typeof keyOrIndex !== 'number') {
-      throw new TypeError('Final path segment for addItem must be an index or a key.');
+    if (typeof keyOrIndex !== "number") {
+      throw new TypeError("Final path segment for addItem must be an index or a key.");
     }
 
     const index = keyOrIndex;
@@ -449,14 +463,14 @@ export class CollabJSON {
 
     const result = this._traverse(parentPath);
     if (!result || !result.node || !result.node[CRDT_ARRAY_MARKER]) {
-      throw new Error('Target for addItem is not an array.');
+      throw new Error("Target for addItem is not an array.");
     }
 
     const targetArray = result.node;
     const sortedItems = this._getSortedItems(targetArray);
 
     if (index > sortedItems.length) {
-      throw new Error('Index out of bounds.');
+      throw new Error("Index out of bounds.");
     }
 
     const previousItem = sortedItems[index - 1] || null;
@@ -466,28 +480,36 @@ export class CollabJSON {
 
     const newSortKey = this._generateSortKey(previousKey, nextKey);
     // Use data.id if present, otherwise generate one.
-    const newItemId = (data && typeof data === 'object' && data.id !== undefined) ? String(data.id) : this._generateId();
+    const newItemId =
+      data && typeof data === "object" && data.id !== undefined
+        ? String(data.id)
+        : this._generateId();
 
     this._applyAndStore({
-      type: 'ADD_ITEM', path: parentPath, itemId: newItemId, data, sortKey: newSortKey, timestamp: this._tick(),
+      type: "ADD_ITEM",
+      path: parentPath,
+      itemId: newItemId,
+      data,
+      sortKey: newSortKey,
+      timestamp: this._tick(),
     });
   }
 
   moveItem(path, fromIndex, toIndex) {
     const result = this._traverse(path);
     if (!result || !result.node || !result.node[CRDT_ARRAY_MARKER]) {
-      throw new Error('Target for moveItem is not an array.');
+      throw new Error("Target for moveItem is not an array.");
     }
 
     const targetArray = result.node;
     const sortedItems = this._getSortedItems(targetArray);
 
     if (fromIndex < 0 || fromIndex >= sortedItems.length) {
-      throw new Error('fromIndex out of bounds');
+      throw new Error("fromIndex out of bounds");
     }
 
     if (toIndex < 0 || toIndex > sortedItems.length) {
-      throw new Error('toIndex out of bounds');
+      throw new Error("toIndex out of bounds");
     }
 
     if (fromIndex === toIndex) {
@@ -527,7 +549,7 @@ export class CollabJSON {
       // Case 3: Moving to the middle (or effectively the end of the reduced list).
       // We simulate the list without the moved item to find the correct neighbors.
 
-      const listWithoutItem = sortedItems.filter(i => i.id !== itemToMove.id);
+      const listWithoutItem = sortedItems.filter((i) => i.id !== itemToMove.id);
 
       // We want to insert at 'toIndex'. However, since we removed one item,
       // the target index might be at the end of the reduced list.
@@ -543,7 +565,7 @@ export class CollabJSON {
     const newSortKey = this._generateSortKey(previousKey, nextKey);
 
     this._applyAndStore({
-      type: 'MOVE_ITEM',
+      type: "MOVE_ITEM",
       path,
       itemId: itemToMove.id,
       sortKey: newSortKey,
@@ -558,7 +580,7 @@ export class CollabJSON {
     } // Idempotent
 
     const { parent, key, node } = result;
-    const op = { type: 'DELETE_ITEM', path, timestamp: this._tick() };
+    const op = { type: "DELETE_ITEM", path, timestamp: this._tick() };
 
     if (parent[CRDT_ARRAY_MARKER]) {
       op.itemId = node.id;
@@ -570,7 +592,10 @@ export class CollabJSON {
   updateItem(path, newData) {
     const p = path || [];
     this._applyAndStore({
-      type: 'UPDATE_ITEM', path: p, data: newData, timestamp: this._tick(),
+      type: "UPDATE_ITEM",
+      path: p,
+      data: newData,
+      timestamp: this._tick(),
     });
   }
 
@@ -601,7 +626,7 @@ export class CollabJSON {
    * or use a "tombstone TTL" strategy (not implemented here).
    */
   purgeTombstones(node = this.root, minTimestamp = 0) {
-    if (typeof node !== 'object' || node === null) {
+    if (typeof node !== "object" || node === null) {
       return;
     }
 
@@ -617,7 +642,7 @@ export class CollabJSON {
       }
     } else {
       for (const key in node) {
-        if (key === 'metadata') {
+        if (key === "metadata") {
           continue;
         }
 
@@ -662,11 +687,11 @@ export class CollabJSON {
 
     // Common traversal for most ops
     // Note: For MOVE_ITEM, path points to the array, not the item
-    const traversePath = (op.type === 'MOVE_ITEM') ? op.path : op.path.slice(0, -1);
+    const traversePath = op.type === "MOVE_ITEM" ? op.path : op.path.slice(0, -1);
     const { parent, node } = this._traverse(traversePath) || {};
 
     switch (op.type) {
-      case 'ADD_ITEM': {
+      case "ADD_ITEM": {
         const targetArray = this._traverse(op.path)?.node;
         if (!targetArray || !targetArray[CRDT_ARRAY_MARKER]) {
           break;
@@ -685,7 +710,7 @@ export class CollabJSON {
         break;
       }
 
-      case 'MOVE_ITEM': {
+      case "MOVE_ITEM": {
         const moveArray = this._traverse(op.path)?.node;
         if (!moveArray || !moveArray[CRDT_ARRAY_MARKER]) {
           break;
@@ -708,7 +733,7 @@ export class CollabJSON {
         break;
       }
 
-      case 'DELETE_ITEM': {
+      case "DELETE_ITEM": {
         // Improved delete logic: resolve parent container first
         const parentPath = op.path.slice(0, -1);
         const parentRes = this._traverse(parentPath);
@@ -759,7 +784,7 @@ export class CollabJSON {
         break;
       }
 
-      case 'UPDATE_ITEM': {
+      case "UPDATE_ITEM": {
         if (op.path.length === 0) {
           this.root = this._plainToCrdt(op.data, op.timestamp, this.root);
           break;
@@ -794,16 +819,25 @@ export class CollabJSON {
             parent.metadata ||= {};
             parent.metadata[key] = { updated: op.timestamp, _deleted: false };
           }
-        } else if (op.path.length > 0) { // Create path (upsert)
+        } else if (op.path.length > 0) {
+          // Create path (upsert)
           let current = this.root;
           for (let i = 0; i < op.path.length - 1; i++) {
             const segment = op.path[i];
             let container = current;
-            if (container && container.hasOwnProperty('data') && container.hasOwnProperty('sortKey')) {
+            if (
+              container &&
+              container.hasOwnProperty("data") &&
+              container.hasOwnProperty("sortKey")
+            ) {
               container = container.data;
             }
 
-            if (!Object.hasOwn(container, segment) || typeof container[segment] !== 'object' || container[segment] === null) {
+            if (
+              !Object.hasOwn(container, segment) ||
+              typeof container[segment] !== "object" ||
+              container[segment] === null
+            ) {
               container[segment] = this._plainToCrdt({}, op.timestamp);
               container.metadata ||= {};
               container.metadata[segment] = { updated: op.timestamp, _deleted: false };
@@ -814,15 +848,23 @@ export class CollabJSON {
 
           const finalKey = op.path.at(-1);
           let parentContainer = current;
-          if (parentContainer && parentContainer.hasOwnProperty('data') && parentContainer.hasOwnProperty('sortKey')) {
+          if (
+            parentContainer &&
+            parentContainer.hasOwnProperty("data") &&
+            parentContainer.hasOwnProperty("sortKey")
+          ) {
             parentContainer = parentContainer.data;
           }
 
-          if (typeof parentContainer !== 'object' || parentContainer === null) {
+          if (typeof parentContainer !== "object" || parentContainer === null) {
             break;
           }
 
-          parentContainer[finalKey] = this._plainToCrdt(op.data, op.timestamp, parentContainer[finalKey]);
+          parentContainer[finalKey] = this._plainToCrdt(
+            op.data,
+            op.timestamp,
+            parentContainer[finalKey],
+          );
           parentContainer.metadata ||= {};
           parentContainer.metadata[finalKey] = { updated: op.timestamp, _deleted: false };
         }
@@ -855,7 +897,7 @@ export class CollabJSON {
       ...options,
       id: state ? state.id : undefined,
       // Prioritize options.clientId if provided (e.g. global device ID), otherwise fallback to state or generate new
-      clientId: options.clientId || ((state && state.clientId) ? state.clientId : undefined),
+      clientId: options.clientId || (state && state.clientId ? state.clientId : undefined),
     });
     if (!state) {
       return doc;
@@ -912,20 +954,28 @@ export class CollabJSON {
   }
 
   static loadOrInit(stateString, syncRequest, defaultJson, options = {}) {
-    const options_ = { ...options, clientId: 'server' };
+    const options_ = { ...options, clientId: "server" };
     if (stateString) {
       return CollabJSON.fromJSON(JSON.parse(stateString), options_);
     }
 
     if (syncRequest && syncRequest.snapshot) {
-      return CollabJSON.fromSnapshot(syncRequest.snapshot, syncRequest.snapshotDvv, syncRequest.docId, options_);
+      return CollabJSON.fromSnapshot(
+        syncRequest.snapshot,
+        syncRequest.snapshotDvv,
+        syncRequest.docId,
+        options_,
+      );
     }
 
-    return new CollabJSON(defaultJson, { ...options_, id: syncRequest ? syncRequest.docId : undefined });
+    return new CollabJSON(defaultJson, {
+      ...options_,
+      id: syncRequest ? syncRequest.docId : undefined,
+    });
   }
 
   static fromOps(ops) {
-    const doc = new CollabJSON('{}');
+    const doc = new CollabJSON("{}");
     if (Array.isArray(ops)) {
       for (const op of ops) {
         doc.applyOp(op);
@@ -947,11 +997,14 @@ export class CollabJSON {
 
   getSyncRequest() {
     const lastSeenBySystem = this.dvv.get(this.clientId) || 0;
-    const newOps = this.ops.filter(op => op.timestamp > lastSeenBySystem);
+    const newOps = this.ops.filter((op) => op.timestamp > lastSeenBySystem);
     this.checked = Date.now();
 
     const request = {
-      dvv: Object.fromEntries(this.dvv), ops: newOps, clientId: this.clientId, docId: this.id,
+      dvv: Object.fromEntries(this.dvv),
+      ops: newOps,
+      clientId: this.clientId,
+      docId: this.id,
     };
 
     if (!this.synced) {
@@ -999,12 +1052,12 @@ export class CollabJSON {
     }
 
     this.dvv = new Map(Object.entries(dvv));
-    this.ops = this.ops.filter(op => op.timestamp > (this.dvv.get(this.clientId) || 0));
+    this.ops = this.ops.filter((op) => op.timestamp > (this.dvv.get(this.clientId) || 0));
     this.synced = Date.now();
   }
 
   replaceData(jsonString) {
-    const data = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
+    const data = typeof jsonString === "string" ? JSON.parse(jsonString) : jsonString;
 
     // Advance clock to ensure this state is newer than any previous state
     this._tick();
@@ -1061,12 +1114,15 @@ export class CollabJSON {
       this.history.push(op);
     }
 
-    const maxTs = clientOps.reduce((max, op) => op.clientId === clientId ? Math.max(max, op.timestamp) : max, 0);
+    const maxTs = clientOps.reduce(
+      (max, op) => (op.clientId === clientId ? Math.max(max, op.timestamp) : max),
+      0,
+    );
     if (maxTs > 0) {
       this.dvv.set(clientId, Math.max(this.dvv.get(clientId) || 0, maxTs));
     }
 
-    const opsForClient = this.history.filter(op => {
+    const opsForClient = this.history.filter((op) => {
       if (op.clientId === clientId) {
         return false;
       }

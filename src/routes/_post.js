@@ -11,7 +11,7 @@ async function do_post_internal(req, syncRequest, username, dbname, db, prune, d
     db_value_str = await db.get(username);
   } catch (e) {
     // 'not-found' error indicates the key is not in the database
-    if (e.code === 'LEVEL_NOT_FOUND') {
+    if (e.code === "LEVEL_NOT_FOUND") {
       db_value_str = undefined;
     } else {
       throw e;
@@ -36,19 +36,11 @@ export async function do_post(req, dbname, db, prune, defaultJSON) {
   let syncRequest = await req.request.json();
   let username = syncRequest.username;
   let password = syncRequest.password;
-  if (
-    username == undefined ||
-    !username ||
-    typeof username.valueOf() !== "string"
-  ) {
+  if (username == undefined || !username || typeof username.valueOf() !== "string") {
     console.log("bad username");
     return new Response(JSON.stringify({ err: "bad username" }));
   }
-  if (
-    password == undefined ||
-    !password ||
-    typeof password.valueOf() !== "string"
-  ) {
+  if (password == undefined || !password || typeof password.valueOf() !== "string") {
     console.log("bad password");
     return new Response(JSON.stringify({ err: "bad password" }));
   }
@@ -57,14 +49,14 @@ export async function do_post(req, dbname, db, prune, defaultJSON) {
     const value = await profile.get(username);
     p = JSON.parse(value);
   } catch (e) {
-    if (e.code === 'LEVEL_NOT_FOUND' || e instanceof SyntaxError) {
+    if (e.code === "LEVEL_NOT_FOUND" || e instanceof SyntaxError) {
       // User doesn't exist or has corrupt data. Create a new profile.
       p = {
         username: username,
         password: password,
         old_password: "",
         message: "profile created, authenticated",
-        authenticated: Date.now()
+        authenticated: Date.now(),
       };
       await profile.put(username, JSON.stringify(p));
     } else {
@@ -84,9 +76,9 @@ export async function do_post(req, dbname, db, prune, defaultJSON) {
 export async function do_upload(req, dbname, db, prune, defaultJSON) {
   const authHeader = req.request.headers.get("Authorization");
   if (!authHeader || !authHeader.startsWith("Basic ")) {
-    return new Response(JSON.stringify({ err: "Missing or invalid Authorization header" }), { 
-      status: 401, 
-      headers: { 'WWW-Authenticate': 'Basic realm="KTrack"' } 
+    return new Response(JSON.stringify({ err: "Missing or invalid Authorization header" }), {
+      status: 401,
+      headers: { "WWW-Authenticate": 'Basic realm="KTrack"' },
     });
   }
 
@@ -121,15 +113,15 @@ export async function do_upload(req, dbname, db, prune, defaultJSON) {
   try {
     db_value_str = await db.get(username);
   } catch (e) {
-    if (e.code === 'LEVEL_NOT_FOUND') {
+    if (e.code === "LEVEL_NOT_FOUND") {
       db_value_str = undefined;
     } else {
       throw e;
     }
   }
 
-  let server_doc = CollabJSON.loadOrInit(db_value_str, null, defaultJSON, { clientId: 'server' });
-  
+  let server_doc = CollabJSON.loadOrInit(db_value_str, null, defaultJSON, { clientId: "server" });
+
   // Only update if the data has actually changed. This prevents generating redundant operations
   // (and thus redundant sync traffic) if the upload endpoint is called repeatedly with the same data.
   const currentData = server_doc.getData();

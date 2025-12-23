@@ -1,5 +1,5 @@
 import foods from "./_foods.json";
-import { CollabJSON } from './_crdt.js';
+import { CollabJSON } from "./_crdt.js";
 
 export const merge_history_limit = 50;
 
@@ -32,7 +32,7 @@ export function load_async(
   options = {
     async: true,
     defer: true,
-  }
+  },
 ) {
   const tag = document.createElement("script");
   tag.src = url;
@@ -45,25 +45,23 @@ export function load_async(
 export function get_date_info(day) {
   // Accept both a day object and a CollabJSON day.
   if (!day.timestamp) {
-    if (!day || !day.getData)
-      return null;
+    if (!day || !day.getData) return null;
     day = day.getData();
   }
-  if (!day.timestamp)
-    return null;
+  if (!day.timestamp) return null;
 
-  const parts = day.timestamp.split('-');
+  const parts = day.timestamp.split("-");
   return {
     year: parseInt(parts[0], 10),
     month: parseInt(parts[1], 10) - 1,
     date: parseInt(parts[2], 10),
-    day: parseInt(parts[3], 10)
-  }
+    day: parseInt(parts[3], 10),
+  };
 }
 
 export function compare_date(d1, d2) {
-  const d1_timestamp = d1.getData(['timestamp']);
-  const d2_timestamp = d2.getData(['timestamp']);
+  const d1_timestamp = d1.getData(["timestamp"]);
+  const d2_timestamp = d2.getData(["timestamp"]);
 
   if (d1_timestamp > d2_timestamp) return 1;
   if (d1_timestamp < d2_timestamp) return -1;
@@ -76,8 +74,7 @@ export function compute_averages(h) {
   var a = 0.0;
   var n = 0;
   for (let i = 0; i < 7; i++) {
-    if (i < h.length)
-      a += get_total(h[i].items);
+    if (i < h.length) a += get_total(h[i].items);
     n += 1;
     if (n > 1 && n % 2 == 1) {
       result[(n - 3) / 2] = a / n;
@@ -101,8 +98,8 @@ export function get_total_fiber(items) {
   let unknown = false;
   for (let f of items) {
     if (f.mcg != undefined) {
-      if (f.hasOwnProperty('fiber') && f.fiber != "") {
-          n += f.fiber * f.servings;
+      if (f.hasOwnProperty("fiber") && f.fiber != "") {
+        n += f.fiber * f.servings;
       } else {
         unknown = true;
       }
@@ -115,11 +112,11 @@ export function make_today() {
   const doc = new CollabJSON("{}");
   const now = new Date();
   const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const d = String(now.getDate()).padStart(2, '0');
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
   const day = now.getDay();
-  doc.updateItem(['timestamp'], `${y}-${m}-${d}-${day}`);
-  doc.updateItem(['items'], []);
+  doc.updateItem(["timestamp"], `${y}-${m}-${d}-${day}`);
+  doc.updateItem(["items"], []);
   return doc;
 }
 
@@ -156,7 +153,7 @@ export function prune_today(server_doc, clientSyncRequest) {
 
   // If server has no date, or client's date is newer, overwrite server state.
   if (!server_has_date || client_day_temp_data.timestamp > server_data.timestamp) {
-    // Reset the server document's state. 
+    // Reset the server document's state.
     // getSyncResponse will then build the new state from the client's operations.
     server_doc.clear();
   }
