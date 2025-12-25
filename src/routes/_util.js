@@ -125,7 +125,11 @@ export function make_favorites() {
 }
 
 export function make_history() {
-  return new CollabJSON("[]");
+  return new CollabJSON("[]", {
+    idGenerator: (item) => item.timestamp,
+    sortKeyGenerator: (item, path) =>
+      item.timestamp ? -parseInt(item.timestamp.replace(/-/g, "").slice(0, 8)) : null,
+  });
 }
 
 export function make_profile() {

@@ -25,6 +25,15 @@ export class CollabJSON {
     this.snapshot = null;
     this.snapshotDvv = new Map();
 
+    // Custom generators
+    this.idGenerator =
+      options.idGenerator ||
+      ((data, path) =>
+        data && typeof data === "object" && data.id !== undefined
+          ? String(data.id)
+          : this._generateId());
+    this.sortKeyGenerator = options.sortKeyGenerator || ((data, path) => null);
+
     if (jsonString) {
       this.root = this._plainToCrdt(JSON.parse(jsonString));
     }
@@ -86,7 +95,7 @@ export class CollabJSON {
     return mid;
   }
 
-  _plainToCrdt(data, timestamp = 0, existingNode = null) {
+  _plainToCrdt(data, timestamp = 0, existingNode = null, path = []) {
     // Check for type mismatch between data and existingNode
     if (existingNode) {
       const isExistingArray = Boolean(existingNode[CRDT_ARRAY_MARKER]);
@@ -113,47 +122,57 @@ export class CollabJSON {
       const usedIds = new Set();
 
       // Step 1: Process new items, trying to match with existing ones
-      for (const itemData of data) {
+      for (const [index, itemData] of data.entries()) {
         let matchedItem = null;
+        // Path is approximate for array items during load (using index), unless ID is known.
+        // But plain traversal relies on structure.
+        const currentPath = [...path, index];
 
-        // Strategy A: Match by ID (if provided in data)
-        if (itemData && typeof itemData === "object" && itemData.id !== undefined) {
-          const targetId = String(itemData.id);
-          matchedItem = existingItems.find((i) => i.id === targetId);
+        // 1. Resolve ID using generator (or fallback to default logic built-in to generator default)
+        const generatedId = this.idGenerator(itemData, currentPath);
+
+        // Strategy A: Match by ID
+        if (generatedId) {
+          matchedItem = existingItems.find((i) => i.id === generatedId);
         }
+
+        // 2. Resolve Sort Key
+        const customSortKey = this.sortKeyGenerator(itemData, currentPath);
+        const finalSortKey =
+          customSortKey !== null && customSortKey !== undefined ? customSortKey : sortKey;
 
         if (matchedItem) {
           usedIds.add(matchedItem.id);
 
           if (matchedItem.updated > timestamp) {
-            // Local item is newer. Preserve its data and deleted status, but update sortKey to match new order.
+            // Local item is newer. Preserve its data and deleted status, but update sortKey.
+            // Note: We respect the custom sort key if provided, effectively "reseting" the order to what the generator says.
             crdtArray.items[matchedItem.id] = {
               ...matchedItem,
-              sortKey,
+              sortKey: finalSortKey,
             };
           } else {
             // Incoming update is newer. Overwrite (resurrect if deleted).
             crdtArray.items[matchedItem.id] = {
               id: matchedItem.id,
-              data: this._plainToCrdt(itemData, timestamp, matchedItem.data),
-              sortKey,
+              data: this._plainToCrdt(itemData, timestamp, matchedItem.data, currentPath),
+              sortKey: finalSortKey,
               updated: timestamp,
               _deleted: false,
             };
           }
         } else {
           // No match found. Create new item.
-          // Use itemData.id as internal ID if available, otherwise generate one.
-          let itemId;
-          itemId =
-            itemData && typeof itemData === "object" && itemData.id !== undefined
-              ? String(itemData.id)
-              : this._generateId();
+          let itemId = generatedId; // Guaranteed to be string or null if generated
+          if (!itemId) {
+            // Fallback if generator failed? (Should not happen with default generator but good for safety)
+            itemId = this._generateId();
+          }
 
           crdtArray.items[itemId] = {
             id: itemId,
-            data: this._plainToCrdt(itemData, timestamp),
-            sortKey,
+            data: this._plainToCrdt(itemData, timestamp, null, currentPath),
+            sortKey: finalSortKey,
             updated: timestamp,
             _deleted: false,
           };
@@ -208,7 +227,7 @@ export class CollabJSON {
           newObject.metadata[key] = meta;
         } else {
           // Incoming is newer.
-          newObject[key] = this._plainToCrdt(data[key], timestamp, existingChild);
+          newObject[key] = this._plainToCrdt(data[key], timestamp, existingChild, [...path, key]);
           // Optimization: Don't set metadata[key] if it matches the default { updated: timestamp, _deleted: false }
         }
       }
