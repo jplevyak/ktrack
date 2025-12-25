@@ -91,10 +91,10 @@
     if (!index) create_index();
     let found = index.search(search_value);
     results = [];
-    for (let f in found) {
-      results_map.set(f, found[f].ref);
-      results.push(favorites_data[found[f].ref]);
-    }
+    found.forEach((f, i) => {
+      results_map.set(i, f.ref);
+      results.push(favorites_data[f.ref]);
+    });
   }
 
   function save(favs) {
@@ -139,7 +139,9 @@
       let y = confirm("Do you want to delete the favorite?");
       if (!y) return;
       let i = index;
-      if (results_map != undefined) i = results_map.get(index);
+      if (results_map != undefined) {
+        i = results_map.get(index);
+      }
       favorites.deleteItem([Number(i)]);
       save(favorites);
     } else if (change == "edit") {

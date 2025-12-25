@@ -121,7 +121,9 @@ export function make_today() {
 }
 
 export function make_favorites() {
-  return new CollabJSON("[]");
+  return new CollabJSON("[]", {
+    idGenerator: (item) => item.name || item.id,
+  });
 }
 
 export function make_history() {
