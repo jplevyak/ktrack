@@ -106,10 +106,15 @@ Averages [3, 5, 7] days: [{averages[0].toFixed(1)}, {averages[1].toFixed(1)}, {a
 )}]<br />
 Number of days to view <input type="number" id="limit" bind:value={limit} />
 &nbsp;&nbsp; Added: {added_count}
-{#if $history_status && $history_status != "idle"}
-  🟡 Unsaved changes: {$history_status}
-{/if}
-<br /><br />
+
+<div style="min-height: 1.5em; margin-top: 0.25em;">
+  {#if $history_status && $history_status != "idle"}
+    <b>🟡 Unsaved changes: {$history_status}</b>
+  {:else}
+    &nbsp;
+  {/if}
+</div>
+<br />
 
 {#each results as day, e}
   {@const day_info = get_date_info(day)}

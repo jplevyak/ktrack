@@ -442,6 +442,67 @@ export class CollabJSON {
 
   // --- Operation Generators (Public API) ---
 
+  upsertItemWithSortKey(path, data, sortKey) {
+    const parentPath = path.slice(0, -1);
+
+    // Check if item exists to decide whether to ADD or MOVE/UPDATE
+    // However, since we want to enforce a specific sortKey, we can just use a new operation type
+    // or reuse ADD_ITEM/MOVE_ITEM logic.
+    // But standard ADD_ITEM generates its own sortKey.
+    // Let's create a specialized internal logic or expose a way to set it.
+
+    // Simplest approach: Reuse ADD_ITEM but override the sortKey generation.
+    // We already have _applyAndStore which takes a raw op.
+
+    // We need to resolve the itemId.
+    const itemId =
+      data && typeof data === "object" && data.id !== undefined
+        ? String(data.id)
+        : this._generateId(); // Note: If generating, we might duplicate if we don't know the ID.
+    // For history, we DO know the ID (timestamp).
+
+    // Check if it already exists to see if we need to merge data
+    const result = this._traverse(parentPath);
+    if (!result || !result.node || !result.node[CRDT_ARRAY_MARKER]) {
+      throw new Error("Target for upsert is not an array");
+    }
+    const targetArray = result.node;
+
+    // Check if item exists
+    const existingItem = targetArray.items[itemId];
+
+    if (existingItem) {
+      // If it exists, we want to update Data AND ensure SortKey is correct.
+      // We can emit an UPDATE_ITEM and a MOVE_ITEM (with manual sortKey).
+      // Or we can define a new op "UPSERT_ITEM" that does both.
+      // Ideally, we stick to existing primitives if possible to avoid breaking peers?
+      // But this is a local change for now.
+      // Let's emit an ADD_ITEM with the specific sortKey.
+      // Our APPLY logic for ADD_ITEM says: "if item.updated or op.timestamp >= item.updated".
+      // It also sets item.sortKey = op.sortKey.
+      // So ADD_ITEM actually works as an UPSERT if we provide the ID.
+
+      this._applyAndStore({
+        type: "ADD_ITEM",
+        path: parentPath,
+        itemId: itemId,
+        data: data,
+        sortKey: sortKey,
+        timestamp: this._tick(),
+      });
+    } else {
+      // Doesn't exist, just add it.
+      this._applyAndStore({
+        type: "ADD_ITEM",
+        path: parentPath,
+        itemId: itemId,
+        data,
+        sortKey: sortKey,
+        timestamp: this._tick(),
+      });
+    }
+  }
+
   addItem(path, data) {
     const parentPath = path.slice(0, -1);
     const keyOrIndex = path.at(-1);
@@ -525,12 +586,12 @@ export class CollabJSON {
     /*
        Problem: We need to generate a fractional sortKey that places 'itemToMove'
        at 'toIndex'.
-
+  
        When moving an item within a list, the indices of other items shift.
        For example, if we have [A, B, C, D] and move A (index 0) to index 2:
        1. Conceptually remove A: [B, C, D]
        2. Insert A at index 2: [B, C, A, D]
-
+  
        To find the correct sortKey for A, we need to look at its new neighbors
        in the list *excluding* A itself. In this example, A is between C and D.
     */

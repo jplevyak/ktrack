@@ -472,27 +472,90 @@ export function save_history(day, profile) {
   if (day == undefined) return;
   history_store.update(function (history) {
     if (history == undefined) history = make_history();
-    let history_data = history.getData();
     let day_data = day.getData();
 
-    const existing_index = history_data.findIndex((d) => d && d.timestamp === day_data.timestamp);
+    // Use negative timestamp as sort key for descending order
+    // e.g. 2025-12-25 -> 20251225 -> -20251225
+    // Remove dashes, parse int, negate.
+    const tsKey = day_data.timestamp
+      ? parseInt(day_data.timestamp.split("-").slice(0, 3).join(""))
+      : 0;
+    const sortKey = -tsKey;
 
-    if (existing_index !== -1) {
-      history.updateItem([existing_index], day_data);
-    } else {
-      const insert_index = history_data.findIndex((d) => d && d.timestamp < day_data.timestamp);
-      history.addItem([insert_index === -1 ? history_data.length : insert_index], {
+    // Use the new upsert method to force the sort key
+    history.upsertItemWithSortKey(
+      ["items"],
+      {
         ...day_data,
         id: day_data.timestamp,
-      });
+      },
+      sortKey,
+    );
+
+    // One-time Fixup: Iterate history and correct sort keys if needed
+    if (history.getData().length > 0) {
+      // We only do this check cheaply? Or should we do it every time?
+      // Let's rely on the user interactions to fix it over time?
+      // Or we can just iterate the array now. It is small (limit=50).
+      const items = history.getData();
+      for (const item of items) {
+        const itemTsKey = item.timestamp
+          ? parseInt(item.timestamp.split("-").slice(0, 3).join(""))
+          : 0;
+        const expectedSortKey = -itemTsKey;
+        // We can't easily check the *current* sortKey from here without internal access,
+        // but we can just re-upsert everything to ensure consistency.
+        // This might generate a lot of ops if we do it every save.
+        // Ideally we only do this if we detect an issue.
+        // Let's assume the current save fixes the "current" day.
+        // But the user asked to "fixup the existing history".
+        // We can check if the item order is correct?
+        // Re-upserting everything is safe but expensive in ops.
+        // Let's just do it for now as it guarantees correctness.
+        // Optimize: Only if global flag not set? No global store here.
+        // We will settle for: The current save is fixed.
+        // AND we will iterate and fix others.
+        if (item.id !== day_data.timestamp) {
+          // Skip the one we just added
+          history.upsertItemWithSortKey(["items"], item, expectedSortKey);
+        }
+      }
     }
 
     const limit = merge_history_limit || 50;
+
+    // With explicit sort keys, we need to be careful about pruning.
+    // deleteItem uses index.
+    // getData returns sorted items.
+    // So logic remains valid.
+
     const current_items = history.getData();
     if (current_items.length > limit) {
       // Prune oldest items if history exceeds limit
+      // The items are sorted descending, so indices limit..length are the oldest.
       for (let i = limit; i < current_items.length; i++) {
-        history.deleteItem([limit]); // Always delete item at `limit` index as list shrinks
+        // Note: deleteItem by index relies on the SORTED order.
+        // Since we fixed the sort order above, this should correctly delete the oldest (smallest negative key => largest positive key? No).
+        // Wait: -2025 > -2024. So Descending Order is preserved.
+        // 2025-12-25 -> -20251225
+        // 2024-12-25 -> -20241225
+        // -20241225 > -20251225.
+        // So -2024 (Old) is GREATER than -2025 (New).
+        // The CRDT sorts Ascending.
+        // So Oldest (Largest Key) will be at the END?
+        // No, Wait.
+        // SortKey Ascending: Smallest first.
+        // We want Newest First (Top of list).
+        // So Newest should be Smallest SortKey.
+        // 2025 should be SMALLER than 2024.
+        // -2025 is SMALLER than -2024.
+        // Correct.
+        // So List is [Newest (-2025), Oldest (-2024)].
+        // Index 0 is Newest.
+        // Index Limit is Oldest.
+        // Pruning at Limit deletes Oldest. Correct.
+
+        history.deleteItem([limit]);
       }
     }
 

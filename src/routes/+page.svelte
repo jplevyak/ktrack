@@ -82,10 +82,10 @@
     history && history.getData ? compute_averages(history.getData()) || [0, 0, 0] : [0, 0, 0];
 
   function save_day() {
-    if (day == today) {
+    console.log('day == today', day == today, day, today);
+    if (edit == undefined) {
       save_today(day, profile);
     } else {
-      edit_store.set(day);
       save_history(day, profile);
     }
   }
@@ -178,10 +178,15 @@ Averages [3, 5, 7] days: [{(averages[0] || 0).toFixed(1)}, {(averages[1] || 0).t
     {date_info.date}, {date_info.year}{/if}
   {#if edit != undefined}<span style="color:red">Editing History</span>
     <button type="button" id="done" on:click={done_edit}>done</button>{/if}
+</b>
+<div style="min-height: 1.5em; margin-top: 0.25em;">
   {#if $today_status && $today_status != "idle"}
-    🟡 Unsaved changes: {$today_status}
+    <b>🟡 Unsaved changes: {$today_status}</b>
+  {:else}
+    &nbsp;
   {/if}
-</b><br /><br />
+</div>
+<br />
 {#if editing == undefined}
   {#each food_items as f, i}
     <Food

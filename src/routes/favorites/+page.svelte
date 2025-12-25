@@ -196,10 +196,15 @@
   <button type="button" id="clear_input" on:click={clear_search}>Clear</button>
   <button type="button" id="create" on:click={create_favorite}>Create New Favorite</button>
   &nbsp;&nbsp; Added: {added_count}
-  {#if $favorites_status && $favorites_status != "idle"}
-    🟡 Unsaved changes: {$favorites_status}
-  {/if}
-  <br /><br />
+
+  <div style="min-height: 1.5em; margin-top: 0.25em;">
+    {#if $favorites_status && $favorites_status != "idle"}
+      <b>🟡 Unsaved changes: {$favorites_status}</b>
+    {:else}
+      &nbsp;
+    {/if}
+  </div>
+  <br />
   {#if favorites != undefined}
     {#each results as f, i}
       <Food
