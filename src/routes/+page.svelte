@@ -87,6 +87,7 @@
       save_today(day, profile);
     } else {
       save_history(day, profile);
+      edit_store.set(day);
     }
   }
 
