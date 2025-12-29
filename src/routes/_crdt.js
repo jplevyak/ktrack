@@ -5,8 +5,8 @@
  */
 import { v4 as uuidv4 } from "uuid";
 
-const HISTORY_PRUNE_LIMIT = 100;
-const HISTORY_PRUNE_WINDOW = 50;
+const HISTORY_PRUNE_LIMIT = 200;
+const HISTORY_PRUNE_WINDOW = 100;
 const CRDT_ARRAY_MARKER = "_crdt_array_";
 
 export class CollabJSON {

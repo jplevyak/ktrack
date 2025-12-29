@@ -82,11 +82,9 @@
     history && history.getData ? compute_averages(history.getData()) || [0, 0, 0] : [0, 0, 0];
 
   function save_day() {
-    console.log("day == today", day == today, day, today);
     if (edit == undefined) {
       save_today(day, profile);
     } else {
-      save_history(day, profile);
       edit_store.set(day);
     }
   }
@@ -102,7 +100,7 @@
   }
 
   function done_edit() {
-    save_day();
+    save_history(day, profile);
     edit_store.set(undefined);
     goto("/history");
   }
