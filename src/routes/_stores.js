@@ -493,31 +493,32 @@ export function save_history(day, profile) {
     );
 
     // One-time Fixup: Iterate history and correct sort keys if needed
-    if (history.getData().length > 0) {
-      // We only do this check cheaply? Or should we do it every time?
-      // Let's rely on the user interactions to fix it over time?
-      // Or we can just iterate the array now. It is small (limit=50).
-      const items = history.getData();
-      for (const item of items) {
-        const itemTsKey = item.timestamp
-          ? parseInt(item.timestamp.split("-").slice(0, 3).join(""))
-          : 0;
-        const expectedSortKey = -itemTsKey;
-        // We can't easily check the *current* sortKey from here without internal access,
-        // but we can just re-upsert everything to ensure consistency.
-        // This might generate a lot of ops if we do it every save.
-        // Ideally we only do this if we detect an issue.
-        // Let's assume the current save fixes the "current" day.
-        // But the user asked to "fixup the existing history".
-        // We can check if the item order is correct?
-        // Re-upserting everything is safe but expensive in ops.
-        // Let's just do it for now as it guarantees correctness.
-        // Optimize: Only if global flag not set? No global store here.
-        // We will settle for: The current save is fixed.
-        // AND we will iterate and fix others.
-        if (item.id !== day_data.timestamp) {
-          // Skip the one we just added
-          history.upsertItemWithSortKey(["items"], item, expectedSortKey);
+    // Optimize: Iterate internal structure to access current sortKey directly avoiding unnecessary ops.
+    const root = history.root;
+    if (root && root.items) {
+      for (const id in root.items) {
+        if (id === day_data.timestamp) continue; // Skip current item
+
+        const item = root.items[id];
+        if (item._deleted) continue;
+
+        const dateParts = id.split("-");
+        if (dateParts.length < 3) continue;
+
+        const tsKey = parseInt(dateParts.slice(0, 3).join(""));
+        const expectedSortKey = -tsKey;
+
+        // Check if sortKey mismatch exists (allow tiny float diff just in case, though here it's integer-based logic mostly)
+        if (Math.abs(item.sortKey - expectedSortKey) > 0.0001) {
+          // Use getData to get the plain content needed for upsert
+          // or just pass a minimal object if upsert supports it?
+          // upsertItemWithSortKey expects 'data' object.
+          // We can reconstitute it or just use the existing internal data if careful.
+          // Safer to use history.getData() to find the item.
+          const plainItem = history.getData().find((i) => i.id === id);
+          if (plainItem) {
+            history.upsertItemWithSortKey(["items"], plainItem, expectedSortKey);
+          }
         }
       }
     }
