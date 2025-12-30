@@ -492,70 +492,13 @@ export function save_history(day, profile) {
       sortKey,
     );
 
-    // One-time Fixup: Iterate history and correct sort keys if needed
-    // Optimize: Iterate internal structure to access current sortKey directly avoiding unnecessary ops.
-    const root = history.root;
-    if (root && root.items) {
-      for (const id in root.items) {
-        if (id === day_data.timestamp) continue; // Skip current item
-
-        const item = root.items[id];
-        if (item._deleted) continue;
-
-        const dateParts = id.split("-");
-        if (dateParts.length < 3) continue;
-
-        const tsKey = parseInt(dateParts.slice(0, 3).join(""));
-        const expectedSortKey = -tsKey;
-
-        // Check if sortKey mismatch exists (allow tiny float diff just in case, though here it's integer-based logic mostly)
-        if (Math.abs(item.sortKey - expectedSortKey) > 0.0001) {
-          // Use getData to get the plain content needed for upsert
-          // or just pass a minimal object if upsert supports it?
-          // upsertItemWithSortKey expects 'data' object.
-          // We can reconstitute it or just use the existing internal data if careful.
-          // Safer to use history.getData() to find the item.
-          const plainItem = history.getData().find((i) => i.id === id);
-          if (plainItem) {
-            history.upsertItemWithSortKey(["items"], plainItem, expectedSortKey);
-          }
-        }
-      }
-    }
-
     const limit = merge_history_limit || 50;
-
-    // With explicit sort keys, we need to be careful about pruning.
-    // deleteItem uses index.
-    // getData returns sorted items.
-    // So logic remains valid.
 
     const current_items = history.getData();
     if (current_items.length > limit) {
       // Prune oldest items if history exceeds limit
       // The items are sorted descending, so indices limit..length are the oldest.
       for (let i = limit; i < current_items.length; i++) {
-        // Note: deleteItem by index relies on the SORTED order.
-        // Since we fixed the sort order above, this should correctly delete the oldest (smallest negative key => largest positive key? No).
-        // Wait: -2025 > -2024. So Descending Order is preserved.
-        // 2025-12-25 -> -20251225
-        // 2024-12-25 -> -20241225
-        // -20241225 > -20251225.
-        // So -2024 (Old) is GREATER than -2025 (New).
-        // The CRDT sorts Ascending.
-        // So Oldest (Largest Key) will be at the END?
-        // No, Wait.
-        // SortKey Ascending: Smallest first.
-        // We want Newest First (Top of list).
-        // So Newest should be Smallest SortKey.
-        // 2025 should be SMALLER than 2024.
-        // -2025 is SMALLER than -2024.
-        // Correct.
-        // So List is [Newest (-2025), Oldest (-2024)].
-        // Index 0 is Newest.
-        // Index Limit is Oldest.
-        // Pruning at Limit deletes Oldest. Correct.
-
         history.deleteItem([limit]);
       }
     }
