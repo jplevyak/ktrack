@@ -1,7 +1,7 @@
 import foods from "./_foods.json";
 import { CollabJSON } from "./_crdt.js";
 
-export const merge_history_limit = 50;
+export const merge_history_limit = 25;
 
 export const weekdays = new Array(7);
 weekdays[0] = "Sunday";
