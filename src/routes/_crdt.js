@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from "uuid";
 
 const HISTORY_PRUNE_LIMIT = 200;
 const HISTORY_PRUNE_WINDOW = 100;
-const CRDT_ARRAY_MARKER = "_crdt_array_";
+export const CRDT_ARRAY_MARKER = "_crdt_array_";
 
 export class CollabJSON {
   constructor(jsonString, options = {}) {
@@ -1210,5 +1210,34 @@ export class CollabJSON {
       return (clientDvvMap.get(op.clientId) || 0) < op.timestamp;
     });
     return { ops: opsForClient, dvv: Object.fromEntries(this.dvv) };
+  }
+
+  static getMaxTimestamp(node) {
+    if (!node || typeof node !== "object") return 0;
+    let max = node.updated || 0;
+
+    if (node.hasOwnProperty("data") && node.hasOwnProperty("sortKey")) {
+      return Math.max(max, CollabJSON.getMaxTimestamp(node.data));
+    }
+
+    if (node.metadata) {
+      for (const key in node.metadata) {
+        if (node.metadata[key] && node.metadata[key].updated) {
+          max = Math.max(max, node.metadata[key].updated);
+        }
+      }
+    }
+
+    for (const key in node) {
+      if (
+        key !== "metadata" &&
+        key !== "items" &&
+        typeof node[key] === "object" &&
+        node[key] !== null
+      ) {
+        max = Math.max(max, CollabJSON.getMaxTimestamp(node[key]));
+      }
+    }
+    return max;
   }
 }

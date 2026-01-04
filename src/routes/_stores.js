@@ -552,6 +552,7 @@ export function check_for_new_day(t, profile) {
   let new_day = make_today();
   if (!t) {
     save_today(new_day, profile);
+    save_history(new_day, profile);
     return new_day;
   }
 
@@ -568,8 +569,8 @@ export function check_for_new_day(t, profile) {
     t.updateItem(["items"], []);
 
     save_today(t, profile);
+    save_history(t, profile);
   }
-  save_history(t, profile);
   return t;
 }
 
