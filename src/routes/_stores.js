@@ -3,14 +3,21 @@ import { browser } from "$app/environment";
 import { CollabJSON } from "./_crdt.js";
 import { v4 as uuidv4 } from "uuid";
 import {
-  compare_date,
-  get_date_info,
-  merge_history_limit,
   make_today,
   make_favorites,
   make_history,
   make_profile,
 } from "./_util.js";
+import {
+  createSyncedStore,
+  add_item_logic,
+  save_history_logic,
+  save_profile_logic,
+  save_today_logic,
+  save_favorite_logic,
+  check_for_new_day_logic,
+  logout_logic,
+} from "./_stores_common.js";
 
 // --- IndexedDB Helper ---
 const DB_NAME = "KTrackDB";
@@ -72,211 +79,9 @@ if (browser) {
     localStorage.setItem("ktrack_client_id", globalClientId);
   }
 } else {
-  // For SSR, we don't have a persistent ID, but we can generate one or use a placeholder.
-  // Since SSR shouldn't be generating ops that persist to the client in this architecture,
-  // a random one is acceptable or 'server-render'.
   globalClientId = uuidv4();
 }
 // ------------------------
-
-function debounce(func, wait) {
-  let timeout;
-  return function (...args) {
-    const context = this;
-    const callNow = !timeout;
-
-    clearTimeout(timeout);
-
-    timeout = setTimeout(() => {
-      timeout = null;
-      if (!callNow) func.apply(context, args);
-    }, wait);
-
-    if (callNow) func.apply(context, args);
-  };
-}
-
-export function synced_store(key, initialValue, sync, fromJSON) {
-  const SYNC_INTERVAL = 2000;
-  const DEBOUNCE_WAIT = 500;
-
-  // We store an object in IDB: { data: serializedData, dirty: boolean }
-
-  let isDirty = false;
-  const status = writable("loading"); // Start with loading status
-
-  // Initialize with default value
-  const {
-    subscribe,
-    set: svelteSet,
-    update: svelteUpdate,
-  } = writable(initialValue, () => {
-    if (!browser) return;
-
-    // Setup sync interval
-    const intervalId = setInterval(syncToServer, SYNC_INTERVAL);
-    return () => clearInterval(intervalId);
-  });
-
-  // Load from IndexedDB on initialization
-  if (browser) {
-    dbGet(key).then((record) => {
-      if (record) {
-        try {
-          // record.data is the JSON object (CollabJSON.toJSON result)
-          const parsed = record.data;
-          const value = fromJSON ? fromJSON(parsed) : parsed;
-          svelteSet(value);
-          isDirty = record.dirty || false;
-          status.set(isDirty ? "dirty" : "idle");
-
-          // if (isDirty) syncToServer(); // OLD: Only synced if dirty
-
-          // NEW: Always sync on load to get fresh server state (Pull-to-Refresh behavior on reload)
-          // Pass force=true to bypass the (!isDirty) check in syncToServer
-          syncToServer(true);
-        } catch (e) {
-          console.error(`Error parsing ${key} from IndexedDB`, e);
-          status.set("error");
-        }
-      } else {
-        // No data in DB, use initialValue
-        status.set("idle");
-        // Also sync on first load/empty DB to populate from server
-        syncToServer(true);
-      }
-    });
-  }
-
-  async function syncToServer(force = false) {
-    if (!browser || (!isDirty && !force) || !get(online)) {
-      if (isDirty && !get(online)) {
-        status.set("error"); // Offline but dirty
-      }
-      return;
-    }
-
-    console.log("Syncing to server...", key);
-    status.set("syncing");
-
-    try {
-      const currentValue = get({ subscribe });
-
-      // Sanity check before sync
-      if (fromJSON && !(currentValue instanceof CollabJSON)) {
-        console.error(`Store ${key} corrupted before sync: expected CollabJSON`, currentValue);
-        return;
-      }
-
-      const ok = await sync(currentValue);
-
-      if (!ok) throw new Error("Server sync failed");
-
-      // Sanity check after sync
-      if (fromJSON && !(currentValue instanceof CollabJSON)) {
-        console.error(`Store ${key} corrupted after sync: expected CollabJSON`, currentValue);
-        return;
-      }
-
-      // Notify Svelte of mutated value.
-      svelteSet(currentValue);
-
-      if (browser) {
-        // Save clean state to IDB
-        const serialized = fromJSON ? currentValue.toJSON() : currentValue;
-        await dbSet(key, { data: serialized, dirty: false });
-      }
-
-      isDirty = false;
-      status.set("idle");
-      console.log("Sync successful", key);
-    } catch (error) {
-      console.error(error.message);
-      status.set("error");
-    }
-  }
-
-  const debouncedSync = debounce(syncToServer, DEBOUNCE_WAIT);
-
-  const set = (newValue) => {
-    isDirty = true;
-    status.set("dirty");
-    svelteSet(newValue);
-
-    if (browser) {
-      // Save dirty state to IDB
-      const serialized = fromJSON ? newValue.toJSON() : newValue;
-      // We don't await this because set() is synchronous in Svelte contract usually,
-      // but IDB is async. It's "fire and forget" for the UI, but ensures persistence.
-      dbSet(key, { data: serialized, dirty: true });
-    }
-
-    debouncedSync();
-  };
-
-  const update = (updater) => {
-    set(updater(get({ subscribe })));
-  };
-
-  return {
-    subscribe,
-    set,
-    update,
-    sync: () => syncToServer(true),
-    status: {
-      subscribe: status.subscribe,
-    },
-  };
-}
-
-async function sync_profile(profile) {
-  if (profile.password == "") {
-    return true;
-  }
-  let data = {
-    username: profile.username,
-    password: profile.password,
-    value: profile,
-  };
-  try {
-    const response = await fetch("/api/profile", {
-      method: "POST",
-      body: JSON.stringify(data),
-      headers: { "Content-Type": "application/json" },
-    });
-    if (!response.ok) {
-      console.log("profile not-ok", response.status, response.statusText);
-      profile_store.set(profile);
-      return false;
-    }
-    try {
-      const data = await response.json();
-      if (data.err) {
-        console.log("profile err", data.err);
-        // Persist error state if needed, though profile_store handles its own persistence via set()
-        return false;
-      }
-      let p = data.value;
-      profile.message = p.message;
-      profile.authenticated = p.authenticated;
-      if (p.authenticated) {
-        profile.old_password = "";
-        // Force sync of other stores upon successful login
-        if (today_store && today_store.sync) today_store.sync();
-        if (favorites_store && favorites_store.sync) favorites_store.sync();
-        if (history_store && history_store.sync) history_store.sync();
-      }
-      // profile_store.set will handle IDB persistence
-    } catch (err) {
-      console.log("JSON error", err.message);
-      return false;
-    }
-  } catch (err) {
-    console.log("POST error", err.message);
-    return false;
-  }
-  return true;
-}
 
 export const online = readable(browser ? navigator.onLine : true, (set) => {
   if (!browser) return;
@@ -293,9 +98,6 @@ export const online = readable(browser ? navigator.onLine : true, (set) => {
 });
 
 function local_writable(key, initialValue) {
-  // Keep local_writable using localStorage for small non-critical UI state (like 'edit')
-  // or switch to IDB if consistency is desired.
-  // 'edit' is transient, so localStorage is probably fine, but let's keep it simple.
   let storedValue = initialValue;
   if (browser) {
     const fromStorage = localStorage.getItem(key);
@@ -338,8 +140,66 @@ function local_writable(key, initialValue) {
   };
 }
 
+export function synced_store(key, initialValue, sync, fromJSON) {
+  return createSyncedStore(key, initialValue, sync, fromJSON, {
+    writable,
+    get,
+    browser,
+    dbGet,
+    dbSet,
+    online,
+  });
+}
+
 export const index_store = writable(undefined);
 export const edit_store = local_writable("edit", undefined);
+
+async function sync_profile(profile) {
+  if (profile.password == "") {
+    return true;
+  }
+  let data = {
+    username: profile.username,
+    password: profile.password,
+    value: profile,
+  };
+  try {
+    const response = await fetch("/api/profile", {
+      method: "POST",
+      body: JSON.stringify(data),
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!response.ok) {
+      console.log("profile not-ok", response.status, response.statusText);
+      profile_store.set(profile);
+      return false;
+    }
+    try {
+      const data = await response.json();
+      if (data.err) {
+        console.log("profile err", data.err);
+        return false;
+      }
+      let p = data.value;
+      profile.message = p.message;
+      profile.authenticated = p.authenticated;
+      if (p.authenticated) {
+        profile.old_password = "";
+        if (today_store && today_store.sync) today_store.sync();
+        if (favorites_store && favorites_store.sync) favorites_store.sync();
+        if (history_store && history_store.sync) history_store.sync();
+      }
+    } catch (err) {
+      console.log("JSON error", err.message);
+      return false;
+    }
+  } catch (err) {
+    console.log("POST error", err.message);
+    return false;
+  }
+  return true;
+}
+
 export const profile_store = synced_store("profile", make_profile(), sync_profile);
 
 async function sync_internal(doc, name) {
@@ -400,9 +260,7 @@ async function sync_history(history) {
 }
 
 function collab_from_json(parsed) {
-  // Gracefully handle null/undefined if localStorage is empty.
   if (!parsed) return null;
-  // Override clientId with global one
   return CollabJSON.fromJSON(parsed, { clientId: globalClientId });
 }
 
@@ -433,140 +291,38 @@ export const history_store = synced_store(
   collab_from_json,
 );
 
+const stores = {
+  today_store,
+  favorites_store,
+  history_store,
+  edit_store,
+  profile_store,
+};
+
 export function add_item(item, today, edit, profile) {
-  if (edit != undefined) {
-    let edit_data = edit.getData();
-    if (Date.now() - edit_data.start_edit > 10 * 60 * 1000) {
-      // 10 min.
-      edit_store.set(undefined);
-      edit = undefined;
-    } else {
-      edit.updateItem(edit.findPath("start_edit"), Date.now());
-      edit_store.set(edit);
-    }
-  } else {
-    if (!today) return;
-  }
-  let store = edit != undefined ? edit_store : today_store;
-  store.update(function (day) {
-    const data = day.getData();
-    const existing_index = data.items.findIndex((i) => i.name == item.name);
-    if (existing_index !== -1) {
-      return day;
-    }
-
-    item = { ...item };
-    if (item.servings == undefined) item.servings = 1.0;
-
-    // Inject ID for deterministic conflict resolution
-    day.addItem(["items", data.items.length], { ...item, id: item.name });
-
-    if (edit == undefined) {
-      save_history(day, profile);
-    }
-    return day;
-  });
+  return add_item_logic(item, today, edit, profile, stores);
 }
 
 export function save_history(day, profile) {
-  if (day == undefined) return;
-  history_store.update(function (history) {
-    if (history == undefined) history = make_history();
-    let day_data = day.getData();
-
-    // Use negative timestamp as sort key for descending order
-    // e.g. 2025-12-25 -> 20251225 -> -20251225
-    // Remove dashes, parse int, negate.
-    const tsKey = day_data.timestamp
-      ? parseInt(day_data.timestamp.split("-").slice(0, 3).join(""))
-      : 0;
-    const sortKey = -tsKey;
-
-    // Use the new upsert method to force the sort key
-    history.upsertItemWithSortKey(
-      ["items"],
-      {
-        ...day_data,
-        id: day_data.timestamp,
-      },
-      sortKey,
-    );
-
-    const limit = merge_history_limit || 50;
-
-    const current_items = history.getData();
-    if (current_items.length > limit) {
-      // Prune oldest items if history exceeds limit
-      // The items are sorted descending, so indices limit..length are the oldest.
-      for (let i = limit; i < current_items.length; i++) {
-        history.deleteItem([limit]);
-      }
-    }
-
-    return history;
-  });
+  return save_history_logic(day, profile, stores);
 }
 
 export async function save_profile(profile) {
-  profile_store.set(profile);
-  await sync_profile(profile);
+  return save_profile_logic(profile, sync_profile, stores);
 }
 
 export function save_today(today, profile) {
-  today_store.set(today);
-  save_history(today, profile);
+  return save_today_logic(today, profile, stores);
 }
 
 export function save_favorite(item, profile, replace_index) {
-  favorites_store.update(function (favorites) {
-    if (favorites == undefined) favorites = make_favorites();
-
-    // Inject ID for deterministic conflict resolution
-    item = { ...item, id: item.name };
-
-    const favorites_data = favorites.getData();
-
-    if (replace_index != undefined) {
-      if (replace_index >= favorites_data.length) {
-        console.log("bad replace_index", replace_index);
-        return favorites;
-      }
-      favorites.updateItem([replace_index], item);
-      return favorites;
-    }
-
-    const existing_index = favorites_data.findIndex((i) => i.name == item.name);
-
-    if (existing_index !== -1) {
-      favorites.updateItem([existing_index], item);
-    } else {
-      if (item.servings == undefined) item.servings = 1.0;
-      favorites.addItem([favorites_data.length], item);
-    }
-
-    return favorites;
-  });
+  return save_favorite_logic(item, profile, replace_index, stores);
 }
 
 export function check_for_new_day(t, profile) {
-  let new_day = make_today();
-  if (!t) {
-    save_today(new_day, profile);
-    save_history(new_day, profile);
-    return new_day;
-  }
-
-  if (!get_date_info(t) || compare_date(t, new_day) < 0) {
-    save_history(t, profile);
-    save_today(new_day, profile);
-    save_history(new_day, profile);
-  }
-  return t;
+  return check_for_new_day_logic(t, profile, stores);
 }
 
 export function logout() {
-  profile_store.set(make_profile());
-  today_store.set(make_today());
-  favorites_store.set(make_favorites());
-  history_store.set(make_history());
+  return logout_logic(stores);
 }

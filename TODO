@@ -1,0 +1,3 @@
+Extend the history to serveral hundred.
+Check the compression path the prune path
+Check the path which combines update operations to prevent repeated >>>> from blowing out history.
