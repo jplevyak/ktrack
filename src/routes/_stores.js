@@ -558,18 +558,8 @@ export function check_for_new_day(t, profile) {
 
   if (!get_date_info(t) || compare_date(t, new_day) < 0) {
     save_history(t, profile);
-
-    // Mutate existing document to preserve ID and avoid server reset
-    const newData = new_day.getData();
-
-    if (newData.timestamp) {
-      t.updateItem(["timestamp"], newData.timestamp);
-    }
-
-    t.updateItem(["items"], []);
-
-    save_today(t, profile);
-    save_history(t, profile);
+    save_today(new_day, profile);
+    save_history(new_day, profile);
   }
   return t;
 }
