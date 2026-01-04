@@ -358,15 +358,15 @@ test("Sync with a pruned server sends snapshot", () => {
   let server = new CollabJSON("{}", { clientId: "server", id: docId });
   const client1 = new CollabJSON("{}", { clientId: "c1", id: docId });
 
-  for (let i = 0; i < 101; i++) {
+  for (let i = 0; i < 250; i++) {
     client1.updateItem([`item${i}`], { val: i });
   }
 
   let req1 = client1.getSyncRequest();
   server.getSyncResponse(req1);
 
-  server.prune(() => {});
-  assert.strictEqual(server.history.length, 50);
+  server.prune(() => { });
+  assert.strictEqual(server.history.length, 100);
   assert.ok(server.snapshot);
 
   const serverState = server.toJSON();
