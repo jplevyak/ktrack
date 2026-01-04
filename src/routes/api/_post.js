@@ -1,9 +1,9 @@
 import LevelPkg from "level";
 const { Level } = LevelPkg;
 import { error } from "@sveltejs/kit";
-import { CollabJSON } from "./_crdt.js";
+import { CollabJSON } from "../_crdt.js";
 
-export var profile = new Level("./profile");
+import { profile } from "./_dbs.js";
 
 async function do_post_internal(req, syncRequest, username, dbname, db, prune, defaultJSON) {
   let db_value_str;
@@ -130,5 +130,68 @@ export async function do_upload(req, dbname, db, prune, defaultJSON) {
     await db.put(username, JSON.stringify(server_doc.toJSON()));
   }
 
-  return new Response(JSON.stringify({ ok: true }));
+
 }
+
+export async function do_sync_batch(req, dbs, prunes, defaults) {
+  let body = await req.request.json();
+  const { username, password, requests } = body;
+
+  if (username == undefined || !username || typeof username.valueOf() !== "string") {
+    return new Response(JSON.stringify({ err: "bad username" }));
+  }
+  if (password == undefined || !password || typeof password.valueOf() !== "string") {
+    return new Response(JSON.stringify({ err: "bad password" }));
+  }
+
+  let p;
+  try {
+    const value = await profile.get(username);
+    p = JSON.parse(value);
+  } catch (e) {
+    if (e.code === "LEVEL_NOT_FOUND" || e instanceof SyntaxError) {
+      p = {
+        username: username,
+        password: password,
+        old_password: "",
+        message: "profile created, authenticated",
+        authenticated: Date.now(),
+      };
+      await profile.put(username, JSON.stringify(p));
+    } else {
+      console.log("Error retrieving profile for user:", username, e);
+      return new Response(JSON.stringify({ err: "Error reading profile" }));
+    }
+  }
+
+  if (p.username != username || p.password != password) {
+    return new Response(JSON.stringify({ err: "incorrect password" }));
+  }
+
+  const responses = {};
+  const promises = [];
+
+  for (const [key, syncRequest] of Object.entries(requests)) {
+    const db = dbs[key];
+    const prune = prunes[key] || ((x) => x);
+    const defaultJSON = defaults[key] || "{}";
+
+    if (db) {
+      promises.push(
+        do_post_internal({ request: { json: async () => syncRequest } }, syncRequest, username, key, db, prune, defaultJSON)
+          .then(async (res) => {
+            const json = await res.json();
+            responses[key] = json;
+          })
+          .catch((err) => {
+            console.error(`Error processing batch item ${key}:`, err);
+            responses[key] = { err: "Internal server error" };
+          })
+      );
+    }
+  }
+
+  await Promise.all(promises);
+  return new Response(JSON.stringify(responses));
+}
+

@@ -172,6 +172,41 @@ function local_writable(key, initialValue) {
     };
 }
 
+// --- Sync Manager for Test ---
+import { SyncManager } from "./_stores_common.js";
+
+async function batch_sync_impl(requests) {
+    const profile = get(profile_store);
+
+    const data = {
+        username: profile ? profile.username : 'test',
+        password: profile ? profile.password : 'test',
+        requests: requests
+    };
+
+    try {
+        // Mock fetch call to unified endpoint
+        const response = await fetch("/api/sync", {
+            method: "POST",
+            body: JSON.stringify(data),
+            headers: { "Content-Type": "application/json" }
+        });
+        if (!response.ok) {
+            console.error("Batch sync not ok", response.status);
+            return false;
+        }
+        return await response.json();
+    } catch (e) {
+        console.error("Batch sync fetch error", e);
+        return false;
+    }
+}
+
+export const syncManager = new SyncManager(batch_sync_impl);
+if (browser) {
+    syncManager.start();
+}
+
 export function synced_store(key, initialValue, sync, fromJSON) {
     return createSyncedStore(key, initialValue, sync, fromJSON, {
         writable,
@@ -180,6 +215,7 @@ export function synced_store(key, initialValue, sync, fromJSON) {
         dbGet,
         dbSet,
         online,
+        syncManager: (key !== 'profile') ? syncManager : null
     });
 }
 
@@ -217,9 +253,7 @@ async function sync_profile(profile) {
             profile.authenticated = p.authenticated;
             if (p.authenticated) {
                 profile.old_password = "";
-                if (today_store && today_store.sync) today_store.sync();
-                if (favorites_store && favorites_store.sync) favorites_store.sync();
-                if (history_store && history_store.sync) history_store.sync();
+                syncManager.syncAll(true);
             }
         } catch (err) {
             console.log("JSON error", err.message);
@@ -234,62 +268,7 @@ async function sync_profile(profile) {
 
 export const profile_store = synced_store("profile", make_profile(), sync_profile);
 
-async function sync_internal(doc, name) {
-    if (!(doc instanceof CollabJSON)) {
-        console.error(`Sync object for "${name}" is not a CollabJSON document. Aborting sync.`);
-        return false;
-    }
-    const profile = get(profile_store);
-    if (profile == undefined/* || !profile.authenticated*/) {
-        // return false;
-    }
-
-    const syncRequest = doc.getSyncRequest();
-    const data = {
-        username: profile ? profile.username : 'test',
-        password: profile ? profile.password : 'test',
-        ...syncRequest,
-    };
-
-    try {
-        const response = await fetch("/api/" + name, {
-            method: "POST",
-            body: JSON.stringify(data),
-            headers: { "Content-Type": "application/json" },
-        });
-        if (!response.ok) {
-            console.log("not-ok", name, response.status, response.statusText);
-            return false;
-        }
-        try {
-            const sync_response = await response.json();
-            if (sync_response.err) {
-                console.log("sync err", name, sync_response.err);
-                return false;
-            }
-            doc.applySyncResponse(sync_response);
-        } catch (err) {
-            console.log(name, "JSON error", err.message);
-            return false;
-        }
-    } catch (err) {
-        console.log(name, "POST error", err.message);
-        return false;
-    }
-    return true;
-}
-
-async function sync_today(today) {
-    return await sync_internal(today, "today");
-}
-
-async function sync_favorites(favorites) {
-    return await sync_internal(favorites, "favorites");
-}
-
-async function sync_history(history) {
-    return await sync_internal(history, "history");
-}
+async function sync_dummy() { return true; }
 
 function collab_from_json(parsed) {
     if (!parsed) return null;
@@ -307,19 +286,19 @@ function init_store_value(maker) {
 export const today_store = synced_store(
     "today",
     init_store_value(make_today),
-    sync_today,
+    sync_dummy,
     collab_from_json,
 );
 export const favorites_store = synced_store(
     "favorites",
     init_store_value(make_favorites),
-    sync_favorites,
+    sync_dummy,
     collab_from_json,
 );
 export const history_store = synced_store(
     "history",
     init_store_value(make_history),
-    sync_history,
+    sync_dummy,
     collab_from_json,
 );
 

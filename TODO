@@ -1,3 +1,8 @@
 Extend the history to serveral hundred.
 Check the compression path the prune path
 Check the path which combines update operations to prevent repeated >>>> from blowing out history.
+- remove id and sortKey from the download information or better yet move
+them into the metadata so that they don't appear unless optionally requested
+in getData()
+- remove the 'metadata' subdivision for lists if that makes it similar to basic objects
+which have all the data in 'data' (similar to 'items'.

@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from "svelte";
   import {
     logout,
+    syncManager,
     profile_store,
     save_profile,
     today_store,
@@ -187,9 +188,9 @@ their own server. Contact server administration if the password is lost.
   <button type="button" id="save">Login/Save</button>
 {/if}
 <input type="button" id="logout" value="Logout" />
+<button on:click={() => syncManager.syncAll(true)}>Sync</button>
 <br /><br />
-Today
-<button on:click={() => download_json("today.json", today)}>Download</button>
+Today <button on:click={() => download_json("today.json", today)}>Download</button>
 <input
   type="file"
   id="upload_today"
@@ -197,18 +198,9 @@ Today
   accept=".json"
   on:change={(e) => upload_json("today", today_store, e.target.files[0])}
 />
-<button on:click={() => document.getElementById("upload_today").click()}>Upload</button>
-<button on:click={() => today_store.sync()}>Sync</button>
-<ul>
-  <li>
-    Server Check Time: {today.checked ? new Date(today.checked).toString() : "unsynced"}
-  </li>
-  <li>
-    Server Sync Time: {today.synced ? new Date(today.synced).toString() : "unsynced"}
-  </li>
-</ul>
-Favorites
-<button on:click={() => download_json("favorites.json", favorites)}>Download</button>
+<button on:click={() => document.getElementById("upload_today").click()}>Upload</button><br />
+
+Favorites <button on:click={() => download_json("favorites.json", favorites)}>Download</button>
 <input
   type="file"
   id="upload_favorites"
@@ -216,18 +208,9 @@ Favorites
   accept=".json"
   on:change={(e) => upload_json("favorites", favorites_store, e.target.files[0])}
 />
-<button on:click={() => document.getElementById("upload_favorites").click()}>Upload</button>
-<button on:click={() => favorites_store.sync()}>Sync</button>
-<ul>
-  <li>
-    Server Check Time: {favorites.checked ? new Date(favorites.checked).toString() : "unsynced"}
-  </li>
-  <li>
-    Server Sync Time: {favorites.synced ? new Date(favorites.synced).toString() : "unsynced"}
-  </li>
-</ul>
-History
-<button on:click={() => download_json("history.json", history)}>Download</button>
+<button on:click={() => document.getElementById("upload_favorites").click()}>Upload</button><br />
+
+History <button on:click={() => download_json("history.json", history)}>Download</button>
 <input
   type="file"
   id="upload_history"
@@ -235,20 +218,11 @@ History
   accept=".json"
   on:change={(e) => upload_json("history", history_store, e.target.files[0])}
 />
-<button on:click={() => document.getElementById("upload_history").click()}>Upload</button>
-<button on:click={() => history_store.sync()}>Sync</button>
-<ul>
-  <li>
-    Server Check Time: {history.checked ? new Date(history.checked).toString() : "unsynced"}
-  </li>
-  <li>
-    Server Sync Time: {history.synced ? new Date(history.synced).toString() : "unsynced"}
-  </li>
-</ul>
+<button on:click={() => document.getElementById("upload_history").click()}>Upload</button><br />
+
+<br />
+Server Check Time: {today && today.checked ? new Date(today.checked).toString() : "unsynced"}<br />
+Server Sync Time: {today && today.synced ? new Date(today.synced).toString() : "unsynced"}
 
 <style>
-  ul {
-    margin: 0 0 1em 0;
-    line-height: 1.5;
-  }
 </style>
