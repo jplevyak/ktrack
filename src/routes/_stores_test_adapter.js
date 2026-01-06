@@ -3,17 +3,8 @@ const browser = true;
 
 import { CollabJSON } from "./_crdt.js";
 import { v4 as uuidv4 } from "uuid";
-import { make_today, make_favorites, make_history, make_profile } from "./_util_test_adapter.js";
-import {
-  createSyncedStore,
-  add_item_logic,
-  save_history_logic,
-  save_profile_logic,
-  save_today_logic,
-  save_favorite_logic,
-  check_for_new_day_logic,
-  logout_logic,
-} from "./_stores_common.js";
+import { make_today, make_favorites, make_history, make_profile } from "./_util.js";
+import { createSyncedStore, bindActions } from "./_stores_common.js";
 
 // --- IndexedDB Helper ---
 const DB_NAME = "KTrackDB";
@@ -310,30 +301,14 @@ const stores = {
   profile_store,
 };
 
-export function add_item(item, today, edit, profile) {
-  return add_item_logic(item, today, edit, profile, stores);
-}
+const actions = bindActions(stores, { sync_profile });
 
-export function save_history(day, profile) {
-  return save_history_logic(day, profile, stores);
-}
-
-export async function save_profile(profile) {
-  return save_profile_logic(profile, sync_profile, stores);
-}
-
-export function save_today(today, profile) {
-  return save_today_logic(today, profile, stores);
-}
-
-export function save_favorite(item, profile, replace_index) {
-  return save_favorite_logic(item, profile, replace_index, stores);
-}
-
-export function check_for_new_day(t, profile) {
-  return check_for_new_day_logic(t, profile, stores);
-}
-
-export function logout() {
-  return logout_logic(stores);
-}
+export const {
+  add_item,
+  save_history,
+  save_profile,
+  save_today,
+  save_favorite,
+  check_for_new_day,
+  logout,
+} = actions;

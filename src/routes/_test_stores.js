@@ -6,7 +6,7 @@ import {
   syncManager,
 } from "./_stores_test_adapter.js";
 import { CollabJSON } from "./_crdt.js";
-import { make_today, make_history, make_profile } from "./_util_test_adapter.js";
+import { make_today, make_history, make_profile } from "./_util.js";
 import assert from "assert";
 
 // --- Mock Global Environment for node ---

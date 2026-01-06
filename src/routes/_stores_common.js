@@ -7,7 +7,7 @@ import {
   make_profile,
   get_date_info,
   compare_date,
-} from "./_util_common.js";
+} from "./_util.js";
 
 export class SyncManager {
   constructor(syncCallback, debounceWait = 500, syncInterval = 2000) {
@@ -218,7 +218,21 @@ export function createSyncedStore(key, initialValue, sync, fromJSON, deps) {
   };
 }
 
-export function add_item_logic(item, today, edit, profile, stores) {
+export function bindActions(stores, extraDeps = {}) {
+  const { sync_profile } = extraDeps;
+  return {
+    add_item: (item, today, edit, profile) => add_item(item, today, edit, profile, stores),
+    save_history: (day, profile) => save_history(day, profile, stores),
+    save_profile: (profile) => save_profile(profile, sync_profile, stores),
+    save_today: (today, profile) => save_today(today, profile, stores),
+    save_favorite: (item, profile, replace_index) =>
+      save_favorite(item, profile, replace_index, stores),
+    check_for_new_day: (t, profile) => check_for_new_day(t, profile, stores),
+    logout: () => logout(stores),
+  };
+}
+
+export function add_item(item, today, edit, profile, stores) {
   const { today_store, edit_store } = stores;
 
   if (edit != undefined) {
@@ -247,13 +261,13 @@ export function add_item_logic(item, today, edit, profile, stores) {
     day.addItem(["items", data.items.length], { ...item, id: item.name });
 
     if (edit == undefined) {
-      save_history_logic(day, profile, stores);
+      save_history(day, profile, stores);
     }
     return day;
   });
 }
 
-export function save_history_logic(day, profile, stores) {
+export function save_history(day, profile, stores) {
   const { history_store } = stores;
   if (day == undefined) return;
   history_store.update(function (history) {
@@ -292,19 +306,19 @@ export function save_history_logic(day, profile, stores) {
   });
 }
 
-export async function save_profile_logic(profile, sync_profile, stores) {
+export async function save_profile(profile, sync_profile, stores) {
   const { profile_store } = stores;
   profile_store.set(profile);
   await sync_profile(profile);
 }
 
-export function save_today_logic(today, profile, stores) {
+export function save_today(today, profile, stores) {
   const { today_store } = stores;
   today_store.set(today);
-  save_history_logic(today, profile, stores);
+  save_history(today, profile, stores);
 }
 
-export function save_favorite_logic(item, profile, replace_index, stores) {
+export function save_favorite(item, profile, replace_index, stores) {
   const { favorites_store } = stores;
   favorites_store.update(function (favorites) {
     if (favorites == undefined) favorites = make_favorites();
@@ -335,23 +349,23 @@ export function save_favorite_logic(item, profile, replace_index, stores) {
   });
 }
 
-export function check_for_new_day_logic(t, profile, stores) {
+export function check_for_new_day(t, profile, stores) {
   let new_day = make_today();
   if (!t) {
-    save_today_logic(new_day, profile, stores);
-    save_history_logic(new_day, profile, stores);
+    save_today(new_day, profile, stores);
+    save_history(new_day, profile, stores);
     return new_day;
   }
 
   if (compare_date(t, new_day) < 0) {
-    save_history_logic(t, profile, stores);
-    save_today_logic(new_day, profile, stores);
-    save_history_logic(new_day, profile, stores);
+    save_history(t, profile, stores);
+    save_today(new_day, profile, stores);
+    save_history(new_day, profile, stores);
   }
   return t;
 }
 
-export function logout_logic(stores) {
+export function logout(stores) {
   const { profile_store, today_store, favorites_store, history_store } = stores;
   profile_store.set(make_profile());
   today_store.set(make_today());
