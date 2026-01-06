@@ -100,9 +100,9 @@ export function get_total_fiber(items) {
   return [n, unknown];
 }
 
-export function make_today() {
+export function make_today(t = null) {
   const doc = new CollabJSON("{}");
-  const now = new Date();
+  const now = t ? new Date(t): new Date();
   const y = now.getFullYear();
   const m = String(now.getMonth() + 1).padStart(2, "0");
   const d = String(now.getDate()).padStart(2, "0");

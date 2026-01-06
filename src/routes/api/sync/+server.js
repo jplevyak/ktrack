@@ -14,7 +14,7 @@ const prunes = {
 };
 
 const defaults = {
-  today: "{}",
+  today: '{ "timestamp": "1970-01-01-4", "items": [] }',
   history: "[]",
   favorites: "[]",
 };
