@@ -1,6 +1,6 @@
 /* Simple CRDT-based class for a collaborative JSON document.
  *
- * It uses Lamport timestamps for causal ordering, Last-Write-Wins (LWW)
+ * Uses Lamport timestamps for causal ordering, Last-Write-Wins (LWW)
  * for atomic updates, and fractional indexing for list ordering.
  */
 import { v4 as uuidv4 } from "uuid";
@@ -43,14 +43,12 @@ export class CollabJSON {
 
   _idToFloat(id) {
     // Use djb2 hash
-    let hash = 5381; // "Magic" starting constant
+    let hash = 5381; // Starting constant
     for (let i = 0; i < id.length; i++) {
-      // Hash * 33 + c
-      // We use ((hash << 5) + hash) as a fast way to do hash * 33
-      // The bitwise operators in JS automatically handle 32-bit wrapping
+      // hash * 33 + c
       hash = (hash << 5) + hash + id.charCodeAt(i);
     }
-    const unsignedHash = hash >>> 0; // Force to unsigned using right shift.
+    const unsignedHash = hash >>> 0; // Force to unsigned
     return unsignedHash / 4294967296;
   }
 
@@ -124,8 +122,6 @@ export class CollabJSON {
       // Step 1: Process new items, trying to match with existing ones
       for (const [index, itemData] of data.entries()) {
         let matchedItem = null;
-        // Path is approximate for array items during load (using index), unless ID is known.
-        // But plain traversal relies on structure.
         const currentPath = [...path, index];
 
         // 1. Resolve ID using generator (or fallback to default logic built-in to generator default)
@@ -146,7 +142,6 @@ export class CollabJSON {
 
           if (matchedItem.updated > timestamp) {
             // Local item is newer. Preserve its data and deleted status, but update sortKey.
-            // Note: We respect the custom sort key if provided, effectively "reseting" the order to what the generator says.
             crdtArray.items[matchedItem.id] = {
               ...matchedItem,
               sortKey: finalSortKey,
@@ -165,7 +160,6 @@ export class CollabJSON {
           // No match found. Create new item.
           let itemId = generatedId; // Guaranteed to be string or null if generated
           if (!itemId) {
-            // Fallback if generator failed? (Should not happen with default generator but good for safety)
             itemId = this._generateId();
           }
 
@@ -228,7 +222,6 @@ export class CollabJSON {
         } else {
           // Incoming is newer.
           newObject[key] = this._plainToCrdt(data[key], timestamp, existingChild, [...path, key]);
-          // Optimization: Don't set metadata[key] if it matches the default { updated: timestamp, _deleted: false }
         }
       }
 
@@ -376,7 +369,6 @@ export class CollabJSON {
     }
 
     let nodeToConvert = result.node;
-    // If the traversed node is an item from a CRDT array, we want to convert its `data` property.
     if (
       nodeToConvert &&
       nodeToConvert.hasOwnProperty("sortKey") &&
@@ -390,7 +382,7 @@ export class CollabJSON {
 
   /**
    * Finds the path to a node with a specific ID (for array items) or key.
-   * This is a DFS search.
+   * Performs a DFS search.
    */
   findPath(targetId) {
     return this._findPathRecursive(targetId, [], this.root);
@@ -464,62 +456,28 @@ export class CollabJSON {
   upsertItemWithSortKey(path, data, sortKey) {
     const parentPath = path.slice(0, -1);
 
-    // Check if item exists to decide whether to ADD or MOVE/UPDATE
-    // However, since we want to enforce a specific sortKey, we can just use a new operation type
-    // or reuse ADD_ITEM/MOVE_ITEM logic.
-    // But standard ADD_ITEM generates its own sortKey.
-    // Let's create a specialized internal logic or expose a way to set it.
-
-    // Simplest approach: Reuse ADD_ITEM but override the sortKey generation.
-    // We already have _applyAndStore which takes a raw op.
-
-    // We need to resolve the itemId.
+    // Reuse ADD_ITEM but override the sortKey generation.
     const itemId =
       data && typeof data === "object" && data.id !== undefined
         ? String(data.id)
-        : this._generateId(); // Note: If generating, we might duplicate if we don't know the ID.
-    // For history, we DO know the ID (timestamp).
+        : this._generateId();
 
-    // Check if it already exists to see if we need to merge data
     const result = this._traverse(parentPath);
     if (!result || !result.node || !result.node[CRDT_ARRAY_MARKER]) {
       throw new Error("Target for upsert is not an array");
     }
     const targetArray = result.node;
 
-    // Check if item exists
-    const existingItem = targetArray.items[itemId];
-
-    if (existingItem) {
-      // If it exists, we want to update Data AND ensure SortKey is correct.
-      // We can emit an UPDATE_ITEM and a MOVE_ITEM (with manual sortKey).
-      // Or we can define a new op "UPSERT_ITEM" that does both.
-      // Ideally, we stick to existing primitives if possible to avoid breaking peers?
-      // But this is a local change for now.
-      // Let's emit an ADD_ITEM with the specific sortKey.
-      // Our APPLY logic for ADD_ITEM says: "if item.updated or op.timestamp >= item.updated".
-      // It also sets item.sortKey = op.sortKey.
-      // So ADD_ITEM actually works as an UPSERT if we provide the ID.
-
-      this._applyAndStore({
-        type: "ADD_ITEM",
-        path: parentPath,
-        itemId: itemId,
-        data: data,
-        sortKey: sortKey,
-        timestamp: this._tick(),
-      });
-    } else {
-      // Doesn't exist, just add it.
-      this._applyAndStore({
-        type: "ADD_ITEM",
-        path: parentPath,
-        itemId: itemId,
-        data,
-        sortKey: sortKey,
-        timestamp: this._tick(),
-      });
-    }
+    // Whether it exists or not, we perform an ADD_ITEM with the specific sortKey.
+    // ADD_ITEM logic (updates if newer) serves as an upsert.
+    this._applyAndStore({
+      type: "ADD_ITEM",
+      path: parentPath,
+      itemId: itemId,
+      data: data,
+      sortKey: sortKey,
+      timestamp: this._tick(),
+    });
   }
 
   addItem(path, data) {
@@ -598,45 +556,18 @@ export class CollabJSON {
 
     const itemToMove = sortedItems[fromIndex];
 
-    // Calculate new sort key
+    // Calculate new sort key based on the position in the list excluding the moved item.
     let previousKey = null;
     let nextKey = null;
 
-    /*
-       Problem: We need to generate a fractional sortKey that places 'itemToMove'
-       at 'toIndex'.
-  
-       When moving an item within a list, the indices of other items shift.
-       For example, if we have [A, B, C, D] and move A (index 0) to index 2:
-       1. Conceptually remove A: [B, C, D]
-       2. Insert A at index 2: [B, C, A, D]
-  
-       To find the correct sortKey for A, we need to look at its new neighbors
-       in the list *excluding* A itself. In this example, A is between C and D.
-    */
-
     if (toIndex === 0) {
-      // Case 1: Moving to the very start of the list.
-      // The item will be placed before the current first item.
-      // We don't need to check for null here because the list is guaranteed to be non-empty (contains itemToMove).
       nextKey = sortedItems[0].sortKey;
     } else if (toIndex === sortedItems.length) {
-      // Case 2: Moving to the very end of the list.
-      // The item will be placed after the current last item.
-      // We don't need to check for null here because the list is guaranteed to be non-empty.
       previousKey = sortedItems.at(-1).sortKey;
     } else {
-      // Case 3: Moving to the middle (or effectively the end of the reduced list).
-      // We simulate the list without the moved item to find the correct neighbors.
-
       const listWithoutItem = sortedItems.filter((i) => i.id !== itemToMove.id);
-
-      // We want to insert at 'toIndex'. However, since we removed one item,
-      // the target index might be at the end of the reduced list.
       const actualToIndex = Math.min(toIndex, listWithoutItem.length);
 
-      // The previous item is guaranteed to exist because toIndex > 0 (handled by Case 1).
-      // nItem might be undefined if actualToIndex equals listWithoutItem.length (appending to reduced list).
       previousKey = listWithoutItem[actualToIndex - 1].sortKey;
       const nItem = listWithoutItem[actualToIndex];
       nextKey = nItem ? nItem.sortKey : null;
@@ -688,9 +619,7 @@ export class CollabJSON {
       return;
     }
 
-    // Tombstone TTL strategy:
-    // We purge tombstones that are older than the history window we are keeping.
-    // We approximate the timestamp threshold using the logical clock and the prune window size.
+    // Tombstone TTL strategy: purge tombstones older than the history window.
     const minTimestamp = this.clock - HISTORY_PRUNE_WINDOW;
     this.purgeTombstones(this.root, minTimestamp);
 
@@ -701,9 +630,7 @@ export class CollabJSON {
 
   /**
    * Garbage Collection: Permanently remove items marked as deleted.
-   * WARNING: This can cause desyncs if other clients still have pending ops
-   * referencing these items. Only use when confident all clients are caught up,
-   * or use a "tombstone TTL" strategy (not implemented here).
+   * WARNING: Can cause desyncs if clients reference purged items.
    */
   purgeTombstones(node = this.root, minTimestamp = 0) {
     if (typeof node !== "object" || node === null) {
@@ -726,7 +653,6 @@ export class CollabJSON {
           continue;
         }
 
-        // Check if this key is deleted in metadata
         if (node.metadata && node.metadata[key] && node.metadata[key]._deleted) {
           if (node.metadata[key].updated < minTimestamp) {
             delete node[key];
@@ -765,8 +691,6 @@ export class CollabJSON {
   applyOp(op) {
     this._mergeClock(op.timestamp);
 
-    // Common traversal for most ops
-    // Note: For MOVE_ITEM, path points to the array, not the item
     const traversePath = op.type === "MOVE_ITEM" ? op.path : op.path.slice(0, -1);
     const { parent, node } = this._traverse(traversePath) || {};
 
@@ -799,22 +723,19 @@ export class CollabJSON {
         const itemToMove = moveArray.items[op.itemId];
         if (!itemToMove) {
           break;
-        } // Item doesn't exist (maybe deleted or not synced yet)
+        }
 
         // LWW on the sortKey specifically.
-        // We use the item's general 'updated' timestamp.
-        // If a delete happened later, _deleted will be true, and we shouldn't un-delete it just by moving.
+        // Moving a deleted item does not un-delete it.
         if (op.timestamp > (itemToMove.updated || 0)) {
           itemToMove.sortKey = op.sortKey;
           itemToMove.updated = op.timestamp;
-          // Note: We do NOT set _deleted = false here. If it was deleted, moving it shouldn't bring it back.
         }
 
         break;
       }
 
       case "DELETE_ITEM": {
-        // Improved delete logic: resolve parent container first
         const parentPath = op.path.slice(0, -1);
         const parentRes = this._traverse(parentPath);
 
@@ -823,19 +744,15 @@ export class CollabJSON {
         }
 
         const container = parentRes.node;
-
         let targetMeta = null;
 
         if (container[CRDT_ARRAY_MARKER]) {
-          // For arrays, use itemId to identify the item to delete
           if (op.itemId && container.items[op.itemId]) {
             targetMeta = container.items[op.itemId];
           }
         } else {
-          // For objects, use the key from the path
           const key = op.path.at(-1);
 
-          // Resolve metadata (explicit or default)
           let targetUpdated = 0;
           if (container.metadata) {
             if (container.metadata[key]) {
@@ -847,7 +764,6 @@ export class CollabJSON {
 
           if (op.timestamp > targetUpdated) {
             container.metadata ||= {};
-            // Materialize metadata if it was implicit
             if (!container.metadata[key]) {
               container.metadata[key] = { updated: targetUpdated, _deleted: false };
             }
@@ -878,7 +794,6 @@ export class CollabJSON {
           if (parent[CRDT_ARRAY_MARKER]) {
             itemUpdated = node ? node.updated : 0;
           } else {
-            // Resolve metadata for object property
             if (parent.metadata && parent.metadata[key]) {
               itemUpdated = parent.metadata[key].updated;
             } else if (parent.metadata && parent.metadata._ts && parent[key]) {
@@ -976,7 +891,6 @@ export class CollabJSON {
     const doc = new CollabJSON(undefined, {
       ...options,
       id: state ? state.id : undefined,
-      // Prioritize options.clientId if provided (e.g. global device ID), otherwise fallback to state or generate new
       clientId: options.clientId || (state && state.clientId ? state.clientId : undefined),
     });
     if (!state) {
@@ -1006,8 +920,6 @@ export class CollabJSON {
     if (state.history) {
       doc.history = state.history || [];
       doc.dvv = new Map(Object.entries(state.dvv || {}));
-      // Do not re-apply history ops here. The 'root' (snapshot) is assumed to be the result of applying these ops.
-      // Re-applying them can be destructive if the ops contain plain data (without IDs) and overwrite existing items.
     }
 
     return doc;
@@ -1139,22 +1051,18 @@ export class CollabJSON {
   replaceData(jsonString) {
     const data = typeof jsonString === "string" ? JSON.parse(jsonString) : jsonString;
 
-    // Advance clock to ensure this state is newer than any previous state
+    // Advance clock to invalidate previous states
     this._tick();
 
-    // Re-initialize root with new data at the current timestamp
     this.root = this._plainToCrdt(data, this.clock);
 
-    // Purge history
     this.history = [];
     this.ops = [];
 
-    // Reset DVV: We are the authority now.
-    // We keep our own clock, but discard knowledge of others since we wiped their history.
+    // Reset DVV as authority
     this.dvv.clear();
     this.dvv.set(this.clientId, this.clock);
 
-    // Set snapshot
     this.snapshot = this.root;
     this.snapshotDvv = new Map(this.dvv);
 
@@ -1165,14 +1073,13 @@ export class CollabJSON {
   getSyncResponse(syncRequest) {
     const { dvv: clientDvv, ops: clientOps, clientId, docId } = syncRequest;
 
-    // 1. Check for Document ID mismatch
     if (this.id && docId && this.id !== docId) {
       return this.getResetResponse();
     }
 
     const clientDvvMap = new Map(Object.entries(clientDvv));
 
-    // 2. Check for History Gap (Pruning)
+    // Check for history gap
     if (this.snapshot) {
       let needsReset = false;
       for (const [cId, ts] of this.snapshotDvv.entries()) {
@@ -1183,12 +1090,10 @@ export class CollabJSON {
       }
 
       if (needsReset) {
-        // Send current state as reset
         return this.getResetResponse();
       }
     }
 
-    // 3. Normal Sync
     for (const op of clientOps) {
       this.applyOp(op);
       this.history.push(op);
