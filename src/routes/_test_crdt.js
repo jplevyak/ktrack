@@ -1026,36 +1026,45 @@ test("save_history behavior: diffUpdate compresses repeated serving updates", ()
   // 4. Update 'Today' (servings changed)
   todayData.items[0].servings = 1.5;
 
-  // 5. Simulate second save_history (Diff Update)
-  // Logic: found -> diffUpdate
-  const existingPath = history.findPath(todayData.timestamp);
-  assert.ok(existingPath, "History should have the day");
+  // 5. Simulate second save_history (Update 1.5) using upsert
+  // User expectation: Library handles diffing transparently.
+  todayData.items[0].servings = 1.5;
 
-  // save_history now includes id in diffUpdate to prevent deletion
-  history.diffUpdate(existingPath, { ...todayData, id: todayData.timestamp });
+  history.upsertItemWithSortKey(
+    ["items"],
+    { ...todayData, id: todayData.timestamp },
+    -20230101
+  );
 
-  // Check ops after first update
-  // Should be 2 ops: 1 Add + 1 Update Items
-  assert.strictEqual(history.ops.length, 2, "First update should result in 2 ops total");
+  // Check ops
+  // Initial Add (1) + Diff Update (1) = 2
+  assert.strictEqual(history.ops.length, 2, "Upsert should degrade to Diff Update and add 1 op");
 
-  // 6. Third Update (Repeated)
+  // 6. Third Update (Update 2.0)
   todayData.items[0].servings = 2.0;
-  history.diffUpdate(existingPath, { ...todayData, id: todayData.timestamp });
+  history.upsertItemWithSortKey(
+    ["items"],
+    { ...todayData, id: todayData.timestamp },
+    -20230101
+  );
 
-  // Should still be 2 ops (compressed)
-  assert.strictEqual(history.ops.length, 2, "Second update should be compressed");
+  // Should compress
+  assert.strictEqual(history.ops.length, 2, "Repeated Upsert (Diff) should be compressed");
 
-  // 7. Fourth Update (Repeated)
+  // 7. Fourth Update (Update 2.5)
   todayData.items[0].servings = 2.5;
-  history.diffUpdate(existingPath, { ...todayData, id: todayData.timestamp });
+  history.upsertItemWithSortKey(
+    ["items"],
+    { ...todayData, id: todayData.timestamp },
+    -20230101
+  );
 
-  // Should still be 2 ops (compressed)
-  assert.strictEqual(history.ops.length, 2, "Third update should be compressed");
+  assert.strictEqual(history.ops.length, 2, "Repeated Upsert (Diff) should be compressed");
 
   // Verify final data
-  // First day in history list (Root array has only 1 item)
-  // getData() returns array [ { ... } ]
   const historyList = history.getData();
+  // Accessing index 0 directly might require knowing internal structure?
+  // getData() on root array returns the array.
   const dayEntry = historyList[0];
 
   assert.strictEqual(dayEntry.timestamp, "2023-01-01");
