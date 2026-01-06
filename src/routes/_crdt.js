@@ -11,7 +11,7 @@ export const CRDT_ARRAY_MARKER = "_crdt_array_";
 
 export class CollabJSON {
   constructor(jsonString, options = {}) {
-    this.root = { data: {}, metadata: {} }; // Unified data model (Wrapped)
+    this.root = { data: {}, metadata: {} }; // Unified data model: root is always a wrapped object
 
     this.id = options.id || uuidv4();
     this.checked = undefined;
@@ -198,8 +198,9 @@ export class CollabJSON {
     }
 
     if (typeof data === "object" && data !== null) {
-      // Optimization: Wrapped Object Structure
+      // Create Wrapped Object Structure:
       // { data: { ...usersFields }, metadata: { ...systemFields } }
+      // This strict separation prevents user keys from colliding with system metadata.
 
       const wrapper = { data: {}, metadata: { _ts: timestamp } };
       const existingMeta = existingNode && existingNode.metadata ? existingNode.metadata : {};
@@ -286,10 +287,6 @@ export class CollabJSON {
       }
 
       for (const key in source) {
-        if (key === "metadata") {
-          continue;
-        }
-
         if (metaSource && metaSource[key] && metaSource[key]._deleted) {
           if (includeMetadata) {
             continue;
@@ -622,10 +619,6 @@ export class CollabJSON {
     if (!targetId && this.idGenerator) {
       targetId = this.idGenerator(data);
     }
-    // Fallback?
-    if (!targetId && data && data.id) {
-      targetId = data.id;
-    }
 
     if (!targetId) {
       throw new Error("Cannot upsert item without an ID");
@@ -656,7 +649,7 @@ export class CollabJSON {
     });
   }
 
-  addItem(path, data) {
+  addItem(path, data, itemId = null) {
     const parentPath = path.slice(0, -1);
     const keyOrIndex = path.at(-1);
 
@@ -698,12 +691,8 @@ export class CollabJSON {
     const nextKey = nextItem ? nextItem.sortKey : null;
 
     const newSortKey = this._generateSortKey(previousKey, nextKey);
-    // Use data.id if present, otherwise use generator, otherwise uuid.
-    let newItemId =
-      data && typeof data === "object" && data.id !== undefined
-        ? String(data.id)
-        : null;
 
+    let newItemId = itemId;
     if (!newItemId && this.idGenerator) {
       newItemId = this.idGenerator(data, [...parentPath, index]);
     }
@@ -813,12 +802,7 @@ export class CollabJSON {
     }
 
     const startClock = this.clock;
-    // We don't increment clock per op here necessarily, 
-    // usually one action = one tick? 
-    // But Ops logic increments tick per op. 
-    // To treat this as one atomic transaction we might want atomic timestamp batches, 
-    // but CollabJSON uses distinct LWW timestamps per op. 
-    // We'll let _tick() handle it naturally for now.
+    // We rely on _tick() to handle timestamps naturally for each operation.
 
     this._generateDiffOps(p, newData, result.node);
   }
@@ -853,8 +837,8 @@ export class CollabJSON {
       source = current.data;
     }
 
-    // Now source is Object Wrapper (or plain if legacy/primitive mismatch?)
-    // If it's Object Wrapper
+    // Unwrap if it is an Object Wrapper (has data, no sortKey)
+    // to access the inner user data for diffing.
     let innerData = source;
     if (source && source.data && !source.sortKey && !source[CRDT_ARRAY_MARKER]) {
       innerData = source.data;
@@ -1124,10 +1108,9 @@ export class CollabJSON {
             // If container is Object Wrapper, we look in container.data
             // If container.data[segment] missing, create it.
 
-            // Wait, if current is Wrapper.
-            // We need to descend.
-            // If current is array, difficult (index vs id).
-            // Usually path creation assumes Objects?
+            // Unwrap Object Wrapper for traversal DOWN.
+            // If container is Object Wrapper, we look in container.data.
+            // If container.data[segment] missing, create it.
 
             // Standardizing Object Wrapper unwrap:
             if (container.data && !container.sortKey && !container[CRDT_ARRAY_MARKER]) {
@@ -1143,24 +1126,8 @@ export class CollabJSON {
             ) {
               // Create NEW NODE.
               // Must be Wrapped Object!
+              // Create NEW NODE as a Wrapped Object.
               container[segment] = { data: {}, metadata: { _ts: op.timestamp } };
-              // Also update metadata on PARENT?
-              // 'container' is 'parent.data'.
-              // We need access to 'parent.metadata'?
-              // The logic here is "Create Path".
-              // Implicit creation usually doesn't update metadata of intermediate nodes explicitly 
-              // other than maybe _ts?
-              // The `_plainToCrdt` handles init.
-              // But we are manually building.
-              // If we insert into `container` (which is `parent.data`), we should technically 
-              // update `parent.metadata[segment]`.
-              // But `container` ref doesn't have link to `metadata`.
-
-              // To enable metadata updates, we shouldn't have unwrapped fully?
-              // This manual path creation loop relies on `current` being the node.
-              // If `current` is Wrapper.
-              // We set `current.data[segment] = newWrapper`.
-              // And `current.metadata[segment] = { updated: ... }`.
             }
 
             // Advance
@@ -1174,13 +1141,8 @@ export class CollabJSON {
           if (parentContainer.hasOwnProperty("data") && parentContainer.hasOwnProperty("sortKey")) {
             parentContainer = parentContainer.data;
           }
-          // Unwrap Object Wrapper?
-          // We need the WRAPPER to write metadata.
-          // IF we unwrap, we lose metadata access.
-          // BUT `_traverse` returns Wrapper as Parent.
-          // Here `parentContainer` IS `current`.
-          // If `current` is Wrapper.
-          // We write to `current.data` and `current.metadata`.
+          // Unwrap Object Wrapper to access data container for write.
+          // Note: references to 'parentContainer' here are already traversing the structure.
 
           if (typeof parentContainer !== "object" || parentContainer === null) {
             break;
