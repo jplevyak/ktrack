@@ -101,8 +101,10 @@ export function get_total_fiber(items) {
 }
 
 export function make_today(t = null) {
-  const doc = new CollabJSON("{}");
-  const now = t ? new Date(t): new Date();
+  const doc = new CollabJSON("{}", {
+    idGenerator: (item) => item.name,
+  });
+  const now = t ? new Date(t) : new Date();
   const y = now.getFullYear();
   const m = String(now.getMonth() + 1).padStart(2, "0");
   const d = String(now.getDate()).padStart(2, "0");
