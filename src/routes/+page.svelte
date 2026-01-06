@@ -1,7 +1,11 @@
 <script>
   import { goto } from "$app/navigation";
-  import { afterUpdate, onDestroy } from "svelte";
+  import { afterUpdate, onDestroy, onMount } from "svelte";
   import Food from "./_food.svelte";
+
+  onMount(() => {
+    syncManager.syncIfNeeded();
+  });
   import {
     weekdays,
     months,
@@ -20,6 +24,7 @@
     save_favorite,
     save_history,
     check_for_new_day,
+    syncManager,
   } from "./_stores.js";
 
   let total = 0;

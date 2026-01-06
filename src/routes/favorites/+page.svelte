@@ -1,5 +1,9 @@
 <script>
-  import { afterUpdate, onDestroy } from "svelte";
+  import { afterUpdate, onDestroy, onMount } from "svelte";
+
+  onMount(() => {
+    syncManager.syncIfNeeded();
+  });
   import Food from "../_food.svelte";
   import {
     today_store,
@@ -9,6 +13,7 @@
     add_item,
     save_favorite,
     check_for_new_day,
+    syncManager,
   } from "../_stores.js";
   import { create_elasticlunr } from "../_elasticlunr.js";
 

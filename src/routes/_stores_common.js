@@ -18,6 +18,8 @@ export class SyncManager {
     this.timeout = null;
     this.interval = null;
     this.pendingSyncs = new Set();
+    this.isSyncing = false;
+    this.lastSyncTime = 0;
   }
 
   register(key, storeMethods) {
@@ -46,54 +48,67 @@ export class SyncManager {
     }, this.debounceWait);
   }
 
+  syncIfNeeded(minInterval = 1000) {
+    if (this.isSyncing) return;
+    if (Date.now() - this.lastSyncTime < minInterval) return;
+    this.syncAll(true);
+  }
+
   async syncAll(force = false) {
-    // Collect requests
-    const requests = {};
-    const keysToSync = [];
-
-    for (const [key, methods] of this.stores.entries()) {
-      // Logic from old syncToServer:
-      // if !browser || (!isDirty && !force) || !isOnline -> skip
-      // We assume the methods.shouldSync(force) handles this check
-      if (methods.shouldSync(force)) {
-        const req = methods.getSyncRequest();
-        if (req) {
-          requests[key] = req;
-          keysToSync.push(key);
-          methods.setSyncingStatus();
-        }
-      }
-    }
-
-    if (Object.keys(requests).length === 0) return;
-
+    if (this.isSyncing) return;
+    this.isSyncing = true;
     try {
-      const responses = await this.syncCallback(requests);
-      if (!responses) {
-        // Failed completely
-        keysToSync.forEach((key) => this.stores.get(key).setStatus("error"));
-        return;
-      }
+      // Collect requests
+      const requests = {};
+      const keysToSync = [];
 
-      for (const key of keysToSync) {
-        const methods = this.stores.get(key);
-        const res = responses[key];
-        if (res) {
-          if (res.err) {
-            methods.setStatus("error");
-          } else {
-            methods.applySyncResponse(res);
-            methods.setIdleStatus();
+      for (const [key, methods] of this.stores.entries()) {
+        // Logic from old syncToServer:
+        // if !browser || (!isDirty && !force) || !isOnline -> skip
+        // We assume the methods.shouldSync(force) handles this check
+        if (methods.shouldSync(force)) {
+          const req = methods.getSyncRequest();
+          if (req) {
+            requests[key] = req;
+            keysToSync.push(key);
+            methods.setSyncingStatus();
           }
-        } else {
-          // No response for this key?
-          console.error("No response for", key);
-          methods.setStatus("error");
         }
       }
-    } catch (e) {
-      console.error("Batch sync error", e);
-      keysToSync.forEach((key) => this.stores.get(key).setStatus("error"));
+
+      if (Object.keys(requests).length === 0) return;
+
+      try {
+        const responses = await this.syncCallback(requests);
+        if (!responses) {
+          // Failed completely
+          keysToSync.forEach((key) => this.stores.get(key).setStatus("error"));
+          return;
+        }
+
+        for (const key of keysToSync) {
+          const methods = this.stores.get(key);
+          const res = responses[key];
+          if (res) {
+            if (res.err) {
+              methods.setStatus("error");
+            } else {
+              methods.applySyncResponse(res);
+              methods.setIdleStatus();
+            }
+          } else {
+            // No response for this key?
+            console.error("No response for", key);
+            methods.setStatus("error");
+          }
+        }
+        this.lastSyncTime = Date.now();
+      } catch (e) {
+        console.error("Batch sync error", e);
+        keysToSync.forEach((key) => this.stores.get(key).setStatus("error"));
+      }
+    } finally {
+      this.isSyncing = false;
     }
   }
 }
@@ -116,7 +131,7 @@ export function createSyncedStore(key, initialValue, sync, fromJSON, deps) {
   } = writable(initialValue, () => {
     if (!browser) return;
     // We rely on the manager's global interval now, or we can ensure it's started
-    return () => {};
+    return () => { };
   });
 
   // Helper methods for the manager

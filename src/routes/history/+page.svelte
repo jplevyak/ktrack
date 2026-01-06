@@ -3,6 +3,10 @@
   import { onMount, onDestroy } from "svelte";
   import Food from "../_food.svelte";
   import { CollabJSON } from "../_crdt.js";
+
+  onMount(() => {
+    syncManager.syncIfNeeded();
+  });
   import {
     get_date_info,
     weekdays,
@@ -20,6 +24,7 @@
     add_item,
     save_favorite,
     check_for_new_day,
+    syncManager,
   } from "../_stores.js";
 
   let the_date = new Date();
