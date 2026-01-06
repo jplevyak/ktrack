@@ -122,7 +122,13 @@ export function make_favorites() {
 
 export function make_history() {
   return new CollabJSON("[]", {
-    idGenerator: (item) => item.timestamp,
+    idGenerator: (item, path) => {
+      // If we are deep inside (e.g. inside "items" array of a day), use name
+      if (path && path.length > 1 && path[path.length - 2] === "items") {
+        return item.name;
+      }
+      return item.timestamp;
+    },
     sortKeyGenerator: (item, path) =>
       item.timestamp ? -parseInt(item.timestamp.replace(/-/g, "").slice(0, 8)) : null,
   });

@@ -1098,4 +1098,37 @@ test("getData supports includeMetadata", () => {
   assert.ok(data[0]._updated !== undefined);
 });
 
+test("idGenerator uses path context for nested items", () => {
+  const doc = new CollabJSON("[]", {
+    idGenerator: (item, path) => {
+      // Top level items (Days) use 'timestamp'
+      if (!path || path.length <= 1) {
+        return item.timestamp;
+      }
+      // Nested items (Foods) in 'items' array use 'name'
+      if (path.at(-2) === "items") {
+        return item.name;
+      }
+      return null; // UUID fallback
+    }
+  });
+
+  const dayData = { timestamp: "2023-01-01", items: [] };
+  // Add Day (Top Level)
+  doc.addItem([0], dayData);
+
+  // Add Food (Nested)
+  const foodData = { name: "Apple", cal: 50 };
+  doc.addItem([0, "items", 0], foodData);
+
+  const data = doc.getData({ includeMetadata: true });
+
+  // Verify Day ID
+  assert.strictEqual(data[0]._id, "2023-01-01");
+
+  // Verify Food ID
+  const day = data[0];
+  assert.strictEqual(day.items[0]._id, "Apple");
+});
+
 runTests();

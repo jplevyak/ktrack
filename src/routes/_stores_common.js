@@ -273,7 +273,7 @@ export function add_item(item, today, edit, profile, stores) {
     item = { ...item };
     if (item.servings == undefined) item.servings = 1.0;
 
-    day.addItem(["items", data.items.length], { ...item, id: item.name }, item.name);
+    day.addItem(["items", data.items.length], item, item.name);
 
     if (edit == undefined) {
       save_history(day, profile, stores);
@@ -303,7 +303,6 @@ export function save_history(day, profile, stores) {
       ["items"],
       {
         ...day_data,
-        id: day_data.timestamp,
       },
       sortKey,
       day_data.timestamp
@@ -339,7 +338,7 @@ export function save_favorite(item, profile, replace_index, stores) {
   favorites_store.update(function (favorites) {
     if (favorites == undefined) favorites = make_favorites();
 
-    item = { ...item, id: item.name };
+    item = { ...item };
 
     const favorites_data = favorites.getData();
 
