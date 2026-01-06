@@ -365,7 +365,7 @@ test("Sync with a pruned server sends snapshot", () => {
   let req1 = client1.getSyncRequest();
   server.getSyncResponse(req1);
 
-  server.prune(() => { });
+  server.prune(() => {});
   assert.strictEqual(server.history.length, 100);
   assert.ok(server.snapshot);
 

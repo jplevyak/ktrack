@@ -33,6 +33,7 @@
   let resolution = 0.0001;
   let edit = undefined;
   let day = undefined;
+  let day_data = undefined;
 
   // Access the status store from the custom store object
   const today_status = today_store.status;
@@ -72,8 +73,8 @@
 
   $: (today, check_for_new_day(today, profile));
   $: day = edit || today;
-  $: date_info = day ? get_date_info(day) : null;
   $: day_data = day ? day.getData() : null;
+  $: date_info = day ? get_date_info(day_data) : null;
   $: all_items = day && day_data.items ? day_data.items : [];
   $: food_items = all_items.filter((item) => typeof item.mcg !== "undefined");
   $: total = get_total(all_items);

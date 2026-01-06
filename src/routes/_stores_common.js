@@ -1,354 +1,360 @@
 import { CollabJSON } from "./_crdt.js";
 import {
-    merge_history_limit,
-    make_today,
-    make_favorites,
-    make_history,
-    make_profile,
-    get_date_info,
-    compare_date,
+  merge_history_limit,
+  make_today,
+  make_favorites,
+  make_history,
+  make_profile,
+  get_date_info,
+  compare_date,
 } from "./_util_common.js";
 
-
 export class SyncManager {
-    constructor(syncCallback, debounceWait = 500, syncInterval = 2000) {
-        this.stores = new Map();
-        this.syncCallback = syncCallback;
-        this.debounceWait = debounceWait;
-        this.syncInterval = syncInterval;
-        this.timeout = null;
-        this.interval = null;
-        this.pendingSyncs = new Set();
-    }
+  constructor(syncCallback, debounceWait = 500, syncInterval = 2000) {
+    this.stores = new Map();
+    this.syncCallback = syncCallback;
+    this.debounceWait = debounceWait;
+    this.syncInterval = syncInterval;
+    this.timeout = null;
+    this.interval = null;
+    this.pendingSyncs = new Set();
+  }
 
-    register(key, storeMethods) {
-        this.stores.set(key, storeMethods);
-    }
+  register(key, storeMethods) {
+    this.stores.set(key, storeMethods);
+  }
 
-    start() {
-        if (this.interval) clearInterval(this.interval);
-        this.interval = setInterval(() => this.syncAll(false), this.syncInterval);
-    }
+  start() {
+    if (this.interval) clearInterval(this.interval);
+    this.interval = setInterval(() => this.syncAll(false), this.syncInterval);
+  }
 
-    stop() {
-        if (this.interval) clearInterval(this.interval);
-    }
+  stop() {
+    if (this.interval) clearInterval(this.interval);
+  }
 
-    notifyChange(key) {
-        this.pendingSyncs.add(key);
-        this.debouncedSync();
-    }
+  notifyChange(key) {
+    this.pendingSyncs.add(key);
+    this.debouncedSync();
+  }
 
-    debouncedSync() {
-        if (this.timeout) clearTimeout(this.timeout);
-        this.timeout = setTimeout(() => {
-            this.timeout = null;
-            this.syncAll(false); // Sync dirty ones, or whatever logic
-        }, this.debounceWait);
-    }
+  debouncedSync() {
+    if (this.timeout) clearTimeout(this.timeout);
+    this.timeout = setTimeout(() => {
+      this.timeout = null;
+      this.syncAll(false); // Sync dirty ones, or whatever logic
+    }, this.debounceWait);
+  }
 
-    async syncAll(force = false) {
-        // Collect requests
-        const requests = {};
-        const keysToSync = [];
+  async syncAll(force = false) {
+    // Collect requests
+    const requests = {};
+    const keysToSync = [];
 
-        for (const [key, methods] of this.stores.entries()) {
-            // Logic from old syncToServer:
-            // if !browser || (!isDirty && !force) || !isOnline -> skip
-            // We assume the methods.shouldSync(force) handles this check
-            if (methods.shouldSync(force)) {
-                const req = methods.getSyncRequest();
-                if (req) {
-                    requests[key] = req;
-                    keysToSync.push(key);
-                    methods.setSyncingStatus();
-                }
-            }
+    for (const [key, methods] of this.stores.entries()) {
+      // Logic from old syncToServer:
+      // if !browser || (!isDirty && !force) || !isOnline -> skip
+      // We assume the methods.shouldSync(force) handles this check
+      if (methods.shouldSync(force)) {
+        const req = methods.getSyncRequest();
+        if (req) {
+          requests[key] = req;
+          keysToSync.push(key);
+          methods.setSyncingStatus();
         }
-
-        if (Object.keys(requests).length === 0) return;
-
-        try {
-            const responses = await this.syncCallback(requests);
-            if (!responses) {
-                // Failed completely
-                keysToSync.forEach(key => this.stores.get(key).setStatus("error"));
-                return;
-            }
-
-            for (const key of keysToSync) {
-                const methods = this.stores.get(key);
-                const res = responses[key];
-                if (res) {
-                    if (res.err) {
-                        methods.setStatus("error");
-                    } else {
-                        methods.applySyncResponse(res);
-                        methods.setIdleStatus();
-                    }
-                } else {
-                    // No response for this key?
-                    console.error("No response for", key);
-                    methods.setStatus("error");
-                }
-            }
-        } catch (e) {
-            console.error("Batch sync error", e);
-            keysToSync.forEach(key => this.stores.get(key).setStatus("error"));
-        }
+      }
     }
+
+    if (Object.keys(requests).length === 0) return;
+
+    try {
+      const responses = await this.syncCallback(requests);
+      if (!responses) {
+        // Failed completely
+        keysToSync.forEach((key) => this.stores.get(key).setStatus("error"));
+        return;
+      }
+
+      for (const key of keysToSync) {
+        const methods = this.stores.get(key);
+        const res = responses[key];
+        if (res) {
+          if (res.err) {
+            methods.setStatus("error");
+          } else {
+            methods.applySyncResponse(res);
+            methods.setIdleStatus();
+          }
+        } else {
+          // No response for this key?
+          console.error("No response for", key);
+          methods.setStatus("error");
+        }
+      }
+    } catch (e) {
+      console.error("Batch sync error", e);
+      keysToSync.forEach((key) => this.stores.get(key).setStatus("error"));
+    }
+  }
 }
 
 let globalSyncManager;
 
 export function createSyncedStore(key, initialValue, sync, fromJSON, deps) {
-    const { writable, get, browser, dbGet, dbSet, online, syncManager } = deps;
-    // If we want a singleton manager injected, we use that.
+  const { writable, get, browser, dbGet, dbSet, online, syncManager } = deps;
+  // If we want a singleton manager injected, we use that.
 
-    const manager = syncManager;
+  const manager = syncManager;
 
-    let isDirty = false;
-    const status = writable("loading");
+  let isDirty = false;
+  const status = writable("loading");
 
-    const {
-        subscribe,
-        set: svelteSet,
-        update: svelteUpdate,
-    } = writable(initialValue, () => {
-        if (!browser) return;
-        // We rely on the manager's global interval now, or we can ensure it's started
-        return () => { };
+  const {
+    subscribe,
+    set: svelteSet,
+    update: svelteUpdate,
+  } = writable(initialValue, () => {
+    if (!browser) return;
+    // We rely on the manager's global interval now, or we can ensure it's started
+    return () => {};
+  });
+
+  // Helper methods for the manager
+  const storeMethods = {
+    shouldSync: (force) => {
+      const isOnline = get(online);
+      return browser && (isDirty || force) && isOnline;
+    },
+    getSyncRequest: () => {
+      const val = get({ subscribe });
+      if (fromJSON && !(val instanceof CollabJSON)) return null;
+      return val.getSyncRequest();
+    },
+    setSyncingStatus: () => status.set("syncing"),
+    setStatus: (s) => status.set(s),
+    applySyncResponse: async (res) => {
+      const currentValue = get({ subscribe });
+      const ok = await sync(currentValue, res); // We might need to adjust 'sync' signature or usage
+      // Actually, the old 'sync' function did the fetch. Now the manager does the fetch.
+      // We need to inject the applying logic properly.
+      // Ideally 'sync' argument to createSyncedStore was 'sync_today' which called 'sync_internal'.
+      // 'sync_internal' did fetch then apply.
+      // We should break that apart.
+
+      // Let's assume the 'sync' arg is now just "apply this response to the doc".
+      // BUT wait, we need to handle the fact that 'sync_internal' handled the fetch.
+
+      // Refactor plan: The 'sync' argument to createSyncedStore is becoming less relevant
+      // if the manager handles the fetch.
+      // We need the doc to apply the response.
+      if (currentValue instanceof CollabJSON) {
+        currentValue.applySyncResponse(res);
+        svelteSet(currentValue); // Notify
+        if (browser) {
+          // persist
+          const serialized = fromJSON ? currentValue.toJSON() : currentValue;
+          await dbSet(key, { data: serialized, dirty: false });
+        }
+        isDirty = false;
+      }
+      return true;
+    },
+    setIdleStatus: () => status.set("idle"),
+  };
+
+  if (manager) {
+    manager.register(key, storeMethods);
+  }
+
+  if (browser) {
+    dbGet(key).then((record) => {
+      if (record) {
+        try {
+          const parsed = record.data;
+          const value = fromJSON ? fromJSON(parsed) : parsed;
+          svelteSet(value);
+          isDirty = record.dirty || false;
+          status.set(isDirty ? "dirty" : "idle");
+
+          if (manager) manager.notifyChange(key); // Force initial sync check
+        } catch (e) {
+          console.error(`Error parsing ${key} from IndexedDB`, e);
+          status.set("error");
+        }
+      } else {
+        status.set("idle");
+        if (manager) manager.notifyChange(key);
+      }
     });
+  }
 
-    // Helper methods for the manager
-    const storeMethods = {
-        shouldSync: (force) => {
-            const isOnline = get(online);
-            return browser && (isDirty || force) && isOnline;
-        },
-        getSyncRequest: () => {
-            const val = get({ subscribe });
-            if (fromJSON && !(val instanceof CollabJSON)) return null;
-            return val.getSyncRequest();
-        },
-        setSyncingStatus: () => status.set("syncing"),
-        setStatus: (s) => status.set(s),
-        applySyncResponse: async (res) => {
-            const currentValue = get({ subscribe });
-            const ok = await sync(currentValue, res); // We might need to adjust 'sync' signature or usage
-            // Actually, the old 'sync' function did the fetch. Now the manager does the fetch.
-            // We need to inject the applying logic properly.
-            // Ideally 'sync' argument to createSyncedStore was 'sync_today' which called 'sync_internal'.
-            // 'sync_internal' did fetch then apply.
-            // We should break that apart.
-
-            // Let's assume the 'sync' arg is now just "apply this response to the doc".
-            // BUT wait, we need to handle the fact that 'sync_internal' handled the fetch.
-
-            // Refactor plan: The 'sync' argument to createSyncedStore is becoming less relevant 
-            // if the manager handles the fetch. 
-            // We need the doc to apply the response.
-            if (currentValue instanceof CollabJSON) {
-                currentValue.applySyncResponse(res);
-                svelteSet(currentValue); // Notify
-                if (browser) { // persist
-                    const serialized = fromJSON ? currentValue.toJSON() : currentValue;
-                    await dbSet(key, { data: serialized, dirty: false });
-                }
-                isDirty = false;
-            }
-            return true;
-        },
-        setIdleStatus: () => status.set("idle")
-    };
-
-    if (manager) {
-        manager.register(key, storeMethods);
-    }
-
+  const set = (newValue) => {
+    isDirty = true;
+    status.set("dirty");
+    svelteSet(newValue);
 
     if (browser) {
-        dbGet(key).then((record) => {
-            if (record) {
-                try {
-                    const parsed = record.data;
-                    const value = fromJSON ? fromJSON(parsed) : parsed;
-                    svelteSet(value);
-                    isDirty = record.dirty || false;
-                    status.set(isDirty ? "dirty" : "idle");
-
-                    if (manager) manager.notifyChange(key); // Force initial sync check
-                } catch (e) {
-                    console.error(`Error parsing ${key} from IndexedDB`, e);
-                    status.set("error");
-                }
-            } else {
-                status.set("idle");
-                if (manager) manager.notifyChange(key);
-            }
-        });
+      const serialized = fromJSON ? newValue.toJSON() : newValue;
+      dbSet(key, { data: serialized, dirty: true });
     }
 
-    const set = (newValue) => {
-        isDirty = true;
-        status.set("dirty");
-        svelteSet(newValue);
+    if (manager) manager.notifyChange(key);
+  };
 
-        if (browser) {
-            const serialized = fromJSON ? newValue.toJSON() : newValue;
-            dbSet(key, { data: serialized, dirty: true });
-        }
+  const update = (updater) => {
+    set(updater(get({ subscribe })));
+  };
 
-        if (manager) manager.notifyChange(key);
-    };
-
-    const update = (updater) => {
-        set(updater(get({ subscribe })));
-    };
-
-    return {
-        subscribe,
-        set,
-        update,
-        sync: () => { if (manager) manager.notifyChange(key); }, // Trigger immediate check
-        status: {
-            subscribe: status.subscribe,
-        },
-    };
+  return {
+    subscribe,
+    set,
+    update,
+    sync: () => {
+      if (manager) manager.notifyChange(key);
+    }, // Trigger immediate check
+    status: {
+      subscribe: status.subscribe,
+    },
+  };
 }
 
 export function add_item_logic(item, today, edit, profile, stores) {
-    const { today_store, edit_store } = stores;
+  const { today_store, edit_store } = stores;
 
-    if (edit != undefined) {
-        let edit_data = edit.getData();
-        if (Date.now() - edit_data.start_edit > 10 * 60 * 1000) {
-            edit_store.set(undefined);
-            edit = undefined;
-        } else {
-            edit.updateItem(edit.findPath("start_edit"), Date.now());
-            edit_store.set(edit);
-        }
+  if (edit != undefined) {
+    let edit_data = edit.getData();
+    if (Date.now() - edit_data.start_edit > 10 * 60 * 1000) {
+      edit_store.set(undefined);
+      edit = undefined;
     } else {
-        if (!today) return;
+      edit.updateItem(edit.findPath("start_edit"), Date.now());
+      edit_store.set(edit);
     }
-    let store = edit != undefined ? edit_store : today_store;
-    store.update(function (day) {
-        const data = day.getData();
-        const existing_index = data.items.findIndex((i) => i.name == item.name);
-        if (existing_index !== -1) {
-            return day;
-        }
+  } else {
+    if (!today) return;
+  }
+  let store = edit != undefined ? edit_store : today_store;
+  store.update(function (day) {
+    const data = day.getData();
+    const existing_index = data.items.findIndex((i) => i.name == item.name);
+    if (existing_index !== -1) {
+      return day;
+    }
 
-        item = { ...item };
-        if (item.servings == undefined) item.servings = 1.0;
+    item = { ...item };
+    if (item.servings == undefined) item.servings = 1.0;
 
-        day.addItem(["items", data.items.length], { ...item, id: item.name });
+    day.addItem(["items", data.items.length], { ...item, id: item.name });
 
-        if (edit == undefined) {
-            save_history_logic(day, profile, stores);
-        }
-        return day;
-    });
+    if (edit == undefined) {
+      save_history_logic(day, profile, stores);
+    }
+    return day;
+  });
 }
 
 export function save_history_logic(day, profile, stores) {
-    const { history_store } = stores;
-    if (day == undefined) return;
-    history_store.update(function (history) {
-        if (history == undefined) history = make_history();
-        let day_data = day.getData();
+  const { history_store } = stores;
+  if (day == undefined) return;
+  history_store.update(function (history) {
+    if (history == undefined) history = make_history();
+    let day_data = day.getData();
 
-        const tsKey = day_data.timestamp
-            ? parseInt(day_data.timestamp.split("-").slice(0, 3).join(""))
-            : 0;
-        const sortKey = -tsKey;
+    if (!day_data.timestamp) {
+      console.error("Attempting to save history with invalid timestamp:", day_data);
+      return history;
+    }
 
-        history.upsertItemWithSortKey(
-            ["items"],
-            {
-                ...day_data,
-                id: day_data.timestamp,
-            },
-            sortKey,
-        );
+    const tsKey = day_data.timestamp
+      ? parseInt(day_data.timestamp.split("-").slice(0, 3).join(""))
+      : 0;
+    const sortKey = -tsKey;
 
-        const limit = merge_history_limit || 50;
+    history.upsertItemWithSortKey(
+      ["items"],
+      {
+        ...day_data,
+        id: day_data.timestamp,
+      },
+      sortKey,
+    );
 
-        const current_items = history.getData();
-        if (current_items.length > limit) {
-            for (let i = limit; i < current_items.length; i++) {
-                history.deleteItem([limit]);
-            }
-        }
+    const limit = merge_history_limit || 50;
 
-        return history;
-    });
+    const current_items = history.getData();
+    if (current_items.length > limit) {
+      for (let i = limit; i < current_items.length; i++) {
+        history.deleteItem([limit]);
+      }
+    }
+
+    return history;
+  });
 }
 
 export async function save_profile_logic(profile, sync_profile, stores) {
-    const { profile_store } = stores;
-    profile_store.set(profile);
-    await sync_profile(profile);
+  const { profile_store } = stores;
+  profile_store.set(profile);
+  await sync_profile(profile);
 }
 
 export function save_today_logic(today, profile, stores) {
-    const { today_store } = stores;
-    today_store.set(today);
-    save_history_logic(today, profile, stores);
+  const { today_store } = stores;
+  today_store.set(today);
+  save_history_logic(today, profile, stores);
 }
 
 export function save_favorite_logic(item, profile, replace_index, stores) {
-    const { favorites_store } = stores;
-    favorites_store.update(function (favorites) {
-        if (favorites == undefined) favorites = make_favorites();
+  const { favorites_store } = stores;
+  favorites_store.update(function (favorites) {
+    if (favorites == undefined) favorites = make_favorites();
 
-        item = { ...item, id: item.name };
+    item = { ...item, id: item.name };
 
-        const favorites_data = favorites.getData();
+    const favorites_data = favorites.getData();
 
-        if (replace_index != undefined) {
-            if (replace_index >= favorites_data.length) {
-                console.log("bad replace_index", replace_index);
-                return favorites;
-            }
-            favorites.updateItem([replace_index], item);
-            return favorites;
-        }
-
-        const existing_index = favorites_data.findIndex((i) => i.name == item.name);
-
-        if (existing_index !== -1) {
-            favorites.updateItem([existing_index], item);
-        } else {
-            if (item.servings == undefined) item.servings = 1.0;
-            favorites.addItem([favorites_data.length], item);
-        }
-
+    if (replace_index != undefined) {
+      if (replace_index >= favorites_data.length) {
+        console.log("bad replace_index", replace_index);
         return favorites;
-    });
+      }
+      favorites.updateItem([replace_index], item);
+      return favorites;
+    }
+
+    const existing_index = favorites_data.findIndex((i) => i.name == item.name);
+
+    if (existing_index !== -1) {
+      favorites.updateItem([existing_index], item);
+    } else {
+      if (item.servings == undefined) item.servings = 1.0;
+      favorites.addItem([favorites_data.length], item);
+    }
+
+    return favorites;
+  });
 }
 
 export function check_for_new_day_logic(t, profile, stores) {
-    let new_day = make_today();
-    if (!t) {
-        save_today_logic(new_day, profile, stores);
-        save_history_logic(new_day, profile, stores);
-        return new_day;
-    }
+  let new_day = make_today();
+  if (!t) {
+    save_today_logic(new_day, profile, stores);
+    save_history_logic(new_day, profile, stores);
+    return new_day;
+  }
 
-    if (!get_date_info(t) || compare_date(t, new_day) < 0) {
-        save_history_logic(t, profile, stores);
-        save_today_logic(new_day, profile, stores);
-        save_history_logic(new_day, profile, stores);
-    }
-    return t;
+  if (compare_date(t, new_day) < 0) {
+    save_history_logic(t, profile, stores);
+    save_today_logic(new_day, profile, stores);
+    save_history_logic(new_day, profile, stores);
+  }
+  return t;
 }
 
 export function logout_logic(stores) {
-    const { profile_store, today_store, favorites_store, history_store } = stores;
-    profile_store.set(make_profile());
-    today_store.set(make_today());
-    favorites_store.set(make_favorites());
-    history_store.set(make_history());
+  const { profile_store, today_store, favorites_store, history_store } = stores;
+  profile_store.set(make_profile());
+  today_store.set(make_today());
+  favorites_store.set(make_favorites());
+  history_store.set(make_history());
 }

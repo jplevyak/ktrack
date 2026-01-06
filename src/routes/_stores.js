@@ -2,12 +2,7 @@ import { readable, writable, get } from "svelte/store";
 import { browser } from "$app/environment";
 import { CollabJSON } from "./_crdt.js";
 import { v4 as uuidv4 } from "uuid";
-import {
-  make_today,
-  make_favorites,
-  make_history,
-  make_profile,
-} from "./_util.js";
+import { make_today, make_favorites, make_history, make_profile } from "./_util.js";
 import {
   createSyncedStore,
   add_item_logic,
@@ -152,14 +147,14 @@ async function batch_sync_impl(requests) {
   const data = {
     username: profile.username,
     password: profile.password,
-    requests: requests
+    requests: requests,
   };
 
   try {
     const response = await fetch("/api/sync", {
       method: "POST",
       body: JSON.stringify(data),
-      headers: { "Content-Type": "application/json" }
+      headers: { "Content-Type": "application/json" },
     });
     if (!response.ok) {
       console.error("Batch sync not ok", response.status);
@@ -185,7 +180,7 @@ export function synced_store(key, initialValue, sync, fromJSON) {
     dbGet,
     dbSet,
     online,
-    syncManager: (key !== 'profile') ? syncManager : null
+    syncManager: key !== "profile" ? syncManager : null,
   });
 }
 
@@ -226,6 +221,7 @@ async function sync_profile(profile) {
         // Force sync of other stores upon successful login
         syncManager.syncAll(true);
       }
+      profile_store.set({ ...profile });
     } catch (err) {
       console.log("JSON error", err.message);
       return false;
@@ -241,7 +237,9 @@ export const profile_store = synced_store("profile", make_profile(), sync_profil
 
 // Legacy individual sync functions no longer used for these three, but kept if needed by signatures
 // actually we can pass null or a dummy for 'sync' arg since SyncManager handles it.
-async function sync_dummy() { return true; }
+async function sync_dummy() {
+  return true;
+}
 
 function collab_from_json(parsed) {
   if (!parsed) return null;

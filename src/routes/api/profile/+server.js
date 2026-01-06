@@ -1,5 +1,5 @@
 import { make_profile } from "../../_util.js";
-import { profile } from "../_post.js";
+import { profile } from "../_dbs.js";
 
 function merge_profile(p1, p2) {
   p1 = { ...p1 }; // shallow copy

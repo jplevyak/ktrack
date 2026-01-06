@@ -130,7 +130,7 @@ export async function do_upload(req, dbname, db, prune, defaultJSON) {
     await db.put(username, JSON.stringify(server_doc.toJSON()));
   }
 
-
+  return new Response(JSON.stringify({ ok: true }));
 }
 
 export async function do_sync_batch(req, dbs, prunes, defaults) {
@@ -178,7 +178,15 @@ export async function do_sync_batch(req, dbs, prunes, defaults) {
 
     if (db) {
       promises.push(
-        do_post_internal({ request: { json: async () => syncRequest } }, syncRequest, username, key, db, prune, defaultJSON)
+        do_post_internal(
+          { request: { json: async () => syncRequest } },
+          syncRequest,
+          username,
+          key,
+          db,
+          prune,
+          defaultJSON,
+        )
           .then(async (res) => {
             const json = await res.json();
             responses[key] = json;
@@ -186,7 +194,7 @@ export async function do_sync_batch(req, dbs, prunes, defaults) {
           .catch((err) => {
             console.error(`Error processing batch item ${key}:`, err);
             responses[key] = { err: "Internal server error" };
-          })
+          }),
       );
     }
   }
@@ -194,4 +202,3 @@ export async function do_sync_batch(req, dbs, prunes, defaults) {
   await Promise.all(promises);
   return new Response(JSON.stringify(responses));
 }
-
