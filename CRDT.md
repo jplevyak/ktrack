@@ -14,6 +14,7 @@ This repository contains a specific CRDT implementation named `CollabJSON`. It i
 - **Client-Server Architecture**: The synchronization mechanism is designed for a star-schema topology where multiple clients communicate with a single central server and not directly with each other.
 - **Dotted Version Vectors (DVV)**: Synchronization is made efficient by using DVVs. Each replica tracks the latest timestamp it has seen from every other replica, allowing it to request only the operations it hasn't seen yet.
 - **Snapshotting and Compaction**: To prevent the operation history from growing indefinitely, the server can compact its history into a snapshot. Clients that are too far behind will receive this snapshot instead of a long list of operations.
+- **Wrapped Object Structure**: Internally, all objects are wrapped in a `{ data: {}, metadata: {} }` structure to strictly separate user data from system metadata (timestamp, deletion status), preventing key collisions.
 
 ## 2. API Reference
 
@@ -25,14 +26,17 @@ Creates a new `CollabJSON` document.
 - `options` (Object):
   - `id` (String): A unique identifier for the document. If two instances share an `id`, they are considered replicas of the same document. Defaults to a new UUID.
   - `clientId` (String): A unique identifier for the current replica (client or server). Defaults to a new UUID.
+  - `idGenerator` (Function): Optional function `(data, path) => id` to automatically derive IDs from data. Defaults to checking `data.id` or generating a UUID.
 
-### `getData(path)`
+### `getData(path, options)` or `getData(options)`
 
 Returns the current state of the document as a plain JavaScript object or array. This is useful for rendering the data in a UI.
 
 - `path` (Array, optional): A path array to retrieve a specific subtree or value. If omitted, returns the entire document.
+- `options` (Object, optional):
+    - `includeMetadata` (Boolean): If `true`, injects system fields (`_id`, `_sortKey`, `_updated`, `_deleted`) into the returned objects for debugging or advanced usage.
 
-### `addItem(path, data)`
+### `addItem(path, data, itemId)`
 
 Adds a new item to the document. This function is polymorphic:
 
@@ -41,6 +45,7 @@ Adds a new item to the document. This function is polymorphic:
 
 - `path` (Array of strings and numbers): The path to the location for the new item.
 - `data` (any): The data to insert. This must be JSON-serializable.
+- `itemId` (String, optional): The explicit system ID for the item. If not provided, the configured `idGenerator` is used (which defaults to checking `data.id` or generating a random UUID). Passing this explicitly is best practice.
 
 ### `updateItem(path, newData)`
 
@@ -54,7 +59,8 @@ Updates or inserts a value at a specified path. This is an "upsert" operation:
 
 ### `deleteItem(path)`
 
-Marks an item in an array or a property on an object as deleted.
+Matches an item in an array or a property on an object as deleted.
+Internally, this creates a tombstone (metadata flag) to preserve CRDT convergence.
 
 - `path` (Array of strings and numbers): The path to the item to be deleted.
 
@@ -80,6 +86,13 @@ Finds the path to a node with a specific ID within a sub-tree of the document. T
 - `subPath` (Array): The path to the root of the sub-tree to search in.
 - `targetId` (String): The ID or key to search for.
 - Returns `Array` (the absolute path) or `null` if not found.
+
+### `diffUpdate(path, newData)`
+
+Granularly updates a subtree by diffing `newData` against the existing state. It generates minimal `UPDATE_ITEM` and `DELETE_ITEM` operations for only the changed fields, preserving unchanged data structure.
+
+- `path` (Array): Path to the object/subtree to update.
+- `newData` (Object): The new state for that subtree.
 
 ### `clear()`
 
@@ -183,8 +196,9 @@ console.log(doc.getData());
 // Output: { project: { name: 'CRDT Implementation', tasks: [] } }
 
 // Use addItem to insert into the nested array (CRDT-native)
-doc.addItem(["project", "tasks", 0], { text: "Write docs", done: false });
-doc.addItem(["project", "tasks", 1], { text: "Write tests", done: false });
+// Explicitly passing 'task1' and 'task2' as IDs ensures idempotency
+doc.addItem(["project", "tasks", 0], { text: "Write docs", done: false }, "task1");
+doc.addItem(["project", "tasks", 1], { text: "Write tests", done: false }, "task2");
 console.log(doc.getData().project.tasks);
 // Output: [ { text: 'Write docs', done: false }, { text: 'Write tests', done: false } ]
 
@@ -280,8 +294,8 @@ When adding items to a collection, you have a choice on how to identify them:
 // BAD: Risk of duplicates if multiple clients add "Apple" simultaneously
 doc.addItem(["food"], { name: "Apple", calories: 95 });
 
-// GOOD: Deterministic ID ensures merging
-doc.addItem(["food"], { id: "Apple", name: "Apple", calories: 95 });
+// GOOD: Explicit ID ensures merging
+doc.addItem(["food"], { name: "Apple", calories: 95 }, "Apple");
 ```
 
 ### Scope and Ambiguity
@@ -303,8 +317,7 @@ Since `CollabJSON` is schema-flexible, it is best practice to enforce your ID st
 ```javascript
 // Example: Pre-processing data before adding to CRDT
 function addFoodItem(doc, dayPath, item) {
-  // Enforce: Item ID must match its Name
-  const cleanItem = { ...item, id: item.name };
-  doc.addItem(dayPath, cleanItem);
+  // Enforce: Pass name as explicit ID
+  doc.addItem(dayPath, item, item.name);
 }
 ```
