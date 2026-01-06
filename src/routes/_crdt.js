@@ -11,7 +11,7 @@ export const CRDT_ARRAY_MARKER = "_crdt_array_";
 
 export class CollabJSON {
   constructor(jsonString, options = {}) {
-    this.root = {}; // Unified data model
+    this.root = { data: {}, metadata: {} }; // Unified data model (Wrapped)
 
     this.id = options.id || uuidv4();
     this.checked = undefined;
@@ -198,16 +198,19 @@ export class CollabJSON {
     }
 
     if (typeof data === "object" && data !== null) {
-      // Optimization: Store default timestamp for the object to avoid redundant metadata
-      const newObject = { metadata: { _ts: timestamp } };
-      const existingMeta = existingNode && existingNode.metadata ? existingNode.metadata : {};
+      // Optimization: Wrapped Object Structure
+      // { data: { ...usersFields }, metadata: { ...systemFields } }
 
-      Object.assign(newObject.metadata, existingMeta);
+      const wrapper = { data: {}, metadata: { _ts: timestamp } };
+      const existingMeta = existingNode && existingNode.metadata ? existingNode.metadata : {};
+      const existingData = existingNode && existingNode.data ? existingNode.data : {};
+
+      Object.assign(wrapper.metadata, existingMeta);
       // Ensure _ts is updated to current timestamp if we are refreshing the object
-      newObject.metadata._ts = timestamp;
+      wrapper.metadata._ts = timestamp;
 
       for (const key in data) {
-        const existingChild = existingNode && existingNode[key] ? existingNode[key] : null;
+        const existingChild = existingData[key] || null;
 
         // Resolve existing metadata, handling default _ts
         let meta = existingMeta[key];
@@ -217,20 +220,16 @@ export class CollabJSON {
 
         if (meta && meta.updated > timestamp) {
           // Local is newer. Keep local value.
-          newObject[key] = existingChild;
-          newObject.metadata[key] = meta;
+          wrapper.data[key] = existingChild;
+          wrapper.metadata[key] = meta;
         } else {
           // Incoming is newer.
-          newObject[key] = this._plainToCrdt(data[key], timestamp, existingChild, [...path, key]);
+          wrapper.data[key] = this._plainToCrdt(data[key], timestamp, existingChild, [...path, key]);
         }
       }
 
       if (existingNode) {
-        for (const key in existingNode) {
-          if (key === "metadata") {
-            continue;
-          }
-
+        for (const key in existingData) {
           if (!(key in data)) {
             let meta = existingMeta[key];
             if (!meta && existingMeta._ts) {
@@ -239,18 +238,18 @@ export class CollabJSON {
 
             if (meta && meta.updated > timestamp) {
               // Local is newer (and present). Keep it.
-              newObject[key] = existingNode[key];
-              newObject.metadata[key] = meta;
+              wrapper.data[key] = existingData[key];
+              wrapper.metadata[key] = meta;
             } else {
               // Incoming (missing) is newer. Delete it.
-              newObject[key] = existingNode[key];
-              newObject.metadata[key] = { updated: timestamp, _deleted: true };
+              wrapper.data[key] = existingData[key];
+              wrapper.metadata[key] = { updated: timestamp, _deleted: true };
             }
           }
         }
       }
 
-      return newObject;
+      return wrapper;
     }
 
     return data;
@@ -271,40 +270,38 @@ export class CollabJSON {
         });
       }
 
-      const newObject = {};
+      // Check for Wrapped Object Structure
+      let source = data;
+      let metaSource = data.metadata;
 
-      if (includeMetadata && data.metadata && data.metadata._ts) {
-        newObject._updated = data.metadata._ts;
+      if (data.data && typeof data.data === "object" && !data.sortKey) {
+        source = data.data;
+        metaSource = data.metadata;
       }
 
-      for (const key in data) {
+      const newObject = {};
+
+      if (includeMetadata && metaSource && metaSource._ts) {
+        newObject._updated = metaSource._ts;
+      }
+
+      for (const key in source) {
         if (key === "metadata") {
           continue;
         }
 
-        if (data.metadata && data.metadata[key] && data.metadata[key]._deleted) {
+        if (metaSource && metaSource[key] && metaSource[key]._deleted) {
           if (includeMetadata) {
-            // Include deleted items with a flag if metadata requested? 
-            // Usually tombstone output is separate, but showing deleted fields with _deleted: true is useful.
-            // However, typically getData returns the 'visible' state.
-            // If we strictly follow "includeMetadata", we could show them.
-            // For now, let's keep hiding deleted fields to preserve 'view' semantics, 
-            // but maybe we can discuss if 'deleted' should be shown.
-            // User request was specifically about _id and _sortKey.
             continue;
           }
           continue;
         }
 
-        newObject[key] = this._crdtToPlain(data[key], includeMetadata);
+        newObject[key] = this._crdtToPlain(source[key], includeMetadata);
 
-        if (includeMetadata && data.metadata && data.metadata[key]) {
-          // We can't easily inject into primitives without wrapping.
-          // If newObject[key] is an object, we can inject.
+        if (includeMetadata && metaSource && metaSource[key]) {
           if (typeof newObject[key] === "object" && newObject[key] !== null) {
-            // It's checked inside the recursive call for objects/arrays.
-            // But for this specific key's metadata (updated time of the link)?
-            newObject[key]._updated = data.metadata[key].updated;
+            newObject[key]._updated = metaSource[key].updated;
           }
         }
       }
@@ -357,11 +354,15 @@ export class CollabJSON {
           return null;
         }
       } else {
-        if (!Object.hasOwn(container, segment)) {
+        // Object Traversal
+        // If container is a Wrapped Object (has data but not sortKey), read from .data
+        const source = (container.data && !container.sortKey) ? container.data : container;
+
+        if (!Object.hasOwn(source, segment)) {
           return null;
         }
 
-        current = container[segment];
+        current = source[segment];
       }
     }
 
@@ -383,7 +384,9 @@ export class CollabJSON {
           return lastItemId;
         }
       } else if (current && typeof current === "object") {
-        if (current.data && current.sortKey) current = current.data;
+        if (current.data && current.sortKey) current = current.data; // Array Item
+        if (current.data && !current.sortKey && !current[CRDT_ARRAY_MARKER]) current = current.data; // Object Wrapper
+
         if (Object.hasOwn(current, segment)) {
           current = current[segment];
         } else {
@@ -576,7 +579,8 @@ export class CollabJSON {
         }
       }
     } else {
-      for (const key in actualNode) {
+      const source = (actualNode.data && !actualNode.sortKey) ? actualNode.data : actualNode;
+      for (const key in source) {
         if (key === "metadata") {
           continue;
         }
@@ -589,7 +593,7 @@ export class CollabJSON {
           return [...currentPath, key];
         } // Found by key name
 
-        const res = this._findPathRecursive(targetId, [...currentPath, key], actualNode[key]);
+        const res = this._findPathRecursive(targetId, [...currentPath, key], source[key]);
         if (res) {
           return res;
         }
@@ -667,7 +671,12 @@ export class CollabJSON {
 
     const index = keyOrIndex;
 
-    if (Object.keys(this.root).length === 0 && parentPath.length === 0) {
+    // Check if root is empty Object Wrapper: { data: {}, metadata: {} }
+    // If so, replace with Array.
+    const isRootObjectWrapper = this.root.data && !this.root[CRDT_ARRAY_MARKER];
+    const isRootEmpty = isRootObjectWrapper && Object.keys(this.root.data).length === 0;
+
+    if (isRootEmpty && parentPath.length === 0) {
       this.root = this._plainToCrdt([]);
     }
 
@@ -837,12 +846,26 @@ export class CollabJSON {
     }
 
     // 3. Object Diffing
+    // Determine source keys and metadata
+    let source = current;
+    // Unwrap Array Item first to get ObjectWrapper
+    if (current && typeof current === "object" && current.data && current.sortKey) {
+      source = current.data;
+    }
+
+    // Now source is Object Wrapper (or plain if legacy/primitive mismatch?)
+    // If it's Object Wrapper
+    let innerData = source;
+    if (source && source.data && !source.sortKey && !source[CRDT_ARRAY_MARKER]) {
+      innerData = source.data;
+    }
+
     // A. Recursively Check Properties in Data
     for (const key in data) {
       const subPath = [...path, key];
-      if (key in current && !this._isDeleted(current, key)) {
+      if (key in innerData && !this._isDeleted(source, key)) { // Check deletion on Wrapper
         // Exists: Recurse
-        this._generateDiffOps(subPath, data[key], current[key]);
+        this._generateDiffOps(subPath, data[key], innerData[key]);
       } else {
         // New Property: Update (Create)
         this.updateItem(subPath, data[key]);
@@ -850,9 +873,9 @@ export class CollabJSON {
     }
 
     // B. Check for Deletions (Keys in Node but not in Data)
-    for (const key in current) {
+    for (const key in innerData) {
       if (key === "metadata") continue;
-      if (this._isDeleted(current, key)) continue;
+      if (this._isDeleted(source, key)) continue;
 
       if (!(key in data)) {
         // Delete Property
@@ -903,18 +926,19 @@ export class CollabJSON {
         }
       }
     } else {
-      for (const key in node) {
+      const source = (node.data && !node.sortKey) ? node.data : node;
+      for (const key in source) {
         if (key === "metadata") {
           continue;
         }
 
         if (node.metadata && node.metadata[key] && node.metadata[key]._deleted) {
           if (node.metadata[key].updated < minTimestamp) {
-            delete node[key];
+            delete source[key];
             delete node.metadata[key];
           }
         } else {
-          this.purgeTombstones(node[key], minTimestamp);
+          this.purgeTombstones(source[key], minTimestamp);
         }
       }
     }
@@ -981,7 +1005,6 @@ export class CollabJSON {
         }
 
         // LWW on the sortKey specifically.
-        // Moving a deleted item does not un-delete it.
         if (op.timestamp > (itemToMove.updated || 0)) {
           itemToMove.sortKey = op.sortKey;
           itemToMove.updated = op.timestamp;
@@ -1007,22 +1030,27 @@ export class CollabJSON {
           }
         } else {
           const key = op.path.at(-1);
+          // Object Wrapper: Metadata is in container.metadata
+          // Ensure metadata container exists
+          container.metadata ||= {};
 
           let targetUpdated = 0;
-          if (container.metadata) {
-            if (container.metadata[key]) {
-              targetUpdated = container.metadata[key].updated;
-            } else if (container.metadata._ts && container[key]) {
-              targetUpdated = container.metadata._ts;
-            }
+          if (container.metadata[key]) {
+            targetUpdated = container.metadata[key].updated;
+          } else if (container.metadata._ts) {
+            // Fallback to object timestamp? 
+            // Usually we verify against key specific ts.
+            // If key doesn't exist, we assume 0 or object ts?
+            // Existing logic used _ts.
+            // Also check existence in data.
+            const source = (container.data && !container.sortKey) ? container.data : container;
+            if (source[key]) targetUpdated = container.metadata._ts;
           }
 
           if (op.timestamp > targetUpdated) {
-            container.metadata ||= {};
             if (!container.metadata[key]) {
               container.metadata[key] = { updated: targetUpdated, _deleted: false };
             }
-
             targetMeta = container.metadata[key];
           }
         }
@@ -1049,10 +1077,13 @@ export class CollabJSON {
           if (parent[CRDT_ARRAY_MARKER]) {
             itemUpdated = node ? node.updated : 0;
           } else {
+            // Object Wrapper
             if (parent.metadata && parent.metadata[key]) {
               itemUpdated = parent.metadata[key].updated;
-            } else if (parent.metadata && parent.metadata._ts && parent[key]) {
-              itemUpdated = parent.metadata._ts;
+            } else if (parent.metadata && parent.metadata._ts) {
+              // Check existence in data
+              const source = (parent.data && !parent.sortKey) ? parent.data : parent;
+              if (source[key]) itemUpdated = parent.metadata._ts;
             }
           }
 
@@ -1065,7 +1096,11 @@ export class CollabJSON {
             node.updated = op.timestamp;
             node._deleted = false;
           } else {
-            parent[key] = this._plainToCrdt(op.data, op.timestamp, parent[key]);
+            // Wrapped Object Write
+            if (!parent.data && !parent.sortKey) parent.data = {}; // Init data if missing
+            const source = (parent.data && !parent.sortKey) ? parent.data : parent; // Fallback if not wrapped? (Should be wrapped)
+
+            source[key] = this._plainToCrdt(op.data, op.timestamp, source[key]);
             parent.metadata ||= {};
             parent.metadata[key] = { updated: op.timestamp, _deleted: false };
           }
@@ -1074,6 +1109,8 @@ export class CollabJSON {
           let current = this.root;
           for (let i = 0; i < op.path.length - 1; i++) {
             const segment = op.path[i];
+
+            // Traversal Logic matching _traverse (unwrapping)
             let container = current;
             if (
               container &&
@@ -1082,41 +1119,87 @@ export class CollabJSON {
             ) {
               container = container.data;
             }
+            // Unwrap Object Wrapper for traversal DOWN
+            // But we need to CREATE if missing.
+            // If container is Object Wrapper, we look in container.data
+            // If container.data[segment] missing, create it.
 
+            // Wait, if current is Wrapper.
+            // We need to descend.
+            // If current is array, difficult (index vs id).
+            // Usually path creation assumes Objects?
+
+            // Standardizing Object Wrapper unwrap:
+            if (container.data && !container.sortKey && !container[CRDT_ARRAY_MARKER]) {
+              container = container.data;
+            }
+
+            // Now container is the storage object (Inner Data).
+            // We need to check segment.
             if (
               !Object.hasOwn(container, segment) ||
               typeof container[segment] !== "object" ||
               container[segment] === null
             ) {
-              container[segment] = this._plainToCrdt({}, op.timestamp);
-              container.metadata ||= {};
-              container.metadata[segment] = { updated: op.timestamp, _deleted: false };
+              // Create NEW NODE.
+              // Must be Wrapped Object!
+              container[segment] = { data: {}, metadata: { _ts: op.timestamp } };
+              // Also update metadata on PARENT?
+              // 'container' is 'parent.data'.
+              // We need access to 'parent.metadata'?
+              // The logic here is "Create Path".
+              // Implicit creation usually doesn't update metadata of intermediate nodes explicitly 
+              // other than maybe _ts?
+              // The `_plainToCrdt` handles init.
+              // But we are manually building.
+              // If we insert into `container` (which is `parent.data`), we should technically 
+              // update `parent.metadata[segment]`.
+              // But `container` ref doesn't have link to `metadata`.
+
+              // To enable metadata updates, we shouldn't have unwrapped fully?
+              // This manual path creation loop relies on `current` being the node.
+              // If `current` is Wrapper.
+              // We set `current.data[segment] = newWrapper`.
+              // And `current.metadata[segment] = { updated: ... }`.
             }
 
+            // Advance
             current = container[segment];
           }
 
+          // Final Upsert
           const finalKey = op.path.at(-1);
+
           let parentContainer = current;
-          if (
-            parentContainer &&
-            parentContainer.hasOwnProperty("data") &&
-            parentContainer.hasOwnProperty("sortKey")
-          ) {
+          if (parentContainer.hasOwnProperty("data") && parentContainer.hasOwnProperty("sortKey")) {
             parentContainer = parentContainer.data;
           }
+          // Unwrap Object Wrapper?
+          // We need the WRAPPER to write metadata.
+          // IF we unwrap, we lose metadata access.
+          // BUT `_traverse` returns Wrapper as Parent.
+          // Here `parentContainer` IS `current`.
+          // If `current` is Wrapper.
+          // We write to `current.data` and `current.metadata`.
 
           if (typeof parentContainer !== "object" || parentContainer === null) {
             break;
           }
 
-          parentContainer[finalKey] = this._plainToCrdt(
-            op.data,
-            op.timestamp,
-            parentContainer[finalKey],
-          );
-          parentContainer.metadata ||= {};
-          parentContainer.metadata[finalKey] = { updated: op.timestamp, _deleted: false };
+          // Ensure structure
+          // If parentContainer is Object Wrapper
+          if (parentContainer.data && !parentContainer.sortKey && !parentContainer[CRDT_ARRAY_MARKER]) {
+            parentContainer.data[finalKey] = this._plainToCrdt(op.data, op.timestamp, parentContainer.data[finalKey]);
+            parentContainer.metadata ||= {};
+            parentContainer.metadata[finalKey] = { updated: op.timestamp, _deleted: false };
+          } else {
+            // Fallback (or Array?)
+            // Arrays shouldn't happen here (path length check).
+            // Just write (legacy/fallback)
+            parentContainer[finalKey] = this._plainToCrdt(op.data, op.timestamp, parentContainer[finalKey]);
+            parentContainer.metadata ||= {};
+            parentContainer.metadata[finalKey] = { updated: op.timestamp, _deleted: false };
+          }
         }
 
         break;

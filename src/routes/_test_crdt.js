@@ -146,8 +146,15 @@ test("findPath locates items", () => {
   const doc = new CollabJSON('{"a": {"b": [{"id": "x", "val": 10}, {"id": "y", "val": 20}]}}');
 
   // We need to get the internal IDs to test findPath reliably on array items
+  // We need to get the internal IDs to test findPath reliably on array items
+  // _traverse returns Wrapped Object for root
   const root = doc._traverse([]).node;
-  const arrayNode = root.a.b;
+  // Unwrap root.data to get 'a'
+  // root.data.a is Object Wrapper. root.data.a.data.b is Array Wrapper.
+  // Wait, root is { data: { a: Wrapper }, ... }
+  // root.data.a is Wrapper.
+  // root.data.a.data.b is Array Wrapper.
+  const arrayNode = root.data.a.data.b;
   const sorted = doc._getSortedItems(arrayNode);
   const id1 = sorted[0].id;
   const id2 = sorted[1].id;
@@ -206,7 +213,7 @@ test("Garbage collection removes tombstones", () => {
 
   // Verify tombstone is gone
   assert.ok(root.metadata.a === undefined);
-  assert.ok(root.a === undefined);
+  assert.ok(root.data.a === undefined);
   assert.deepStrictEqual(doc.getData(), { b: 2 });
 });
 
@@ -857,7 +864,8 @@ test("addItem uses data.id if present", () => {
 
   // Check if the item is stored under 'explicit-id'
   assert.ok(listNode.items["explicit-id"]);
-  assert.equal(listNode.items["explicit-id"].data.value, "foo");
+  // Item data is now an Object Wrapper: { data: { value: "foo" }, ... }
+  assert.equal(listNode.items["explicit-id"].data.data.value, "foo");
 });
 
 test("findPathIn supports scoped search", () => {
