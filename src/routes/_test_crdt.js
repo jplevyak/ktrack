@@ -365,7 +365,7 @@ test("Sync with a pruned server sends snapshot", () => {
   let req1 = client1.getSyncRequest();
   server.getSyncResponse(req1);
 
-  server.prune(() => {});
+  server.prune(() => { });
   assert.strictEqual(server.history.length, 100);
   assert.ok(server.snapshot);
 
@@ -885,6 +885,69 @@ test("findPathIn supports scoped search", () => {
   // Search in non-existent path
   const pathFail = doc.findPathIn(["nonexistent"], "item1");
   assert.strictEqual(pathFail, null);
+});
+
+// --- Optimization Tests ---
+
+test("Redundant Update Check", () => {
+  const doc = new CollabJSON();
+  doc.addItem([0], { id: "item1", name: "original" });
+
+  // Initial ops: ADD_ITEM
+  const initialOpsCount = doc.ops.length;
+  assert.strictEqual(initialOpsCount, 1, "Initial add should create 1 op");
+
+  const path = doc.findPath("item1");
+  const propPath = [...path, 'name'];
+
+  // Redundant update
+  doc.updateItem(propPath, "original");
+
+  assert.strictEqual(doc.ops.length, initialOpsCount, "Redundant update should not add op");
+
+  // Non-redundant update
+  doc.updateItem(propPath, "changed");
+  assert.strictEqual(doc.ops.length, initialOpsCount + 1, "Non-redundant update should add op");
+});
+
+test("Delete Pruning (Updates)", () => {
+  const doc = new CollabJSON();
+  doc.addItem([0], { id: "item2", name: "to-be-updated" });
+
+  // Commit ops so we have a baseline (simulating synced state for the ADD)
+  doc.commitOps();
+  assert.strictEqual(doc.ops.length, 0, "Ops cleared after commit");
+
+  const path = doc.findPath("item2");
+  doc.updateItem([...path, "name"], "updated");
+
+  assert.strictEqual(doc.ops.length, 1, "Update op added");
+  assert.strictEqual(doc.ops[0].type, "UPDATE_ITEM", "Op is UPDATE_ITEM");
+
+  // Now delete
+  doc.deleteItem(path);
+
+  // Expectation: The UPDATE_ITEM should be gone. The DELETE_ITEM should be present.
+  const ops = doc.ops;
+  const hasUpdate = ops.some(op => op.type === "UPDATE_ITEM");
+  const hasDelete = ops.some(op => op.type === "DELETE_ITEM");
+
+  assert.strictEqual(hasUpdate, false, "Pending update should be pruned");
+  assert.strictEqual(hasDelete, true, "Delete op should be present (since item existed on server)");
+});
+
+test("Delete Pruning (Add + Delete)", () => {
+  const doc = new CollabJSON();
+
+  doc.addItem([0], { id: "item3", name: "temporary" });
+  assert.strictEqual(doc.ops.length, 1, "Add op created");
+
+  const path = doc.findPath("item3");
+
+  doc.deleteItem(path);
+
+  // Expectation: Both ADD and DELETE should be gone.
+  assert.strictEqual(doc.ops.length, 0, "Both Add and Delete ops should be removed");
 });
 
 runTests();

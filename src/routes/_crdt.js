@@ -327,10 +327,59 @@ export class CollabJSON {
     return { parent, key: finalKey, node: current };
   }
 
+  _resolveItemId(path) {
+    let current = this.root;
+    let lastItemId = null;
+
+    for (const segment of path) {
+      if (current && current[CRDT_ARRAY_MARKER]) {
+        const sorted = this._getSortedItems(current);
+        if (typeof segment === "number" && segment >= 0 && segment < sorted.length) {
+          const item = sorted[segment];
+          lastItemId = item.id;
+          current = current.items[lastItemId];
+        } else {
+          return lastItemId;
+        }
+      } else if (current && typeof current === "object") {
+        if (current.data && current.sortKey) current = current.data;
+        if (Object.hasOwn(current, segment)) {
+          current = current[segment];
+        } else {
+          return lastItemId;
+        }
+      } else {
+        return lastItemId;
+      }
+    }
+    return lastItemId;
+  }
+
   _applyAndStore(op) {
     op.clientId = this.clientId;
-    // Compression: If updating the same item consecutively, merge ops
+
     if (op.type === "UPDATE_ITEM") {
+      // Resolve Target ID for pruning
+      if (!op.itemId) {
+        op.itemId = this._resolveItemId(op.path);
+      }
+
+      // 1. Redundant Update Check
+      const currentRes = this._traverse(op.path);
+      if (currentRes && currentRes.node) {
+        let nodeToCompare = currentRes.node;
+        if (nodeToCompare && nodeToCompare.data && nodeToCompare.sortKey) {
+          nodeToCompare = nodeToCompare.data;
+        }
+
+        // This might be expensive for large objects, but good for primitives/small objects.
+        const currentPlain = this._crdtToPlain(nodeToCompare);
+        if (JSON.stringify(currentPlain) === JSON.stringify(op.data)) {
+          return; // Redundant update
+        }
+      }
+
+      // 2. Update Compression (Existing)
       const lastOp = this.ops.length > 0 ? this.ops.at(-1) : null;
       if (
         lastOp &&
@@ -339,6 +388,46 @@ export class CollabJSON {
       ) {
         lastOp.data = op.data;
         lastOp.timestamp = op.timestamp;
+        this.applyOp(op);
+        return;
+      }
+    }
+
+    if (op.type === "DELETE_ITEM") {
+      // 3. Delete Pruning
+      const targetItemId = op.itemId; // For array items
+      const targetPathStr = JSON.stringify(op.path); // For object keys
+
+      const retainedOps = [];
+      let skippedAdd = false;
+
+      for (const pendingOp of this.ops) {
+        let isTarget = false;
+
+        // Check by ID if available
+        if (targetItemId && pendingOp.itemId === targetItemId) {
+          isTarget = true;
+        } else if (
+          !targetItemId &&
+          !pendingOp.itemId &&
+          JSON.stringify(pendingOp.path) === targetPathStr
+        ) {
+          isTarget = true;
+        }
+
+        if (isTarget) {
+          if (pendingOp.type === "ADD_ITEM") {
+            skippedAdd = true;
+          }
+          // Prune
+        } else {
+          retainedOps.push(pendingOp);
+        }
+      }
+
+      this.ops = retainedOps;
+
+      if (skippedAdd) {
         this.applyOp(op);
         return;
       }
