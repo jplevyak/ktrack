@@ -256,23 +256,57 @@ export class CollabJSON {
     return data;
   }
 
-  _crdtToPlain(data) {
+  _crdtToPlain(data, includeMetadata = false) {
     if (typeof data === "object" && data !== null) {
       if (data[CRDT_ARRAY_MARKER]) {
-        return this._getSortedItems(data).map((item) => this._crdtToPlain(item.data));
+        return this._getSortedItems(data).map((item) => {
+          const plain = this._crdtToPlain(item.data, includeMetadata);
+          if (includeMetadata && typeof plain === "object" && plain !== null) {
+            plain._id = item.id;
+            plain._sortKey = item.sortKey;
+            plain._updated = item.updated;
+            plain._deleted = item._deleted;
+          }
+          return plain;
+        });
       }
 
       const newObject = {};
+
+      if (includeMetadata && data.metadata && data.metadata._ts) {
+        newObject._updated = data.metadata._ts;
+      }
+
       for (const key in data) {
         if (key === "metadata") {
           continue;
         }
 
         if (data.metadata && data.metadata[key] && data.metadata[key]._deleted) {
+          if (includeMetadata) {
+            // Include deleted items with a flag if metadata requested? 
+            // Usually tombstone output is separate, but showing deleted fields with _deleted: true is useful.
+            // However, typically getData returns the 'visible' state.
+            // If we strictly follow "includeMetadata", we could show them.
+            // For now, let's keep hiding deleted fields to preserve 'view' semantics, 
+            // but maybe we can discuss if 'deleted' should be shown.
+            // User request was specifically about _id and _sortKey.
+            continue;
+          }
           continue;
         }
 
-        newObject[key] = this._crdtToPlain(data[key]);
+        newObject[key] = this._crdtToPlain(data[key], includeMetadata);
+
+        if (includeMetadata && data.metadata && data.metadata[key]) {
+          // We can't easily inject into primitives without wrapping.
+          // If newObject[key] is an object, we can inject.
+          if (typeof newObject[key] === "object" && newObject[key] !== null) {
+            // It's checked inside the recursive call for objects/arrays.
+            // But for this specific key's metadata (updated time of the link)?
+            newObject[key]._updated = data.metadata[key].updated;
+          }
+        }
       }
 
       return newObject;
@@ -454,9 +488,27 @@ export class CollabJSON {
 
   // --- Public View Functions ---
 
-  getData(path) {
+  // --- Public View Functions ---
+
+  /**
+   * Retrieves the plain JSON representation of the document.
+   * @param {string[]} path - Optional path to subtree.
+   * @param {Object} options - Options object.
+   * @param {boolean} options.includeMetadata - If true, injects _id, _sortKey, etc.
+   */
+  getData(pathOrOptions, options = {}) {
+    let path = [];
+    let opts = options;
+
+    // Support overloaded arguments: getData(options) or getData(path, options)
+    if (Array.isArray(pathOrOptions)) {
+      path = pathOrOptions;
+    } else if (typeof pathOrOptions === "object" && pathOrOptions !== null) {
+      opts = pathOrOptions;
+    }
+
     if (!path || path.length === 0) {
-      return this._crdtToPlain(this.root);
+      return this._crdtToPlain(this.root, opts.includeMetadata);
     }
 
     const result = this._traverse(path);
@@ -473,7 +525,7 @@ export class CollabJSON {
       nodeToConvert = nodeToConvert.data;
     }
 
-    return this._crdtToPlain(nodeToConvert);
+    return this._crdtToPlain(nodeToConvert, opts.includeMetadata);
   }
 
   /**
@@ -549,7 +601,7 @@ export class CollabJSON {
 
   // --- Operation Generators (Public API) ---
 
-  upsertItemWithSortKey(path, data, sortKey) {
+  upsertItemWithSortKey(path, data, sortKey, itemId) {
     // path is the path to the ITEM (conceptually).
     // We assume the parent of this path is the Array.
     const parentPath = path.slice(0, -1);
@@ -561,54 +613,29 @@ export class CollabJSON {
     }
 
     const items = result.node.items;
-    let itemId = data.id;
+    let targetId = itemId;
 
-    if (!itemId && this.options.idGenerator) {
-      itemId = this.options.idGenerator(data);
+    if (!targetId && this.idGenerator) {
+      targetId = this.idGenerator(data);
     }
-    if (!itemId) {
+    // Fallback?
+    if (!targetId && data && data.id) {
+      targetId = data.id;
+    }
+
+    if (!targetId) {
       throw new Error("Cannot upsert item without an ID");
     }
 
     // 2. Check if Item Exists
-    if (itemId in items && !items[itemId]._deleted) {
-      const existingItem = items[itemId];
-
-      // 3. Check Sort Key Match
-      // If sort key is maintained (or not provided, implying no change needed if defaults align),
-      // we can try to DIFF the data instead of replacing.
-      // Note: existingItem.sortKey might be float. sortKey arg might be int/float.
-      // We use loose comparison or exact?
-      // If sortKey is explicitly provided, we should check it.
+    if (targetId in items && !items[targetId]._deleted) {
+      const existingItem = items[targetId];
 
       const sortKeyMatches = (sortKey === undefined || sortKey === null) || (existingItem.sortKey === sortKey);
 
       if (sortKeyMatches) {
         // Smart Update: Diff the data against the existing item's data
-        // We need to form the path to the item: [...path, itemId] ?? 
-        // No, traverse returns the Array Node. The item is at items[itemId].
-        // BUT public API uses `_traverse` which handles Array indices/IDs.
-        // To use `_generateDiffOps` or `diffUpdate`, we need a public path to the item.
-        // Since we have the ID, we can construct the path relative to the array.
-        // Actually, `findPath` might not be efficient if we already know where we are.
-        // But `_generateDiffOps` expects a full path for the Ops it generates.
-        // So we construct the path: [...path, itemId].
-        // Wait, `_traverse` handles arrays by ID in path? 
-        // Yes, `_getKey` logic: if node is array, key is ID.
-
-        // However, we must be careful: currently `path` argument to this function is the ARRAY path.
-        // The item path is `[...path, itemId]`.
-        // Wait, verify `path` usage in _applyAndStore.
-        // `path` in `ADD_ITEM` is the ARRAY path.
-        // `path` in `UPDATE_ITEM` (generated by diff) must be the ITEM path (or property path).
-
-        const itemPath = [...parentPath, itemId];
-
-        // We can call `_generateDiffOps` directly if we unwrap the item node.
-        // existingItem is the wrapper { data, sortKey, serialized, ... }.
-        // We pass `existingItem` to `_generateDiffOps`.
-        // `_generateDiffOps` expects `node` (the wrapper).
-
+        const itemPath = [...parentPath, targetId];
         this._generateDiffOps(itemPath, data, existingItem);
         return;
       }
@@ -619,7 +646,7 @@ export class CollabJSON {
       type: "ADD_ITEM",
       path: parentPath,
       data: data,
-      itemId: itemId,
+      itemId: targetId,
       sortKey: sortKey,
       timestamp: this._tick(),
     });
@@ -662,11 +689,19 @@ export class CollabJSON {
     const nextKey = nextItem ? nextItem.sortKey : null;
 
     const newSortKey = this._generateSortKey(previousKey, nextKey);
-    // Use data.id if present, otherwise generate one.
-    const newItemId =
+    // Use data.id if present, otherwise use generator, otherwise uuid.
+    let newItemId =
       data && typeof data === "object" && data.id !== undefined
         ? String(data.id)
-        : this._generateId();
+        : null;
+
+    if (!newItemId && this.idGenerator) {
+      newItemId = this.idGenerator(data, [...parentPath, index]);
+    }
+
+    if (!newItemId) {
+      newItemId = this._generateId();
+    }
 
     this._applyAndStore({
       type: "ADD_ITEM",
@@ -1337,32 +1372,4 @@ export class CollabJSON {
     return { ops: opsForClient, dvv: Object.fromEntries(this.dvv) };
   }
 
-  static getMaxTimestamp(node) {
-    if (!node || typeof node !== "object") return 0;
-    let max = node.updated || 0;
-
-    if (node.hasOwnProperty("data") && node.hasOwnProperty("sortKey")) {
-      return Math.max(max, CollabJSON.getMaxTimestamp(node.data));
-    }
-
-    if (node.metadata) {
-      for (const key in node.metadata) {
-        if (node.metadata[key] && node.metadata[key].updated) {
-          max = Math.max(max, node.metadata[key].updated);
-        }
-      }
-    }
-
-    for (const key in node) {
-      if (
-        key !== "metadata" &&
-        key !== "items" &&
-        typeof node[key] === "object" &&
-        node[key] !== null
-      ) {
-        max = Math.max(max, CollabJSON.getMaxTimestamp(node[key]));
-      }
-    }
-    return max;
-  }
 }

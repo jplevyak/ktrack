@@ -1017,7 +1017,8 @@ test("save_history behavior: diffUpdate compresses repeated serving updates", ()
   history.upsertItemWithSortKey(
     ["items"],
     { ...todayData, id: todayData.timestamp },
-    -20230101
+    -20230101,
+    todayData.timestamp
   );
 
   const initialOps = history.ops.length;
@@ -1033,7 +1034,8 @@ test("save_history behavior: diffUpdate compresses repeated serving updates", ()
   history.upsertItemWithSortKey(
     ["items"],
     { ...todayData, id: todayData.timestamp },
-    -20230101
+    -20230101,
+    todayData.timestamp
   );
 
   // Check ops
@@ -1045,7 +1047,8 @@ test("save_history behavior: diffUpdate compresses repeated serving updates", ()
   history.upsertItemWithSortKey(
     ["items"],
     { ...todayData, id: todayData.timestamp },
-    -20230101
+    -20230101,
+    todayData.timestamp
   );
 
   // Should compress
@@ -1056,7 +1059,8 @@ test("save_history behavior: diffUpdate compresses repeated serving updates", ()
   history.upsertItemWithSortKey(
     ["items"],
     { ...todayData, id: todayData.timestamp },
-    -20230101
+    -20230101,
+    todayData.timestamp
   );
 
   assert.strictEqual(history.ops.length, 2, "Repeated Upsert (Diff) should be compressed");
@@ -1070,6 +1074,20 @@ test("save_history behavior: diffUpdate compresses repeated serving updates", ()
   assert.strictEqual(dayEntry.timestamp, "2023-01-01");
   // items is the array [ { food1, servings: 2.5 } ]
   assert.strictEqual(dayEntry.items[0].servings, 2.5);
+});
+
+test("getData supports includeMetadata", () => {
+  const doc = new CollabJSON("[]", {
+    idGenerator: () => "custom-id"
+  });
+  doc.addItem([0], { name: "test" });
+
+  const data = doc.getData({ includeMetadata: true });
+  assert.strictEqual(data.length, 1);
+  assert.strictEqual(data[0].name, "test");
+  assert.strictEqual(data[0]._id, "custom-id");
+  assert.ok(data[0]._sortKey !== undefined);
+  assert.ok(data[0]._updated !== undefined);
 });
 
 runTests();
