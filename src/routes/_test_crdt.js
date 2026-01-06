@@ -950,4 +950,117 @@ test("Delete Pruning (Add + Delete)", () => {
   assert.strictEqual(doc.ops.length, 0, "Both Add and Delete ops should be removed");
 });
 
+test("diffUpdate: Granular Object Updates", () => {
+  const doc = new CollabJSON('{"a": 1, "b": {"x": 10, "y": 20}}');
+  const initialOps = doc.ops.length;
+
+  // Update only b.x, leave b.y alone
+  doc.diffUpdate([], { a: 1, b: { x: 100, y: 20 } });
+
+  // Should generate 1 op: update b.x
+  // (a is same, b.y is same)
+  const newOps = doc.ops.slice(initialOps);
+
+  assert.strictEqual(newOps.length, 1);
+  assert.strictEqual(newOps[0].type, "UPDATE_ITEM");
+  assert.deepStrictEqual(newOps[0].path, ["b", "x"]);
+  assert.strictEqual(newOps[0].data, 100);
+
+  assert.deepStrictEqual(doc.getData(), { a: 1, b: { x: 100, y: 20 } });
+});
+
+test("diffUpdate: Implicit Deletions", () => {
+  const doc = new CollabJSON('{"a": 1, "b": 2}');
+
+  // Implicitly delete b by omitted it
+  doc.diffUpdate([], { a: 1 });
+
+  const ops = doc.ops;
+  const deleteOp = ops.find(op => op.type === "DELETE_ITEM");
+
+  assert.ok(deleteOp, "Should generate delete op");
+  assert.deepStrictEqual(deleteOp.path, ["b"]);
+  assert.deepStrictEqual(doc.getData(), { a: 1 });
+});
+
+test("diffUpdate: Nested Additions", () => {
+  const doc = new CollabJSON('{"a": 1}');
+
+  doc.diffUpdate([], { a: 1, b: { c: 3 } });
+
+  const ops = doc.ops;
+  const addOp = ops.find(op => op.type === "UPDATE_ITEM" && op.path.includes("b"));
+
+  assert.ok(addOp);
+  assert.deepStrictEqual(addOp.path, ["b"]);
+  assert.deepStrictEqual(doc.getData(), { a: 1, b: { c: 3 } });
+});
+
+test("save_history behavior: diffUpdate compresses repeated serving updates", () => {
+  // 1. Setup 'History' doc (Root Array, mirroring make_history)
+  const history = new CollabJSON('[]', {
+    idGenerator: (item) => item.timestamp,
+    sortKeyGenerator: (item) => item.timestamp ? -parseInt(item.timestamp.replace(/-/g, "").slice(0, 8)) : null
+  });
+
+  // 2. Setup 'Today' data
+  const todayData = {
+    timestamp: "2023-01-01",
+    items: [
+      { id: "food1", name: "Apple", servings: 1.0 }
+    ]
+  };
+
+  // 3. Simulate first save_history (Upsert)
+  // Logic from save_history: not found -> upsert
+  // We assume history is empty first, so not found.
+  history.upsertItemWithSortKey(
+    ["items"],
+    { ...todayData, id: todayData.timestamp },
+    -20230101
+  );
+
+  const initialOps = history.ops.length;
+  assert.strictEqual(initialOps, 1, "Initial save should be 1 op (ADD_ITEM)");
+
+  // 4. Update 'Today' (servings changed)
+  todayData.items[0].servings = 1.5;
+
+  // 5. Simulate second save_history (Diff Update)
+  // Logic: found -> diffUpdate
+  const existingPath = history.findPath(todayData.timestamp);
+  assert.ok(existingPath, "History should have the day");
+
+  // save_history now includes id in diffUpdate to prevent deletion
+  history.diffUpdate(existingPath, { ...todayData, id: todayData.timestamp });
+
+  // Check ops after first update
+  // Should be 2 ops: 1 Add + 1 Update Items
+  assert.strictEqual(history.ops.length, 2, "First update should result in 2 ops total");
+
+  // 6. Third Update (Repeated)
+  todayData.items[0].servings = 2.0;
+  history.diffUpdate(existingPath, { ...todayData, id: todayData.timestamp });
+
+  // Should still be 2 ops (compressed)
+  assert.strictEqual(history.ops.length, 2, "Second update should be compressed");
+
+  // 7. Fourth Update (Repeated)
+  todayData.items[0].servings = 2.5;
+  history.diffUpdate(existingPath, { ...todayData, id: todayData.timestamp });
+
+  // Should still be 2 ops (compressed)
+  assert.strictEqual(history.ops.length, 2, "Third update should be compressed");
+
+  // Verify final data
+  // First day in history list (Root array has only 1 item)
+  // getData() returns array [ { ... } ]
+  const historyList = history.getData();
+  const dayEntry = historyList[0];
+
+  assert.strictEqual(dayEntry.timestamp, "2023-01-01");
+  // items is the array [ { food1, servings: 2.5 } ]
+  assert.strictEqual(dayEntry.items[0].servings, 2.5);
+});
+
 runTests();

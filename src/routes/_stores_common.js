@@ -294,19 +294,27 @@ export function save_history(day, profile, stores) {
       return history;
     }
 
-    const tsKey = day_data.timestamp
-      ? parseInt(day_data.timestamp.split("-").slice(0, 3).join(""))
-      : 0;
-    const sortKey = -tsKey;
+    // Try to find existing day entry
+    const existingPath = history.findPath(day_data.timestamp);
 
-    history.upsertItemWithSortKey(
-      ["items"],
-      {
-        ...day_data,
-        id: day_data.timestamp,
-      },
-      sortKey,
-    );
+    if (existingPath) {
+      // Granular update against existing day
+      history.diffUpdate(existingPath, day_data);
+    } else {
+      const tsKey = day_data.timestamp
+        ? parseInt(day_data.timestamp.split("-").slice(0, 3).join(""))
+        : 0;
+      const sortKey = -tsKey;
+
+      history.upsertItemWithSortKey(
+        ["items"],
+        {
+          ...day_data,
+          id: day_data.timestamp,
+        },
+        sortKey,
+      );
+    }
 
     const limit = merge_history_limit || 50;
 

@@ -699,6 +699,81 @@ export class CollabJSON {
     });
   }
 
+  /**
+   * Granularly updates a subtree by diffing new data against existing state.
+   * Generates minimal operations (UPDATE/DELETE) for changed fields.
+   */
+  diffUpdate(path, newData) {
+    const p = path || [];
+    const result = this._traverse(p);
+    // If target doesn't exist, fall back to standard update (create)
+    if (!result || !result.node) {
+      this.updateItem(p, newData);
+      return;
+    }
+
+    const startClock = this.clock;
+    // We don't increment clock per op here necessarily, 
+    // usually one action = one tick? 
+    // But Ops logic increments tick per op. 
+    // To treat this as one atomic transaction we might want atomic timestamp batches, 
+    // but CollabJSON uses distinct LWW timestamps per op. 
+    // We'll let _tick() handle it naturally for now.
+
+    this._generateDiffOps(p, newData, result.node);
+  }
+
+  _generateDiffOps(path, data, node) {
+    // 1. Unwrap CRDT node wrapper if present
+    let current = node;
+    if (current && typeof current === "object" && current.data && current.sortKey) {
+      current = current.data;
+    }
+
+    // 2. Handle Primitives / Type Mismatches / Arrays (Fallback)
+    // If data is not object, or node is not object, or array mismatch:
+    // Full replace necessary for that specific leaf.
+    const isDataObj = typeof data === "object" && data !== null && !Array.isArray(data);
+    const isNodeObj = typeof current === "object" && current !== null && !Array.isArray(current) && !current[CRDT_ARRAY_MARKER];
+
+    if (!isDataObj || !isNodeObj) {
+      // Simple equality check to avoid redundant leaf update
+      const currentPlain = this._crdtToPlain(current);
+      if (JSON.stringify(currentPlain) !== JSON.stringify(data)) {
+        this.updateItem(path, data);
+      }
+      return;
+    }
+
+    // 3. Object Diffing
+    // A. Recursively Check Properties in Data
+    for (const key in data) {
+      const subPath = [...path, key];
+      if (key in current && !this._isDeleted(current, key)) {
+        // Exists: Recurse
+        this._generateDiffOps(subPath, data[key], current[key]);
+      } else {
+        // New Property: Update (Create)
+        this.updateItem(subPath, data[key]);
+      }
+    }
+
+    // B. Check for Deletions (Keys in Node but not in Data)
+    for (const key in current) {
+      if (key === "metadata") continue;
+      if (this._isDeleted(current, key)) continue;
+
+      if (!(key in data)) {
+        // Delete Property
+        this.deleteItem([...path, key]);
+      }
+    }
+  }
+
+  _isDeleted(node, key) {
+    return node.metadata && node.metadata[key] && node.metadata[key]._deleted;
+  }
+
   prune(pruneFn, clientRequestData) {
     if (pruneFn) {
       pruneFn(this, clientRequestData);
