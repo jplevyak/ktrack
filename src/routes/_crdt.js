@@ -11,7 +11,7 @@ export const CRDT_ARRAY_MARKER = "_crdt_array_";
 
 export class CollabJSON {
   constructor(jsonString, options = {}) {
-    this.root = { data: {}, metadata: {} }; // Unified data model: root is always a wrapped object
+    this.root = { data: {}, metadata: {} };
 
     this.id = options.id || uuidv4();
     this.checked = undefined;
@@ -354,8 +354,11 @@ export class CollabJSON {
         }
       } else {
         // Object Traversal
-        // If container is a Wrapped Object (has data but not sortKey), read from .data
-        const source = (container.data && !container.sortKey) ? container.data : container;
+        // Ensure container is a Wrapped Object
+        if (!container.data || container.sortKey) {
+          return null;
+        }
+        const source = container.data;
 
         if (!Object.hasOwn(source, segment)) {
           return null;
@@ -666,14 +669,6 @@ export class CollabJSON {
 
     const index = keyOrIndex;
 
-    // Check if root is empty Object Wrapper: { data: {}, metadata: {} }
-    // If so, replace with Array.
-    const isRootObjectWrapper = this.root.data && !this.root[CRDT_ARRAY_MARKER];
-    const isRootEmpty = isRootObjectWrapper && Object.keys(this.root.data).length === 0;
-
-    if (isRootEmpty && parentPath.length === 0) {
-      this.root = this._plainToCrdt([]);
-    }
 
     const result = this._traverse(parentPath);
     if (!result || !result.node || !result.node[CRDT_ARRAY_MARKER]) {
@@ -1021,24 +1016,14 @@ export class CollabJSON {
           // Ensure metadata container exists
           container.metadata ||= {};
 
+          // Logic for Wrapped Object
           let targetUpdated = 0;
           if (container.metadata[key]) {
             targetUpdated = container.metadata[key].updated;
-          } else if (container.metadata._ts) {
-            // Fallback to object timestamp? 
-            // Usually we verify against key specific ts.
-            // If key doesn't exist, we assume 0 or object ts?
-            // Existing logic used _ts.
-            // Also check existence in data.
-            const source = (container.data && !container.sortKey) ? container.data : container;
-            if (source[key]) targetUpdated = container.metadata._ts;
           }
 
           if (op.timestamp > targetUpdated) {
-            if (!container.metadata[key]) {
-              container.metadata[key] = { updated: targetUpdated, _deleted: false };
-            }
-            targetMeta = container.metadata[key];
+            container.metadata[key] = { updated: op.timestamp, _deleted: true };
           }
         }
 
@@ -1068,10 +1053,6 @@ export class CollabJSON {
             // Object Wrapper
             if (parent.metadata && parent.metadata[key]) {
               itemUpdated = parent.metadata[key].updated;
-            } else if (parent.metadata && parent.metadata._ts) {
-              // Check existence in data
-              const source = (parent.data && !parent.sortKey) ? parent.data : parent;
-              if (source[key]) itemUpdated = parent.metadata._ts;
             }
           }
 
@@ -1086,10 +1067,9 @@ export class CollabJSON {
           } else {
             // Wrapped Object Write
             if (!parent.data && !parent.sortKey) parent.data = {}; // Init data if missing
-            const source = (parent.data && !parent.sortKey) ? parent.data : parent; // Fallback if not wrapped? (Should be wrapped)
 
-            // Update the key
-            source[key] = this._plainToCrdt(op.data, op.timestamp, source[key], op.path);
+            // Update the key in .data
+            parent.data[key] = this._plainToCrdt(op.data, op.timestamp, parent.data[key], op.path);
             parent.metadata ||= {};
             parent.metadata[key] = { updated: op.timestamp, _deleted: false };
           }
@@ -1145,15 +1125,13 @@ export class CollabJSON {
           let parentContainer = current;
 
           // Unwrap Object Wrapper
-          // If we encounter a populated wrapper, unwrap it.
+          // If we encounter a populated wrapper, unwrap it (ONLY if it's an array item wrapper that holds an object wrapper inside?)
+          // No, wait. 
+          // Structural hierarchy:
+          // 1. Array Item Wrapper: { data: {ObjectWrapper}, sortKey:..., id:... }  -> Unwrap to data (ObjectWrapper)
+          // 2. Object Wrapper: { data: {...}, metadata: {...} } -> DO NOT UNWRAP. We write 'into' it.
+
           if (parentContainer.hasOwnProperty("data") && parentContainer.hasOwnProperty("sortKey")) {
-            parentContainer = parentContainer.data;
-          } else if (parentContainer.data && !parentContainer.sortKey && !parentContainer[CRDT_ARRAY_MARKER]) {
-            parentContainer = parentContainer.data;
-          } else if (!parentContainer.data && !parentContainer.sortKey && !parentContainer[CRDT_ARRAY_MARKER]) {
-            // Treat as Empty Generic Object that needs upgrading to Wrapper
-            parentContainer.data = {};
-            parentContainer.metadata = {};
             parentContainer = parentContainer.data;
           }
 
@@ -1167,13 +1145,6 @@ export class CollabJSON {
           // If parentContainer is Object Wrapper
           if (parentContainer.data && !parentContainer.sortKey && !parentContainer[CRDT_ARRAY_MARKER]) {
             parentContainer.data[finalKey] = this._plainToCrdt(op.data, op.timestamp, parentContainer.data[finalKey]);
-            parentContainer.metadata ||= {};
-            parentContainer.metadata[finalKey] = { updated: op.timestamp, _deleted: false };
-          } else {
-            // Fallback (or Array?)
-            // Arrays shouldn't happen here (path length check).
-            // Just write (legacy/fallback)
-            parentContainer[finalKey] = this._plainToCrdt(op.data, op.timestamp, parentContainer[finalKey]);
             parentContainer.metadata ||= {};
             parentContainer.metadata[finalKey] = { updated: op.timestamp, _deleted: false };
           }
@@ -1209,15 +1180,6 @@ export class CollabJSON {
       clientId: options.clientId || (state && state.clientId ? state.clientId : undefined),
     });
     if (!state) {
-      return doc;
-    }
-
-    // Legacy Array Handling
-    // If state is an array, it's a legacy history log or favorites list.
-    // Convert it to CRDT structure immediately.
-    if (Array.isArray(state)) {
-      doc.root = doc._plainToCrdt(state);
-      // Assume empty history/ops for legacy load
       return doc;
     }
 
