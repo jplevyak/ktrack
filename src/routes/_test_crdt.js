@@ -898,7 +898,7 @@ test("findPathIn supports scoped search", () => {
 // --- Optimization Tests ---
 
 test("Redundant Update Check", () => {
-  const doc = new CollabJSON();
+  const doc = new CollabJSON("[]"); // Initialize as Array
   doc.addItem([0], { id: "item1", name: "original" });
 
   // Initial ops: ADD_ITEM
@@ -919,7 +919,7 @@ test("Redundant Update Check", () => {
 });
 
 test("Delete Pruning (Updates)", () => {
-  const doc = new CollabJSON();
+  const doc = new CollabJSON("[]");
   doc.addItem([0], { id: "item2", name: "to-be-updated" });
 
   // Commit ops so we have a baseline (simulating synced state for the ADD)
@@ -945,7 +945,7 @@ test("Delete Pruning (Updates)", () => {
 });
 
 test("Delete Pruning (Add + Delete)", () => {
-  const doc = new CollabJSON();
+  const doc = new CollabJSON("[]");
 
   doc.addItem([0], { id: "item3", name: "temporary" });
   assert.strictEqual(doc.ops.length, 1, "Add op created");
