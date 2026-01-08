@@ -931,7 +931,7 @@ export class CollabJSON {
   }
 
   clear() {
-    this.root = {};
+    this.root = { data: {}, metadata: {} };
     this.history = [];
     this.dvv.clear();
     this.snapshot = null;
@@ -1143,11 +1143,21 @@ export class CollabJSON {
           const finalKey = op.path.at(-1);
 
           let parentContainer = current;
+
+          // Unwrap Object Wrapper
+          // If we encounter a populated wrapper, unwrap it.
           if (parentContainer.hasOwnProperty("data") && parentContainer.hasOwnProperty("sortKey")) {
             parentContainer = parentContainer.data;
+          } else if (parentContainer.data && !parentContainer.sortKey && !parentContainer[CRDT_ARRAY_MARKER]) {
+            parentContainer = parentContainer.data;
+          } else if (!parentContainer.data && !parentContainer.sortKey && !parentContainer[CRDT_ARRAY_MARKER]) {
+            // Treat as Empty Generic Object that needs upgrading to Wrapper
+            parentContainer.data = {};
+            parentContainer.metadata = {};
+            parentContainer = parentContainer.data;
           }
+
           // Unwrap Object Wrapper to access data container for write.
-          // Note: references to 'parentContainer' here are already traversing the structure.
 
           if (typeof parentContainer !== "object" || parentContainer === null) {
             break;
