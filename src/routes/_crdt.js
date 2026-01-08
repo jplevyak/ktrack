@@ -206,10 +206,6 @@ export class CollabJSON {
       const existingMeta = existingNode && existingNode.metadata ? existingNode.metadata : {};
       const existingData = existingNode && existingNode.data ? existingNode.data : {};
 
-      if (data && data.items && existingNode) {
-        console.log("[PLAIN_TO_CRDT INSPECT]", "Existing Meta Keys:", Object.keys(existingMeta), "Has Items Meta?", !!existingMeta.items);
-      }
-
       Object.assign(wrapper.metadata, existingMeta);
       // Ensure _ts is updated to current timestamp if we are refreshing the object
       wrapper.metadata._ts = timestamp;
@@ -224,10 +220,6 @@ export class CollabJSON {
           meta = { updated: existingMeta._ts, _deleted: false };
         }
 
-        if (key === "items") {
-          console.log("[PLAIN_TO_CRDT DEBUG]", key, "Meta:", meta ? meta.updated : "None", "Op TS:", timestamp, "Keep Local?", (meta && meta.updated > timestamp));
-        }
-
         if (meta && meta.updated > timestamp) {
           // Local is newer. Keep local value.
           wrapper.data[key] = existingChild;
@@ -235,6 +227,7 @@ export class CollabJSON {
         } else {
           // Incoming is newer.
           wrapper.data[key] = this._plainToCrdt(data[key], timestamp, existingChild, [...path, key]);
+          wrapper.metadata[key] = { updated: timestamp, _deleted: false };
         }
       }
 
@@ -977,7 +970,8 @@ export class CollabJSON {
         item ||= targetArray.items[op.itemId] = { id: op.itemId };
 
         if (!item.updated || op.timestamp >= item.updated) {
-          item.data = this._plainToCrdt(op.data, op.timestamp);
+          const itemPath = [...op.path, op.itemId];
+          item.data = this._plainToCrdt(op.data, op.timestamp, item.data, itemPath);
           item.sortKey = op.sortKey;
           item.updated = op.timestamp;
           item._deleted = false;
@@ -1067,14 +1061,6 @@ export class CollabJSON {
 
           const { parent, key, node } = updateRes;
 
-          // DEBUG PARENT STATE
-          if (key === "items") {
-            console.log("[CRDT DEBUG TRAVERSE]", key, "Parent has meta:", !!parent.metadata, "Meta Items:", parent.metadata ? !!parent.metadata[key] : "N/A");
-            if (parent.metadata && parent.metadata[key]) {
-              console.log("  Meta TS:", parent.metadata[key].updated);
-            }
-          }
-
           let itemUpdated = 0;
           if (parent[CRDT_ARRAY_MARKER]) {
             itemUpdated = node ? node.updated : 0;
@@ -1102,7 +1088,8 @@ export class CollabJSON {
             if (!parent.data && !parent.sortKey) parent.data = {}; // Init data if missing
             const source = (parent.data && !parent.sortKey) ? parent.data : parent; // Fallback if not wrapped? (Should be wrapped)
 
-            source[key] = this._plainToCrdt(op.data, op.timestamp, source[key]);
+            // Update the key
+            source[key] = this._plainToCrdt(op.data, op.timestamp, source[key], op.path);
             parent.metadata ||= {};
             parent.metadata[key] = { updated: op.timestamp, _deleted: false };
           }

@@ -223,7 +223,12 @@ test("simultaneous client updates sync correctly", () => {
   const clientA_history = make_history();
   const clientB_history = make_history();
 
-  // Assign distinct client IDs
+  // Assign distinct client IDs but SAME Doc ID
+  const sharedDocId = "history-doc-v1";
+  server_history.id = sharedDocId;
+  clientA_history.id = sharedDocId;
+  clientB_history.id = sharedDocId;
+
   clientA_history.clientId = "client-A";
   clientB_history.clientId = "client-B";
 
@@ -292,7 +297,7 @@ test("simultaneous client updates sync correctly", () => {
 
   // Sync Server -> B
   reqB = clientB_history.getSyncRequest();
-  respToB = server_history.getSyncResponse(reqB); // No 'let' redeclaration
+  respToB = server_history.getSyncResponse(reqB);
   clientB_history.applySyncResponse(respToB);
 
   // 5. Verification
@@ -303,15 +308,8 @@ test("simultaneous client updates sync correctly", () => {
   assert.strictEqual(valA, valB, "Clients should converge");
   assert.strictEqual(valA, valS, "Clients should match Server");
 
-  // KNOWN BUG: CollabJSON ADD_ITEM merge logic seems to reset metadata for nested items,
-  // causing older updates (from A) to overwrite newer updates (from B) if A sent an ADD_ITEM op (e.g. from init).
-  // We observed valA === 2 and valB === 2, even though valB (3) had higher timestamp.
-  // Disabling strict check for now to allow suite to pass.
-  // assert.strictEqual(valA, 3.0, "Later update (B) should win");
-
-  if (valA !== 3.0) {
-    console.warn("WARN: Known CRDT Convergence Bug - Expected 3.0, got", valA);
-  }
+  // We expect B (3.0) to win because it happened 'later' in execution (wall clock timestamp).
+  assert.strictEqual(valA, 3.0, "Later update (B) should win");
 });
 
 
