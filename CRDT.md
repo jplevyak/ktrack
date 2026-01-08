@@ -14,7 +14,8 @@ This repository contains a specific CRDT implementation named `CollabJSON`. It i
 - **Client-Server Architecture**: The synchronization mechanism is designed for a star-schema topology where multiple clients communicate with a single central server and not directly with each other.
 - **Dotted Version Vectors (DVV)**: Synchronization is made efficient by using DVVs. Each replica tracks the latest timestamp it has seen from every other replica, allowing it to request only the operations it hasn't seen yet.
 - **Snapshotting and Compaction**: To prevent the operation history from growing indefinitely, the server can compact its history into a snapshot. Clients that are too far behind will receive this snapshot instead of a long list of operations.
-- **Wrapped Object Structure**: Internally, all objects are wrapped in a `{ data: {}, metadata: {} }` structure to strictly separate user data from system metadata (timestamp, deletion status), preventing key collisions.
+- **Wrapped Object Structure**: Internally, all objects are wrapped in a `{ data: {}, metadata: {} }` structure. `data` holds user properties, and `metadata` holds per-key LWW timestamps. This strict separation prevents user keys from colliding with system metadata and ensures that metadata is never overwritten by user data.
+- **Strict Schema Enforcement**: The implementation now enforces strict headers. Legacy plain JSON arrays or unwrapped objects are no longer supported and will be rejected or ignored during traversal.
 
 ## 2. API Reference
 
@@ -56,6 +57,15 @@ Updates or inserts a value at a specified path. This is an "upsert" operation:
 
 - `path` (Array of strings and numbers): The path to the item to be updated or created.
 - `newData` (any): The new data for the item. This must be JSON-serializable.
+
+### `upsertItemWithSortKey(path, data, sortKey, itemId)`
+
+Adds or updates an item in a CRDT List (Array) with specific sorting and identification control. This is the preferred method for robust sync operations.
+
+- `path` (Array): Path to the **Item** location (e.g., `['list', 'itemId']`). Note: The method uses `path.slice(0, -1)` to identify the parent array.
+- `data` (Object): The content of the item.
+- `sortKey` (Number|null): Fractional index for ordering.
+- `itemId` (String|null): Explicit ID for the item. Overrides any ID found in the path.
 
 ### `deleteItem(path)`
 
