@@ -185,6 +185,52 @@ test("save_profile updates store and triggers sync", async () => {
   assert.strictEqual(syncCalled, true);
 });
 
+test("check_for_new_day updates history correctly", async () => {
+  // Mock stores
+  let today_val = null;
+  const today_store = {
+    set: (val) => { today_val = val; },
+    get: () => today_val
+  };
+
+  let history_val = make_history();
+  const history_store = {
+    update: (fn) => { fn(history_val); },
+    set: (val) => { history_val = val; },
+    get: () => history_val
+  };
+  const stores = { today_store, history_store };
+
+  // 1. Setup Old Day
+  const today_doc = make_today("2020-01-01");
+  // Ensure today_doc is in the store (simulating app state)
+  today_store.set(today_doc);
+
+  // 2. Setup History (Empty)
+  // history_val is already make_history()
+  // No need to call history_store.set(history_doc) if history_val is already the mock's internal state.
+
+  // 3. Trigger Rollover
+  // We expect this to save 2020 day, then Create Today (Current Date), and Save Today + Save History(Today)
+  await check_for_new_day(today_doc, {}, stores);
+
+  // 4. Verify History
+  // Should have 2 items: 2020 and Current Date
+  const history_items = history_store.get().getData();
+
+  // console.log("Rollover History Items:", history_items.map(i => i.timestamp));
+
+  assert.strictEqual(history_items.length, 2, `Expected 2 history items, found ${history_items.length}`);
+
+  // Verify Sort Order (Latest First)
+  // Current day should be [0]
+  // 2020 (Old) should be [1]
+  const currentYear = new Date().getFullYear();
+  const firstYear = parseInt(history_items[0].timestamp.split("-")[0]);
+  assert.ok(firstYear >= currentYear, "History sort order incorrect? Expected newer item first.");
+  assert.strictEqual(parseInt(history_items[1].timestamp.split("-")[0]), 2020, "Expected old day to be the second item.");
+});
+
 test("save_history updates nested items (e.g. servings)", () => {
   const history = make_history();
   const history_store = {

@@ -224,6 +224,7 @@ export function createSyncedStore(key, initialValue, sync, fromJSON, deps) {
     subscribe,
     set,
     update,
+    get: () => get({ subscribe }),
     sync: () => {
       if (manager) manager.notifyChange(key);
     }, // Trigger immediate check
@@ -376,6 +377,21 @@ export function check_for_new_day(t, profile, stores) {
     save_history(t, profile, stores);
     save_today(new_day, profile, stores);
     save_history(new_day, profile, stores);
+  } else {
+    // START FIX: Ensure current 'today' is in history (Fresh Load Scenario)
+    const { history_store } = stores;
+    if (history_store && history_store.get) {
+      const history = history_store.get();
+      // Check if today is already in history to avoid redundant "dirty" updates
+      const history_data = history.getData();
+      const t_data = t.getData();
+      const exists = history_data.some(item => item.timestamp === t_data.timestamp);
+
+      if (!exists) {
+        save_history(t, profile, stores);
+      }
+    }
+    // END FIX
   }
   return t;
 }

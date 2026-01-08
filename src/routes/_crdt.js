@@ -1212,6 +1212,15 @@ export class CollabJSON {
       return doc;
     }
 
+    // Legacy Array Handling
+    // If state is an array, it's a legacy history log or favorites list.
+    // Convert it to CRDT structure immediately.
+    if (Array.isArray(state)) {
+      doc.root = doc._plainToCrdt(state);
+      // Assume empty history/ops for legacy load
+      return doc;
+    }
+
     doc.root = state.snapshot || state.root || {};
     doc.snapshot = state.snapshot;
     doc.snapshotDvv = new Map(Object.entries(state.snapshotDvv || {}));
