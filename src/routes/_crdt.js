@@ -1,7 +1,14 @@
 /* Simple CRDT-based class for a collaborative JSON document.
  *
- * Uses Lamport timestamps for causal ordering, Last-Write-Wins (LWW)
- * for atomic updates, and fractional indexing for list ordering.
+ * Architecture:
+ * - Uses Last-Write-Wins (LWW) registers for object properties and array items.
+ * - Uses Fractional Indexing for conflict-free array ordering.
+ * - "Wrapped Objects": All persistent objects are stored as { data: {}, metadata: {} }.
+ *   "data" holds user properties, "metadata" holds per-key LWW timestamps.
+ *
+ * Conflict Resolution:
+ * - Objects: LWW per key based on timestamps.
+ * - Arrays: Unique IDs per item + Fractional Indexing for sort order.
  */
 import { v4 as uuidv4 } from "uuid";
 
@@ -53,7 +60,9 @@ export class CollabJSON {
   }
 
   _tick() {
-    // Hybrid logical clock: integer counter + client ID tie-breaker
+    // Hybrid Logical Clock (HLC)
+    // Combines physical time (in a rough integer sense via counter) with a client ID tie-breaker
+    // to ensure total ordering of events across distributed systems.
     this.clock = Math.floor(this.clock) + 1;
     return this.clock + this._idToFloat(this.id);
   }
@@ -201,6 +210,9 @@ export class CollabJSON {
       // Create Wrapped Object Structure:
       // { data: { ...usersFields }, metadata: { ...systemFields } }
       // This strict separation prevents user keys from colliding with system metadata.
+      // CRITICAL: We enforce strict {data, metadata} structure for objects. 
+      // Unlike "plain" JSON, we never store user keys directly on the node to ensure metadata fields
+      // (like _ts) are never overwritten by user data with the same name.
 
       const wrapper = { data: {}, metadata: { _ts: timestamp } };
       const existingMeta = existingNode && existingNode.metadata ? existingNode.metadata : {};
@@ -255,6 +267,7 @@ export class CollabJSON {
       return wrapper;
     }
 
+    // Primitive value: return as is.
     return data;
   }
 
@@ -355,6 +368,8 @@ export class CollabJSON {
       } else {
         // Object Traversal
         // Ensure container is a Wrapped Object
+        // If it's not a wrapper (missing data, or has sortKey meaning it's an array item), we abort.
+        // This enforces strict schema adherence: objects MUST be wrapped.
         if (!container.data || container.sortKey) {
           return null;
         }
@@ -363,11 +378,9 @@ export class CollabJSON {
         if (!Object.hasOwn(source, segment)) {
           return null;
         }
-
         current = source[segment];
       }
     }
-
     return { parent, key: finalKey, node: current };
   }
 
@@ -593,7 +606,7 @@ export class CollabJSON {
 
         if (key === targetId) {
           return [...currentPath, key];
-        } // Found by key name
+        }
 
         const res = this._findPathRecursive(targetId, [...currentPath, key], source[key]);
         if (res) {
@@ -607,9 +620,17 @@ export class CollabJSON {
 
   // --- Operation Generators (Public API) ---
 
+  /**
+   * Adds or updates an item in a CRDT List (Array).
+   * 
+   * @param {string[]} path - Path to the ITEM itself (e.g. ['foo', 'items', 'item_id']). 
+   *                          NOTE: This method automatically slices the last segment off to get the parent Array path.
+   * @param {Object} data - The content of the item.
+   * @param {number|null} sortKey - Optional fractional index for ordering.
+   * @param {string|null} itemId - Optional specific ID. If provided, it overrides the ID in the path.
+   */
   upsertItemWithSortKey(path, data, sortKey, itemId) {
-    // path is the path to the ITEM (conceptually).
-    // We assume the parent of this path is the Array.
+    // We infer the array path by dropping the last segment (the item ID/Key).
     const parentPath = path.slice(0, -1);
 
     // 1. Resolve Parent Array
