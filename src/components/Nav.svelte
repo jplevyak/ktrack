@@ -54,9 +54,9 @@
     padding: var(--spacing-md) var(--spacing-sm);
     text-decoration: none;
     color: var(--color-text-secondary);
-    font-weight: 500;
+    font-weight: 600; /* Made slightly bolder too */
     position: relative;
-    font-size: var(--font-size-base);
+    font-size: var(--font-size-lg); /* Increased size */
     transition: color var(--transition-fast);
   }
 
@@ -83,7 +83,7 @@
   /* Mobile adjustments */
   @media (max-width: 400px) {
     .nav-link {
-      font-size: var(--font-size-sm);
+      font-size: var(--font-size-base); /* Increased mobile size */
       padding: var(--spacing-md) var(--spacing-xs);
     }
   }

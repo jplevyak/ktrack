@@ -174,42 +174,39 @@
 
 <div class="day-view">
   <!-- Header Section -->
-  <div class="card header-card">
-    <div class="date-header flex justify-between items-center">
-      <h2 class="current-date flex items-center gap-sm">
+  <div class="header-section border-b-2 border-black pb-1 mb-2">
+    <div class="flex justify-between items-baseline">
+      <h2 class="current-date m-0 text-lg">
         {#if date_info}
-          {weekdays[date_info.day]}, {months[date_info.month]} {date_info.date}
+          {weekdays[date_info.day].toUpperCase()}
+          {months[date_info.month].toUpperCase()}
+          {date_info.date}
         {/if}
         {#if $today_status && $today_status != "idle"}
-          <span class="status-badge text-sm">🟡 {$today_status}</span>
+          <span class="text-sm"> [{$today_status}]</span>
         {/if}
       </h2>
-
       {#if edit != undefined}
-        <div class="edit-warning flex items-center gap-sm">
-          <span class="text-error font-bold">Editing History</span>
-          <button type="button" class="btn btn-primary btn-sm" on:click={done_edit}>Done</button>
+        <div class="edit-warning">
+          <span class="text-error font-bold">EDITING</span>
+          <button type="button" class="btn btn-primary btn-sm" on:click={done_edit}>DONE</button>
         </div>
       {/if}
     </div>
 
-    <div class="stats-row flex justify-between text-secondary text-sm">
-      <div class="averages">
-        <span class="font-bold">Average (3/5/7 days):</span>
-        [{(averages[0] || 0).toFixed(1)}, {(averages[1] || 0).toFixed(1)}, {(
-          averages[2] || 0
-        ).toFixed(1)}]
+    <div class="text-sm mt-1">
+      <div class="mb-xs">
+        <strong>Averages (3/5/7 days):</strong> [{(averages[0] || 0).toFixed(1)} / {(
+          averages[1] || 0
+        ).toFixed(1)} / {(averages[2] || 0).toFixed(1)}]
       </div>
-    </div>
-    <!-- Totals Section moved to header -->
-    <div
-      class="totals-section flex justify-between items-center mt-md pt-md border-t border-border"
-    >
-      <div class="total-row large">
-        <span class="text-primary font-bold">{total.toFixed(2)}</span> mcg Vit K
-      </div>
-      <div class="total-row large">
-        {total_fiber.toFixed(2)} g {#if fiber_unknown}<span class="text-error"> + ?</span>{/if} Fiber
+      <div class="text-lg flex justify-between items-center">
+        <div>
+          <span class="text-primary font-bold">{total.toFixed(1)}</span> mcg Vit K
+        </div>
+        <div>
+          {total_fiber.toFixed(2)} g {#if fiber_unknown}<span class="text-error"> + ?</span>{/if} Fiber
+        </div>
       </div>
     </div>
   </div>
@@ -291,11 +288,21 @@
 
 <style>
   .current-date {
-    margin: 0;
-    color: var(--color-primary-dark);
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
+    font-size: 1.25rem;
+    font-weight: 700;
+  }
+
+  .total-row.large {
+    font-size: 1.2rem;
+    font-weight: 500;
+  }
+
+  .mb-xs {
+    margin-bottom: var(--spacing-xs);
+  }
+
+  .text-lg {
+    font-size: 1.25rem;
   }
 
   .stats-row {
