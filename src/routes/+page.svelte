@@ -172,81 +172,194 @@
   <title>KTrack - Day</title>
 </svelte:head>
 
-Averages [3, 5, 7] days: [{(averages[0] || 0).toFixed(1)}, {(averages[1] || 0).toFixed(1)}, {(
-  averages[2] || 0
-).toFixed(1)}]<br />
-<b
-  >Date: {#if date_info}{weekdays[date_info.day]}
-    {months[date_info.month]}
-    {date_info.date}, {date_info.year}{/if}
-  {#if edit != undefined}<span style="color:red">Editing History</span>
-    <button type="button" id="done" on:click={done_edit}>done</button>{/if}
-</b>
-<div style="min-height: 1.5em; margin-top: 0.25em;">
-  {#if $today_status && $today_status != "idle"}
-    <b>🟡 Unsaved changes: {$today_status}</b>
+<div class="day-view">
+  <!-- Header Section -->
+  <div class="card header-card">
+    <div class="date-header flex justify-between items-center">
+      <h2 class="current-date">
+        {#if date_info}
+          {weekdays[date_info.day]}, {months[date_info.month]} {date_info.date}
+        {/if}
+      </h2>
+
+      {#if edit != undefined}
+        <div class="edit-warning flex items-center gap-sm">
+          <span class="text-error font-bold">Editing History</span>
+          <button type="button" class="btn btn-primary btn-sm" on:click={done_edit}>Done</button>
+        </div>
+      {/if}
+    </div>
+
+    <div class="stats-row flex justify-between text-secondary text-sm">
+      <div class="averages">
+        <span class="font-bold">Avg (3/5/7):</span>
+        [{(averages[0] || 0).toFixed(1)}, {(averages[1] || 0).toFixed(1)}, {(
+          averages[2] || 0
+        ).toFixed(1)}]
+      </div>
+
+      <div class="unsaved-changes">
+        {#if $today_status && $today_status != "idle"}
+          <span class="status-badge">🟡 {$today_status}</span>
+        {/if}
+      </div>
+    </div>
+  </div>
+
+  {#if editing == undefined}
+    <!-- View Mode -->
+    <div class="food-list">
+      {#each food_items as f, i}
+        <Food
+          name={f.name}
+          notes={f.notes}
+          index={i}
+          mcg={f.mcg}
+          fiber={f.fiber}
+          unit={f.unit}
+          servings={f.servings}
+          source={f.source}
+          use_edit="true"
+          use_fav="true"
+          use_dec="true"
+          use_inc="true"
+          use_del="true"
+          on:message={do_msg}
+        />
+      {/each}
+    </div>
+
+    <div class="card totals-card text-center">
+      <div class="total-row large">
+        Total: <span class="text-primary font-bold">{total.toFixed(2)}</span> mcg
+      </div>
+      <div class="total-row text-secondary">
+        Fiber: {total_fiber.toFixed(2)} g
+        {#if fiber_unknown}
+          <span class="text-warning text-sm">(some unknown)</span>
+        {/if}
+      </div>
+    </div>
   {:else}
-    &nbsp;
+    <!-- Edit Mode -->
+    <div class="card edit-form">
+      <h3>Edit Item</h3>
+
+      <div class="form-group">
+        <label for="edit-name">Name</label>
+        <input id="edit-name" type="text" bind:value={editing.name} readonly />
+      </div>
+
+      <div class="form-group">
+        <label for="edit-notes">Notes</label>
+        <input id="edit-notes" type="text" bind:value={editing.notes} placeholder="Add notes..." />
+      </div>
+
+      <div class="grid-2-col">
+        <div class="form-group">
+          <label for="edit-mcg">Mcg</label>
+          <input id="edit-mcg" type="number" bind:value={editing.mcg} readonly />
+        </div>
+
+        <div class="form-group">
+          <label for="edit-fiber">Fiber</label>
+          <input id="edit-fiber" type="number" bind:value={editing.fiber} readonly />
+        </div>
+      </div>
+
+      <div class="grid-2-col">
+        <div class="form-group">
+          <label for="edit-unit">Unit</label>
+          <input id="edit-unit" type="text" bind:value={editing.unit} readonly />
+        </div>
+
+        <div class="form-group">
+          <label for="edit-servings">Servings</label>
+          <input id="edit-servings" type="number" step="0.1" bind:value={editing.servings} />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="edit-source">Source</label>
+        <input id="edit-source" type="text" bind:value={editing.source} readonly />
+      </div>
+
+      <div class="form-actions flex gap-md justify-between mt-lg">
+        <button type="button" class="btn btn-outline" on:click={cancel_edit}>Cancel</button>
+        <button type="button" class="btn btn-primary" on:click={save_edit}>Save Changes</button>
+      </div>
+    </div>
   {/if}
 </div>
-<br />
-{#if editing == undefined}
-  {#each food_items as f, i}
-    <Food
-      name={f.name}
-      notes={f.notes}
-      index={i}
-      mcg={f.mcg}
-      fiber={f.fiber}
-      unit={f.unit}
-      servings={f.servings}
-      source={f.source}
-      use_edit="true"
-      use_fav="true"
-      use_dec="true"
-      use_inc="true"
-      use_del="true"
-      on:message={do_msg}
-    />
-  {/each}
-  Total: {total.toFixed(2)} Total fiber: {total_fiber.toFixed(2)}
-  {#if fiber_unknown}
-    * some unknown *
-  {/if}
-{:else}
-  <table>
-    <colgroup> <col /><col /> </colgroup>
-    <tbody>
-      <tr
-        ><th>Name</th><th><input class="val" type="text" bind:value={editing.name} readonly /></th
-        ></tr
-      >
-      <tr><th>Notes</th><th><input class="val" type="text" bind:value={editing.notes} /></th></tr>
-      <tr
-        ><th>mcg</th><th><input class="val" type="number" bind:value={editing.mcg} readonly /></th
-        ></tr
-      >
-      <tr
-        ><th>fiber</th><th
-          ><input class="val" type="number" bind:value={editing.fiber} readonly /></th
-        ></tr
-      >
-      <tr
-        ><th>Unit</th><th><input class="val" type="text" bind:value={editing.unit} readonly /></th
-        ></tr
-      >
-      <tr
-        ><th>Servings</th><th
-          ><input class="val" type="number" step="0.1" bind:value={editing.servings} /></th
-        ></tr
-      >
-      <tr
-        ><th>Source</th><th
-          ><input class="val" type="text" bind:value={editing.source} readonly /></th
-        ></tr
-      >
-    </tbody>
-  </table>
-  <br /><button type="button" id="cancel" on:click={cancel_edit}>cancel</button>
-  <button type="button" id="save" on:click={save_edit}>save</button>
-{/if}
+
+<style>
+  .current-date {
+    margin: 0;
+    color: var(--color-primary-dark);
+  }
+
+  .stats-row {
+    margin-top: var(--spacing-sm);
+    border-top: 1px solid var(--color-border);
+    padding-top: var(--spacing-sm);
+  }
+
+  .status-badge {
+    background-color: #fffde7;
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: #fbc02d;
+    border: 1px solid #fbc02d;
+    font-size: 0.8rem;
+    font-weight: 500;
+  }
+
+  .totals-card {
+    background-color: var(--color-primary-dark);
+    color: white;
+    margin-top: var(--spacing-md);
+  }
+
+  .totals-card .text-primary {
+    color: white;
+  }
+
+  .totals-card .text-secondary {
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  .total-row.large {
+    font-size: 1.25rem;
+    margin-bottom: var(--spacing-xs);
+  }
+
+  .edit-form {
+    padding: var(--spacing-lg);
+  }
+
+  .form-group {
+    margin-bottom: var(--spacing-md);
+  }
+
+  label {
+    display: block;
+    margin-bottom: var(--spacing-xs);
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    font-size: 0.9rem;
+  }
+
+  .grid-2-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-md);
+  }
+
+  .mt-lg {
+    margin-top: var(--spacing-lg);
+  }
+
+  .text-error {
+    color: var(--color-error);
+  }
+</style>

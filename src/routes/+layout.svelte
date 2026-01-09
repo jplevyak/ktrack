@@ -3,6 +3,7 @@
   import { page } from "$app/stores";
   import Nav from "../components/Nav.svelte";
   import { goto } from "$app/navigation";
+  import "../app.css";
 
   export let segment;
 
@@ -74,23 +75,41 @@
 </script>
 
 <div
+  class="app-container"
   use:swipe={{ timeframe: 300, minSwipeDistance: 100, touchAction: "pan-y" }}
   on:swipe={handle_swipe}
-  style="height: 100%;"
 >
-  <Nav {segment} />
+  <header class="app-header">
+    <Nav {segment} />
+  </header>
 
-  <main>
+  <main class="app-content">
     <slot />
   </main>
 </div>
 
 <style>
-  main {
-    position: relative;
-    background-color: white;
-    padding: 2em;
+  .app-container {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    background-color: var(--color-background);
+  }
+
+  .app-header {
+    background-color: var(--color-surface);
+    box-shadow: var(--shadow-sm);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .app-content {
+    flex: 1;
+    width: 100%;
+    max-width: 800px;
     margin: 0 auto;
+    padding: var(--spacing-md);
     box-sizing: border-box;
   }
 </style>

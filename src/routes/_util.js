@@ -56,6 +56,10 @@ export function compare_date(d1, d2) {
   const d1_timestamp = d1.getData(["timestamp"]);
   const d2_timestamp = d2.getData(["timestamp"]);
 
+  if (!d1_timestamp && !d2_timestamp) return 0;
+  if (!d1_timestamp) return -1;
+  if (!d2_timestamp) return 1;
+
   if (d1_timestamp > d2_timestamp) return 1;
   if (d1_timestamp < d2_timestamp) return -1;
   return 0;
@@ -162,6 +166,10 @@ export function prune_today(server_doc, clientSyncRequest) {
     // Reset the server document's state.
     // getSyncResponse will then build the new state from the client's operations.
     server_doc.clear();
+    // Ensure server adopts the client's Document ID for the new day
+    if (clientSyncRequest && clientSyncRequest.docId) {
+      server_doc.id = clientSyncRequest.docId;
+    }
   }
 }
 

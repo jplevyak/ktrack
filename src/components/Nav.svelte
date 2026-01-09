@@ -2,70 +2,89 @@
   export let segment;
 </script>
 
-<nav>
-  <ul>
+<nav class="nav-container">
+  <ul class="nav-list">
     <li>
-      <a aria-current={segment === "" ? "page" : undefined} href=".">Day</a>
+      <a class="nav-link" aria-current={segment === "" ? "page" : undefined} href=".">Day</a>
     </li>
     <li>
-      <a aria-current={segment === "favorites" ? "page" : undefined} href="/favorites">Favorites</a>
+      <a
+        class="nav-link"
+        aria-current={segment === "favorites" ? "page" : undefined}
+        href="/favorites">Favs</a
+      >
     </li>
     <li>
-      <a aria-current={segment === "search" ? "page" : undefined} href="/search">Search</a>
+      <a class="nav-link" aria-current={segment === "search" ? "page" : undefined} href="/search"
+        >Search</a
+      >
     </li>
     <li>
-      <a aria-current={segment === "history" ? "page" : undefined} href="/history">History</a>
+      <a class="nav-link" aria-current={segment === "history" ? "page" : undefined} href="/history"
+        >History</a
+      >
     </li>
     <li>
-      <a aria-current={segment === "about" ? "page" : undefined} href="/about">KTrack</a>
+      <a class="nav-link" aria-current={segment === "about" ? "page" : undefined} href="/about"
+        >KTrack</a
+      >
     </li>
   </ul>
 </nav>
 
 <style>
-  nav {
-    border-bottom: 1px solid rgba(255, 62, 0, 0.1);
-    font-weight: 500;
-    padding: 0 1em;
-    width: 90%;
-    font-size: 4.2vmin;
+  .nav-container {
+    width: 100%;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 0 var(--spacing-md);
   }
 
-  ul {
+  .nav-list {
     margin: 0;
     padding: 0;
+    list-style: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
   }
 
-  /* clearfix */
-  ul::after {
-    content: "";
+  .nav-link {
     display: block;
-    clear: both;
-  }
-
-  li {
-    display: block;
-    float: left;
-  }
-
-  [aria-current] {
-    position: relative;
-    display: inline-block;
-  }
-
-  [aria-current]::after {
-    position: absolute;
-    content: "";
-    width: calc(100% - 1em);
-    height: 2px;
-    background-color: rgb(255, 62, 0);
-    display: block;
-    bottom: -1px;
-  }
-
-  a {
+    padding: var(--spacing-md) var(--spacing-sm);
     text-decoration: none;
-    padding: 1em 0.5em;
-    display: block;
+    color: var(--color-text-secondary);
+    font-weight: 500;
+    position: relative;
+    font-size: var(--font-size-base);
+    transition: color var(--transition-fast);
+  }
+
+  .nav-link:hover {
+    color: var(--color-primary);
+  }
+
+  .nav-link[aria-current="page"] {
+    color: var(--color-primary);
+  }
+
+  .nav-link[aria-current="page"]::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: var(--spacing-sm);
+    right: var(--spacing-sm);
+    height: 3px;
+    background-color: var(--color-primary);
+    border-top-left-radius: 2px;
+    border-top-right-radius: 2px;
+  }
+
+  /* Mobile adjustments */
+  @media (max-width: 400px) {
+    .nav-link {
+      font-size: var(--font-size-sm);
+      padding: var(--spacing-md) var(--spacing-xs);
+    }
   }
 </style>

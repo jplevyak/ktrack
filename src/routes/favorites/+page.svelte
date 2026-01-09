@@ -192,73 +192,176 @@
   <title>KTrack - Favorites</title>
 </svelte:head>
 
-{#if editing == undefined}
-  Search <input
-    type="text"
-    id="search_string"
-    bind:value={search_value}
-    on:input={search_results}
-  />
-  <button type="button" id="search" on:click={search_results}>Search</button>
-  <button type="button" id="clear_input" on:click={clear_search}>Clear</button>
-  <button type="button" id="create" on:click={create_favorite}>Create New Favorite</button>
-  &nbsp;&nbsp; Added: {added_count}
+<div class="favorites-view">
+  {#if editing == undefined}
+    <!-- Search & Controls Header -->
+    <div class="card header-card">
+      <div class="search-controls flex flex-col gap-sm">
+        <label for="search_string" class="sr-only">Search Favorites</label>
+        <div class="flex gap-sm">
+          <input
+            type="text"
+            id="search_string"
+            bind:value={search_value}
+            on:input={search_results}
+            placeholder="Search favorites..."
+            class="flex-1"
+          />
+          <button type="button" class="btn btn-primary" on:click={search_results}>Search</button>
+          <button type="button" class="btn btn-outline" on:click={clear_search}>Clear</button>
+        </div>
 
-  <div style="min-height: 1.5em; margin-top: 0.25em;">
-    {#if $favorites_status && $favorites_status != "idle"}
-      <b>🟡 Unsaved changes: {$favorites_status}</b>
-    {:else}
-      &nbsp;
-    {/if}
-  </div>
-  <br />
-  {#if favorites != undefined}
-    {#each results as f, i}
-      <Food
-        name={f.name}
-        notes={f.notes}
-        index={i}
-        mcg={f.mcg}
-        fiber={f.fiber}
-        unit={f.unit}
-        servings={f.servings}
-        source={f.source}
-        use_edit="true"
-        use_dup="true"
-        use_add="true"
-        use_del="true"
-        use_move="true"
-        on:message={do_msg}
-      />
-    {/each}
+        <div class="flex justify-between items-center mt-sm">
+          <button type="button" class="btn btn-outline text-sm" on:click={create_favorite}>
+            + Create New Favorite
+          </button>
+
+          <div class="added-count text-primary font-bold text-sm">
+            Added: {added_count}
+          </div>
+        </div>
+      </div>
+
+      <div class="status-row mt-sm">
+        {#if $favorites_status && $favorites_status != "idle"}
+          <span class="status-badge">🟡 {$favorites_status}</span>
+        {/if}
+      </div>
+    </div>
+
+    <!-- Favorites List -->
+    <div class="favorites-list">
+      {#if favorites != undefined}
+        {#each results as f, i}
+          <Food
+            name={f.name}
+            notes={f.notes}
+            index={i}
+            mcg={f.mcg}
+            fiber={f.fiber}
+            unit={f.unit}
+            servings={f.servings}
+            source={f.source}
+            use_edit="true"
+            use_dup="true"
+            use_add="true"
+            use_del="true"
+            use_move="true"
+            on:message={do_msg}
+          />
+        {/each}
+      {/if}
+    </div>
+  {:else}
+    <!-- Edit Mode -->
+    <div class="card edit-form">
+      <h3>{editing.name ? "Edit Favorite" : "Create Favorite"}</h3>
+
+      <div class="form-group">
+        <label for="fav-name">Name</label>
+        <input id="fav-name" type="text" bind:value={editing.name} />
+      </div>
+
+      <div class="form-group">
+        <label for="fav-notes">Notes</label>
+        <input id="fav-notes" type="text" bind:value={editing.notes} placeholder="Add notes..." />
+      </div>
+
+      <div class="grid-2-col">
+        <div class="form-group">
+          <label for="fav-mcg">Mcg</label>
+          <input id="fav-mcg" type="number" bind:value={editing.mcg} />
+        </div>
+
+        <div class="form-group">
+          <label for="fav-fiber">Fiber</label>
+          <input id="fav-fiber" type="number" bind:value={editing.fiber} />
+        </div>
+      </div>
+
+      <div class="grid-2-col">
+        <div class="form-group">
+          <label for="fav-unit">Unit</label>
+          <input id="fav-unit" type="text" bind:value={editing.unit} />
+        </div>
+
+        <div class="form-group">
+          <label for="fav-servings">Servings</label>
+          <input id="fav-servings" type="number" step="0.1" bind:value={editing.servings} />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="fav-source">Source</label>
+        <input id="fav-source" type="text" bind:value={editing.source} />
+      </div>
+
+      <div class="form-actions flex gap-md justify-between mt-lg">
+        <button type="button" class="btn btn-outline" on:click={cancel_edit}>Cancel</button>
+        <button type="button" class="btn btn-primary" on:click={save_edit}>Save Favorite</button>
+      </div>
+    </div>
   {/if}
-{:else}
-  <table>
-    <tbody>
-      <tr><th>Name</th><th><input class="val" type="text" bind:value={editing.name} /></th></tr>
-      <tr><th>Notes</th><th><input class="val" type="text" bind:value={editing.notes} /></th></tr>
-      <tr><th>mcg</th><th> <input class="val" type="number" bind:value={editing.mcg} /></th></tr>
-      <tr><th>fiber</th><th> <input class="val" type="number" bind:value={editing.fiber} /></th></tr
-      >
-      <tr><th>Unit</th><th><input class="val" type="text" bind:value={editing.unit} /></th></tr>
-      <tr
-        ><th>Servings</th><th
-          ><input class="val" type="number" step="0.1" bind:value={editing.servings} /></th
-        ></tr
-      >
-      <tr><th>Source</th><th><input class="val" type="text" bind:value={editing.source} /></th></tr>
-    </tbody>
-  </table>
-  <br /><button type="button" id="cancel" on:click={cancel_edit}>cancel</button>
-  <button type="button" id="save" on:click={save_edit}>save</button>
-{/if}
+</div>
 
 <style>
-  table,
-  th {
-    align: "left";
+  .favorites-view {
+    padding-bottom: var(--spacing-xl);
   }
-  .val {
-    width: 50em;
+
+  .mt-sm {
+    margin-top: var(--spacing-sm);
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+  }
+
+  .flex-1 {
+    flex: 1;
+  }
+
+  .status-badge {
+    background-color: #fffde7;
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: #fbc02d;
+    border: 1px solid #fbc02d;
+    font-size: 0.8rem;
+    font-weight: 500;
+  }
+
+  /* Form Styles (Reused from Main Page concept) */
+  .edit-form {
+    padding: var(--spacing-lg);
+  }
+
+  .form-group {
+    margin-bottom: var(--spacing-md);
+  }
+
+  label {
+    display: block;
+    margin-bottom: var(--spacing-xs);
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    font-size: 0.9rem;
+  }
+
+  .grid-2-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-md);
+  }
+
+  .mt-lg {
+    margin-top: var(--spacing-lg);
   }
 </style>

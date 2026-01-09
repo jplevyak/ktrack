@@ -84,23 +84,67 @@
   <title>KTrack - Favorites</title>
 </svelte:head>
 
-Search <input type="text" id="search_string" />
-<button type="button" id="search">Search</button>
-<button type="button" id="clear_input">Clear</button>
-&nbsp;&nbsp; Added: {added_count}
-<br /><br />
+<div class="search-view">
+  <!-- Search Header -->
+  <div class="card header-card">
+    <div class="search-controls flex flex-col gap-sm">
+      <label for="search_string" class="sr-only">Search Foods</label>
+      <div class="flex gap-sm">
+        <input type="text" id="search_string" placeholder="Search database..." class="flex-1" />
+        <button type="button" id="search" class="btn btn-primary">Search</button>
+        <button type="button" id="clear_input" class="btn btn-outline">Clear</button>
+      </div>
 
-{#each results as f, i}
-  <Food
-    name={f.name}
-    notes={f.notes}
-    index={i}
-    mcg={f.mcg}
-    fiber={f.fiber}
-    unit={f.unit}
-    source={f.source}
-    use_add="true"
-    use_fav="true"
-    on:message={do_msg}
-  />
-{/each}
+      <div class="added-count text-primary font-bold text-sm text-right mt-sm">
+        Added: {added_count}
+      </div>
+    </div>
+  </div>
+
+  <!-- Results List -->
+  <div class="search-results">
+    {#each results as f, i}
+      <Food
+        name={f.name}
+        notes={f.notes}
+        index={i}
+        mcg={f.mcg}
+        fiber={f.fiber}
+        unit={f.unit}
+        source={f.source}
+        use_add="true"
+        use_fav="true"
+        on:message={do_msg}
+      />
+    {/each}
+  </div>
+</div>
+
+<style>
+  .search-view {
+    padding-bottom: var(--spacing-xl);
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+  }
+
+  .flex-1 {
+    flex: 1;
+  }
+
+  .mt-sm {
+    margin-top: var(--spacing-sm);
+  }
+
+  .text-right {
+    text-align: right;
+  }
+</style>
