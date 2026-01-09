@@ -89,7 +89,7 @@
 
   <div class="food-details text-secondary text-sm">
     <div class="detail-row">
-      <span class="detail-label">Micronutrients:</span>
+      <span class="detail-label">Vitamin K:</span>
       <span class="detail-value">{mcg == undefined ? "unknown" : mcg} mcg/{unit}</span>
     </div>
 

@@ -11,7 +11,7 @@
       <a
         class="nav-link"
         aria-current={segment === "favorites" ? "page" : undefined}
-        href="/favorites">Favs</a
+        href="/favorites">Favorites</a
       >
     </li>
     <li>
