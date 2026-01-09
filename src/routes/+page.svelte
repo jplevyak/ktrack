@@ -176,9 +176,12 @@
   <!-- Header Section -->
   <div class="card header-card">
     <div class="date-header flex justify-between items-center">
-      <h2 class="current-date">
+      <h2 class="current-date flex items-center gap-sm">
         {#if date_info}
           {weekdays[date_info.day]}, {months[date_info.month]} {date_info.date}
+        {/if}
+        {#if $today_status && $today_status != "idle"}
+          <span class="status-badge text-sm">🟡 {$today_status}</span>
         {/if}
       </h2>
 
@@ -192,16 +195,21 @@
 
     <div class="stats-row flex justify-between text-secondary text-sm">
       <div class="averages">
-        <span class="font-bold">Avg (3/5/7):</span>
+        <span class="font-bold">Average (3/5/7 days):</span>
         [{(averages[0] || 0).toFixed(1)}, {(averages[1] || 0).toFixed(1)}, {(
           averages[2] || 0
         ).toFixed(1)}]
       </div>
-
-      <div class="unsaved-changes">
-        {#if $today_status && $today_status != "idle"}
-          <span class="status-badge">🟡 {$today_status}</span>
-        {/if}
+    </div>
+    <!-- Totals Section moved to header -->
+    <div
+      class="totals-section flex justify-between items-center mt-md pt-md border-t border-border"
+    >
+      <div class="total-row large">
+        <span class="text-primary font-bold">{total.toFixed(2)}</span> mcg Vit K
+      </div>
+      <div class="total-row large">
+        {total_fiber.toFixed(2)} g {#if fiber_unknown}<span class="text-error"> + ?</span>{/if} Fiber
       </div>
     </div>
   </div>
@@ -224,21 +232,10 @@
           use_dec="true"
           use_inc="true"
           use_del="true"
+          hide_details={true}
           on:message={do_msg}
         />
       {/each}
-    </div>
-
-    <div class="card totals-card text-center">
-      <div class="total-row large">
-        Total: <span class="text-primary font-bold">{total.toFixed(2)}</span> mcg
-      </div>
-      <div class="total-row text-secondary">
-        Fiber: {total_fiber.toFixed(2)} g
-        {#if fiber_unknown}
-          <span class="text-warning text-sm">(some unknown)</span>
-        {/if}
-      </div>
     </div>
   {:else}
     <!-- Edit Mode -->
@@ -296,6 +293,9 @@
   .current-date {
     margin: 0;
     color: var(--color-primary-dark);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
   }
 
   .stats-row {
@@ -314,18 +314,11 @@
     font-weight: 500;
   }
 
-  .totals-card {
-    background-color: var(--color-primary-dark);
-    color: white;
-    margin-top: var(--spacing-md);
+  .border-t {
+    border-top: 1px solid var(--color-border);
   }
-
-  .totals-card .text-primary {
-    color: white;
-  }
-
-  .totals-card .text-secondary {
-    color: rgba(255, 255, 255, 0.7);
+  .pt-md {
+    padding-top: var(--spacing-md);
   }
 
   .total-row.large {

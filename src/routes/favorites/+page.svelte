@@ -247,6 +247,7 @@
             use_add="true"
             use_del="true"
             use_move="true"
+            hide_details={true}
             on:message={do_msg}
           />
         {/each}

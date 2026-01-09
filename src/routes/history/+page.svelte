@@ -60,7 +60,6 @@
 
   $: (today, check_for_new_day(today, profile));
   $: results = history.getData().slice(0, limit);
-  $: averages = compute_averages(history.getData());
 
   function do_msg(event) {
     if (event.status == "completed") return;
@@ -109,11 +108,6 @@
 <div class="history-view">
   <!-- Controls & Stats Header -->
   <div class="card header-card">
-    <div class="stats-row text-secondary text-sm mb-md">
-      <span class="font-bold">Avg (3/5/7):</span>
-      [{averages[0].toFixed(1)}, {averages[1].toFixed(1)}, {averages[2].toFixed(1)}]
-    </div>
-
     <div class="controls-row flex justify-between items-center">
       <div class="limit-control flex items-center gap-sm">
         <label for="limit" class="mb-0">Days to view:</label>
@@ -139,12 +133,47 @@
       {@const day_info = get_date_info(day)}
 
       <div class="card day-card">
-        <div class="day-header flex justify-between items-center">
-          <h3 class="day-date">
-            {weekdays[day_info.day]}, {months[day_info.month]}
-            {day_info.date}, {day_info.year}
-          </h3>
-          <button on:click={() => edit_day(day)} class="btn btn-outline btn-sm">Edit Day</button>
+        <div class="day-header">
+          <!-- Removed flex classes here to allow block stacking -->
+          <div class="flex justify-between items-center mb-sm">
+            <h3 class="day-date">
+              {weekdays[day_info.day]}, {months[day_info.month]}
+              {day_info.date}, {day_info.year}
+            </h3>
+            <button on:click={() => edit_day(day)} class="btn btn-icon" aria-label="Edit Day">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                ><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path
+                  d="m15 5 4 4"
+                /></svg
+              >
+            </button>
+          </div>
+
+          <!-- Totals Section moved to header -->
+          <div
+            class="totals-section flex justify-between items-center pt-sm border-t border-border"
+          >
+            <div class="total-row large">
+              <span class="text-primary font-bold">{get_total(day.items).toFixed(2)}</span>
+              mcg Vit K
+            </div>
+            <div class="total-row large">
+              {get_total_fiber(day.items)[0].toFixed(2)} g {#if get_total_fiber(day.items)[1]}<span
+                  class="text-error"
+                >
+                  + ?</span
+                >{/if} Fiber
+            </div>
+          </div>
         </div>
 
         <div class="day-items">
@@ -161,24 +190,10 @@
               source={f.source}
               use_add="true"
               use_fav="true"
+              hide_details={true}
               on:message={do_msg}
             />
           {/each}
-        </div>
-
-        <div class="day-totals flex justify-between items-center">
-          <div class="total-group">
-            <span class="text-secondary">Total:</span>
-            <span class="font-bold text-primary">{get_total(day.items).toFixed(2)}</span> mcg
-          </div>
-
-          <div class="total-group">
-            <span class="text-secondary">Fiber:</span>
-            <span>{get_total_fiber(day.items)[0].toFixed(2)}</span> g
-            {#if get_total_fiber(day.items)[1]}
-              <span class="text-warning text-sm">(unknowns)</span>
-            {/if}
-          </div>
         </div>
       </div>
     {/each}
@@ -228,18 +243,23 @@
     border-bottom: 1px solid var(--color-border);
   }
 
-  .day-date {
-    margin: 0;
-    font-size: 1.1rem;
-    color: var(--color-text-main);
+  .pt-sm {
+    padding-top: var(--spacing-sm);
+  }
+  .border-t {
+    border-top: 1px solid var(--color-border);
   }
 
-  .day-totals {
-    margin-top: var(--spacing-md);
-    padding-top: var(--spacing-md);
-    border-top: 1px solid var(--color-border);
-    background-color: var(--color-background);
-    padding: var(--spacing-sm) var(--spacing-md);
-    border-radius: var(--radius-sm);
+  .total-row.large {
+    font-size: 1.15rem; /* Slightly smaller than main page to fit card context */
+    font-weight: 500;
+  }
+
+  .text-error {
+    color: var(--color-error);
+  }
+
+  .text-error {
+    color: var(--color-error);
   }
 </style>
