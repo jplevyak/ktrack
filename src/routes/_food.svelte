@@ -278,8 +278,8 @@
 
 <style>
   .food-card {
-    padding: var(--spacing-md);
-    margin-bottom: var(--spacing-md);
+    padding: var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
     transition: transform var(--transition-fast);
   }
 
@@ -299,8 +299,8 @@
   }
 
   .food-details {
-    margin: var(--spacing-sm) 0;
-    padding: var(--spacing-sm) 0;
+    margin: var(--spacing-xs) 0;
+    padding: var(--spacing-xs) 0;
     border-top: 1px dashed var(--color-border);
     border-bottom: 1px dashed var(--color-border);
   }
@@ -320,7 +320,7 @@
   }
 
   .food-toolbar {
-    margin-top: var(--spacing-sm);
+    margin-top: var(--spacing-xs);
   }
 
   .star-btn {
