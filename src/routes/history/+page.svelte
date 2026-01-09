@@ -205,10 +205,6 @@
     padding-bottom: var(--spacing-xl);
   }
 
-  .mb-md {
-    margin-bottom: var(--spacing-md);
-  }
-
   .mb-0 {
     margin-bottom: 0;
   }
@@ -253,10 +249,6 @@
   .total-row.large {
     font-size: 1.15rem; /* Slightly smaller than main page to fit card context */
     font-weight: 500;
-  }
-
-  .text-error {
-    color: var(--color-error);
   }
 
   .text-error {

@@ -292,45 +292,12 @@
     font-weight: 700;
   }
 
-  .total-row.large {
-    font-size: 1.2rem;
-    font-weight: 500;
-  }
-
   .mb-xs {
     margin-bottom: var(--spacing-xs);
   }
 
   .text-lg {
     font-size: 1.25rem;
-  }
-
-  .stats-row {
-    margin-top: var(--spacing-sm);
-    border-top: 1px solid var(--color-border);
-    padding-top: var(--spacing-sm);
-  }
-
-  .status-badge {
-    background-color: #fffde7;
-    padding: 2px 6px;
-    border-radius: 4px;
-    color: #fbc02d;
-    border: 1px solid #fbc02d;
-    font-size: 0.8rem;
-    font-weight: 500;
-  }
-
-  .border-t {
-    border-top: 1px solid var(--color-border);
-  }
-  .pt-md {
-    padding-top: var(--spacing-md);
-  }
-
-  .total-row.large {
-    font-size: 1.25rem;
-    margin-bottom: var(--spacing-xs);
   }
 
   .edit-form {
