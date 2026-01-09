@@ -1,0 +1,256 @@
+/* Design System Variables - BALANCED COMPACT */
+:root {
+    /* Color Palette - High Contrast / Utilitarian */
+    --primary-hue: 210;
+    --primary-sat: 100%;
+    --primary-light: 45%;
+
+    --color-primary: #0000aa;
+    /* Dark Blue */
+    --color-primary-dark: #000088;
+    --color-primary-light: #eeeeff;
+
+    --color-surface: #ffffff;
+    --color-background: #eeeeee;
+    --color-text-main: #000000;
+    --color-text-secondary: #333333;
+    --color-border: #999999;
+    /* Softer border */
+
+    --color-success: #008800;
+    --color-error: #cc0000;
+    --color-warning: #884400;
+
+    /* Typography - Clean Sans */
+    --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --font-size-base: 15px;
+    --font-size-sm: 13px;
+    --font-size-lg: 17px;
+    --font-size-xl: 19px;
+
+    /* Spacing - Compact but breathing */
+    --spacing-xs: 2px;
+    --spacing-sm: 4px;
+    --spacing-md: 8px;
+    --spacing-lg: 12px;
+    --spacing-xl: 16px;
+
+    /* Shadows - Subtle */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.1);
+    --shadow-md: none;
+    --shadow-lg: none;
+
+    /* Radius - Softened */
+    --radius-sm: 2px;
+    --radius-md: 4px;
+    --radius-lg: 6px;
+    --radius-full: 9999px;
+
+    /* Transitions */
+    --transition-fast: 0.1s ease;
+    --transition-normal: 0.2s ease;
+}
+
+/* Global Reset & Base Styles */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: var(--font-family);
+    font-size: var(--font-size-base);
+    line-height: 1.3;
+    color: var(--color-text-main);
+    background-color: var(--color-background);
+    min-height: 100vh;
+}
+
+/* Typography */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    margin-top: 0;
+    margin-bottom: var(--spacing-sm);
+    font-weight: 600;
+    line-height: 1.2;
+    text-transform: none;
+    /* Normal case headers */
+}
+
+h1 {
+    font-size: 1.5rem;
+}
+
+h2 {
+    font-size: 1.25rem;
+}
+
+h3 {
+    font-size: 1.1rem;
+}
+
+a {
+    color: var(--color-primary);
+    text-decoration: none;
+}
+
+a:hover {
+    background-color: transparent;
+    color: var(--color-primary-dark);
+    text-decoration: underline;
+}
+
+button {
+    font-family: inherit;
+    cursor: pointer;
+    text-transform: none;
+    /* Normal case buttons */
+    font-size: 0.9rem;
+}
+
+/* Utility Components */
+.card {
+    background: var(--color-surface);
+    border-radius: var(--radius-md);
+    /* Rounded corners */
+    box-shadow: var(--shadow-sm);
+    padding: var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
+    border: 1px solid var(--color-border);
+}
+
+.flex {
+    display: flex;
+}
+
+.flex-col {
+    flex-direction: column;
+}
+
+.items-center {
+    align-items: center;
+}
+
+.justify-between {
+    justify-content: space-between;
+}
+
+.gap-sm {
+    gap: var(--spacing-sm);
+}
+
+.gap-md {
+    gap: var(--spacing-md);
+}
+
+.text-sm {
+    font-size: var(--font-size-sm);
+}
+
+.text-secondary {
+    color: var(--color-text-secondary);
+}
+
+.font-bold {
+    font-weight: 600;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 6px;
+    /* Balanced padding */
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+    background-color: #f0f0f0;
+    color: black;
+    font-weight: 600;
+}
+
+.btn:active {
+    background-color: #e0e0e0;
+    transform: translateY(1px);
+}
+
+.btn-primary {
+    background-color: var(--color-primary);
+    color: white;
+    border-color: var(--color-primary-dark);
+}
+
+.btn-primary:hover {
+    background-color: var(--color-primary-dark);
+}
+
+.btn-outline {
+    background-color: transparent;
+    border: 1px solid var(--color-border);
+    color: black;
+}
+
+.btn-outline:hover {
+    background-color: #f5f5f5;
+    color: black;
+}
+
+.btn-danger {
+    background-color: var(--color-error);
+    color: white;
+}
+
+.btn-icon {
+    padding: 1px;
+    width: 24px;
+    /* Larger targets */
+    height: 24px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: #555;
+    border-radius: var(--radius-full);
+}
+
+.btn-icon:hover {
+    background-color: #e0e0e0;
+    color: black;
+    border-color: #ccc;
+}
+
+/* Input Styles */
+input[type="text"],
+input[type="number"],
+select,
+textarea {
+    display: block;
+    width: 100%;
+    padding: 3px 6px;
+    font-size: 1rem;
+    font-family: inherit;
+    line-height: 1.3;
+    color: black;
+    background-color: white;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+}
+
+input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px var(--color-primary-light);
+}
+
+/* Hide spin buttons */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button {
+    appearance: none;
+}
+
+input[type=number] {
+    -moz-appearance: textfield;
+}
