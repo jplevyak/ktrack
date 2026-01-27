@@ -20,14 +20,13 @@
   export let hide_details = false;
 
   let show_details = !hide_details;
-  let use_total = undefined;
+
   let use_notes = undefined;
   let g100 = unit == "100g";
   let m = undefined;
   let grams = undefined;
   let use_grams = undefined;
 
-  $: use_total = mcg != undefined && servings != undefined;
   $: use_notes = notes != undefined && notes != "";
   $: m = use_notes ? notes.match(/^(\d+)g/) : undefined;
   $: grams = m == undefined ? (g100 ? 100 : undefined) : m[1];
@@ -78,6 +77,11 @@
       {#if servings != undefined}
         <div class="food-servings">
           <span class="font-bold text-primary">{servings.toFixed(3)}</span> servings
+          {#if use_grams}
+            <span class="text-secondary">
+              · {(grams * servings).toFixed(1)} g
+            </span>
+          {/if}
           {#if mcg != undefined}
             <span class="text-secondary">
               · {(mcg * servings).toFixed(1)} mcg Vit K
@@ -122,70 +126,11 @@
           <span class="detail-value">{source}</span>
         </div>
       {/if}
-
-      {#if use_total}
-        <div class="detail-row food-total">
-          <span class="detail-label">Total:</span>
-          <span class="detail-value">
-            {#if use_grams}{(grams * servings).toFixed(3)}g &bull;
-            {/if}
-            <strong>{(mcg * servings).toFixed(3)}</strong> mcg
-          </span>
-        </div>
-      {/if}
     </div>
   {/if}
 
   <div class="food-toolbar flex justify-between items-center">
     <div class="left-tools flex gap-sm">
-      {#if use_dec}
-        <button on:click={dec} class="btn btn-icon" aria-label="Decrease">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg
-          >
-        </button>
-      {/if}
-      {#if use_inc}
-        <button on:click={inc} class="btn btn-icon" aria-label="Increase">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg
-          >
-        </button>
-      {/if}
-      {#if use_add}
-        <button on:click={inc} class="btn btn-icon" aria-label="Add">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg
-          >
-        </button>
-      {/if}
-    </div>
-
-    <div class="right-tools flex gap-sm">
       {#if use_move}
         <button on:click={up} class="btn btn-icon" aria-label="Move Up">
           <svg
@@ -273,6 +218,54 @@
         </button>
       {/if}
     </div>
+
+    <div class="right-tools flex gap-sm">
+      {#if use_dec}
+        <button on:click={dec} class="btn btn-icon" aria-label="Decrease">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg
+          >
+        </button>
+      {/if}
+      {#if use_inc}
+        <button on:click={inc} class="btn btn-icon" aria-label="Increase">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg
+          >
+        </button>
+      {/if}
+      {#if use_add}
+        <button on:click={inc} class="btn btn-icon" aria-label="Add">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg
+          >
+        </button>
+      {/if}
+    </div>
   </div>
 </div>
 
@@ -311,14 +304,6 @@
     margin-bottom: 2px;
   }
 
-  .food-total {
-    margin-top: 4px;
-    padding-top: 4px;
-    border-top: 1px dotted var(--color-border);
-    font-weight: 500;
-    color: var(--color-text-main);
-  }
-
   .food-toolbar {
     margin-top: var(--spacing-xs);
   }
@@ -329,10 +314,6 @@
 
   .delete-btn {
     color: var(--color-error);
-  }
-
-  .delete-btn:hover {
-    background-color: #ffebee;
   }
 
   .delete-btn:hover {
