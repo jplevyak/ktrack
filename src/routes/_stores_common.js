@@ -295,6 +295,52 @@ export function save_history(day, profile, stores) {
       return history;
     }
 
+    const current_history = history.getData();
+    if (current_history.length > 0) {
+      const last_entry = current_history[0];
+      if (last_entry.timestamp && day_data.timestamp) {
+        const last_date_info = get_date_info(last_entry);
+        const current_date_info = get_date_info(day_data);
+
+        // Create dates (months are 0-indexed in Date, but get_date_info handles the -1 correction/check)
+        // get_date_info returns: month: parseInt(...) - 1. So it is 0-indexed.
+        const last_date = new Date(
+          last_date_info.year,
+          last_date_info.month,
+          last_date_info.date,
+        );
+        const current_date = new Date(
+          current_date_info.year,
+          current_date_info.month,
+          current_date_info.date,
+        );
+
+        let iter_date = new Date(last_date);
+        iter_date.setDate(iter_date.getDate() + 1);
+
+        while (iter_date < current_date) {
+          const empty_day_doc = make_today(iter_date);
+          const empty_day_data = empty_day_doc.getData();
+
+          const tsKey = empty_day_data.timestamp
+            ? parseInt(empty_day_data.timestamp.split("-").slice(0, 3).join(""))
+            : 0;
+          const sortKey = -tsKey;
+
+          history.upsertItemWithSortKey(
+            ["items"],
+            {
+              ...empty_day_data,
+            },
+            sortKey,
+            empty_day_data.timestamp,
+          );
+
+          iter_date.setDate(iter_date.getDate() + 1);
+        }
+      }
+    }
+
     const tsKey = day_data.timestamp
       ? parseInt(day_data.timestamp.split("-").slice(0, 3).join(""))
       : 0;
