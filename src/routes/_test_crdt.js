@@ -1131,4 +1131,403 @@ test("idGenerator uses path context for nested items", () => {
   assert.strictEqual(day.items[0]._id, "Apple");
 });
 
+// --- New Tests for Code Fixes and Missing Coverage ---
+
+test("Array DELETE with LWW: stale DELETE should not override newer ADD/UPDATE", () => {
+  const doc = new CollabJSON("[]");
+  doc.addItem([0], { name: "item1" });
+
+  const data = doc.getData({ includeMetadata: true });
+  const itemId = data[0]._id;
+
+  // Simulate a stale delete (timestamp older than the item's updated)
+  const itemTs = data[0]._updated;
+  const staleTs = itemTs - 1;
+
+  // Manually apply a stale DELETE_ITEM op
+  doc.applyOp({
+    type: "DELETE_ITEM",
+    path: [],
+    itemId,
+    timestamp: staleTs,
+    clientId: "other-client",
+  });
+
+  // Item should still be present because stale delete should be ignored
+  const afterData = doc.getData();
+  assert.strictEqual(afterData.length, 1, "Stale DELETE should not remove item added with newer timestamp");
+});
+
+test("Array DELETE with LWW: newer DELETE should override older ADD", () => {
+  const doc = new CollabJSON("[]");
+  doc.addItem([0], { name: "item1" });
+
+  const data = doc.getData({ includeMetadata: true });
+  const itemId = data[0]._id;
+  const itemTs = data[0]._updated;
+
+  // Apply a newer DELETE_ITEM op
+  const newerTs = itemTs + 1;
+  doc.applyOp({
+    type: "DELETE_ITEM",
+    path: [],
+    itemId,
+    timestamp: newerTs,
+    clientId: "other-client",
+  });
+
+  // Item should be removed
+  const afterData = doc.getData();
+  assert.strictEqual(afterData.length, 0, "Newer DELETE should remove item");
+});
+
+test("Concurrent MOVE_ITEM convergence: two clients both move items converge", () => {
+  const client1 = new CollabJSON("[]", { clientId: "c1" });
+  client1.addItem([0], { name: "A" });
+  client1.addItem([1], { name: "B" });
+  client1.addItem([2], { name: "C" });
+  client1.commitOps();
+
+  // Clone state to client2
+  const client2 = CollabJSON.fromJSON(JSON.parse(JSON.stringify(client1.toJSON())), { clientId: "c2" });
+
+  // client1 moves item 0 to position 2 (A -> end)
+  client1.moveItem([], 0, 2);
+
+  // client2 moves item 2 to position 0 (C -> start)
+  client2.moveItem([], 2, 0);
+
+  // Exchange ops
+  const ops1 = client1.ops;
+  const ops2 = client2.ops;
+
+  for (const op of ops2) {
+    client1.applyOp(op);
+  }
+  for (const op of ops1) {
+    client2.applyOp(op);
+  }
+
+  // Both clients should have the same order
+  const data1 = client1.getData().map((i) => i.name);
+  const data2 = client2.getData().map((i) => i.name);
+  assert.deepStrictEqual(data1, data2, "Concurrent MOVEs should converge to same order");
+});
+
+test("fromJSON / toJSON round-trip preserves all fields", () => {
+  const doc = new CollabJSON("[]", { clientId: "test-client" });
+  doc.addItem([0], { name: "item1" });
+  doc.commitOps();
+  doc.checked = Date.now();
+  doc.synced = Date.now();
+
+  const json = doc.toJSON();
+  const restored = CollabJSON.fromJSON(json, { clientId: "test-client" });
+
+  assert.strictEqual(restored.id, doc.id, "id should round-trip");
+  assert.strictEqual(restored.clientId, doc.clientId, "clientId should round-trip");
+  assert.strictEqual(restored.clock, doc.clock, "clock should round-trip");
+  assert.deepStrictEqual(restored.history, doc.history, "history should round-trip");
+  assert.deepStrictEqual(restored.ops, doc.ops, "ops should round-trip");
+  assert.deepStrictEqual(Object.fromEntries(restored.dvv), Object.fromEntries(doc.dvv), "dvv should round-trip");
+  assert.strictEqual(restored.checked, doc.checked, "checked should round-trip");
+  assert.strictEqual(restored.synced, doc.synced, "synced should round-trip");
+
+  const restoredData = restored.getData();
+  assert.strictEqual(restoredData.length, 1, "data should survive round-trip");
+  assert.strictEqual(restoredData[0].name, "item1", "data content should survive round-trip");
+});
+
+test("fromJSON prefers root over snapshot", () => {
+  const doc = new CollabJSON("[]", { clientId: "test-client" });
+  doc.addItem([0], { name: "before-snapshot" });
+  doc.commitOps();
+
+  const json = doc.toJSON();
+  // Simulate a state where snapshot is stale but root has newer data
+  json.snapshot = { _crdt_array_: true, items: {} };
+  // root should take precedence
+  const restored = CollabJSON.fromJSON(json);
+  const data = restored.getData();
+  assert.strictEqual(data.length, 1, "fromJSON should prefer root over snapshot");
+  assert.strictEqual(data[0].name, "before-snapshot");
+});
+
+test("fromSnapshot initializes document from snapshot and snapshotDvv", () => {
+  // Create a source doc and get its snapshot data
+  const source = new CollabJSON("[]", { clientId: "server" });
+  source.addItem([0], { name: "snap-item" });
+  source.commitOps();
+  source.prune(() => {}, null);
+
+  const snapshotData = JSON.parse(JSON.stringify(source.toJSON().root));
+  const snapshotDvv = Object.fromEntries(source.dvv);
+
+  const doc = CollabJSON.fromSnapshot(snapshotData, snapshotDvv, source.id);
+
+  assert.ok(doc.root, "fromSnapshot should set root");
+  assert.deepStrictEqual(Object.fromEntries(doc.snapshotDvv), snapshotDvv, "fromSnapshot should set snapshotDvv");
+  assert.deepStrictEqual(Object.fromEntries(doc.dvv), snapshotDvv, "fromSnapshot should initialize dvv from snapshotDvv");
+  assert.ok(doc.clock >= 0, "fromSnapshot should initialize clock");
+});
+
+test("fromOps replays operations to build state", () => {
+  // fromOps initializes with {} root, so test with object-based ops
+  const source = new CollabJSON("{}", { clientId: "c1" });
+  source.updateItem(["name"], "op-item");
+  source.commitOps();
+
+  const ops = source.history;
+  const doc = CollabJSON.fromOps(ops);
+
+  const data = doc.getData();
+  assert.strictEqual(data.name, "op-item", "fromOps should replay UPDATE_ITEM and produce correct data");
+});
+
+test("fromOps with empty/null returns empty document", () => {
+  const doc1 = CollabJSON.fromOps(null);
+  assert.deepStrictEqual(doc1.getData(), {}, "fromOps(null) should return empty doc");
+
+  const doc2 = CollabJSON.fromOps([]);
+  assert.deepStrictEqual(doc2.getData(), {}, "fromOps([]) should return empty doc");
+});
+
+test("fromSyncRequest creates document from sync request ops", () => {
+  // fromSyncRequest -> fromOps initializes with {} root
+  const source = new CollabJSON("{}", { clientId: "c1" });
+  source.updateItem(["name"], "sync-item");
+
+  const syncRequest = source.getSyncRequest();
+  const doc = CollabJSON.fromSyncRequest(syncRequest);
+
+  assert.ok(doc !== null, "fromSyncRequest should return a document");
+  const data = doc.getData();
+  assert.strictEqual(data.name, "sync-item", "fromSyncRequest should replay ops correctly");
+});
+
+test("fromSyncRequest returns null for empty request", () => {
+  const result1 = CollabJSON.fromSyncRequest(null);
+  assert.strictEqual(result1, null, "fromSyncRequest(null) should return null");
+
+  const result2 = CollabJSON.fromSyncRequest({ ops: [] });
+  assert.strictEqual(result2, null, "fromSyncRequest with empty ops should return null");
+});
+
+test("clear() resets root, history, dvv, snapshot, snapshotDvv, and ops", () => {
+  const doc = new CollabJSON("[]", { clientId: "c1" });
+  doc.addItem([0], { name: "to-be-cleared" });
+  doc.commitOps();
+
+  assert.ok(doc.history.length > 0, "history should have ops before clear");
+  assert.ok(doc.ops.length === 0 || doc.history.length > 0, "ops/history populated before clear");
+
+  doc.clear();
+
+  assert.deepStrictEqual(doc.getData(), {}, "root should be reset after clear()");
+  assert.strictEqual(doc.history.length, 0, "history should be empty after clear()");
+  assert.strictEqual(doc.ops.length, 0, "ops should be empty after clear()");
+  assert.strictEqual(doc.dvv.size, 0, "dvv should be empty after clear()");
+  assert.strictEqual(doc.snapshot, null, "snapshot should be null after clear()");
+  assert.strictEqual(doc.snapshotDvv.size, 0, "snapshotDvv should be empty after clear()");
+});
+
+test("purgeTombstones with minTimestamp preserves newer tombstones", () => {
+  const doc = new CollabJSON("[]", { clientId: "c1" });
+  doc.addItem([0], { name: "old-deleted" });
+  doc.addItem([1], { name: "new-deleted" });
+  doc.commitOps();
+
+  const data = doc.getData({ includeMetadata: true });
+  const oldId = data[0]._id;
+  const newId = data[1]._id;
+
+  // Delete both items but at different times
+  const oldTs = doc.clock + 1;
+  doc.applyOp({ type: "DELETE_ITEM", path: [], itemId: oldId, timestamp: oldTs, clientId: "c1" });
+
+  const newTs = doc.clock + 100;
+  doc.applyOp({ type: "DELETE_ITEM", path: [], itemId: newId, timestamp: newTs, clientId: "c1" });
+
+  // Purge only tombstones older than a midpoint
+  const midTs = oldTs + 50;
+  doc.purgeTombstones(doc.root, midTs);
+
+  // Access internal array structure to verify tombstones
+  const items = doc.root.items;
+  assert.ok(!items[oldId], "Old tombstone should be purged (updated < minTimestamp)");
+  assert.ok(items[newId] && items[newId]._deleted, "New tombstone should be preserved (updated >= minTimestamp)");
+});
+
+test("Concurrent delete-delete: two clients both delete same item converge", () => {
+  const client1 = new CollabJSON("[]", { clientId: "c1" });
+  client1.addItem([0], { name: "shared" });
+  client1.commitOps();
+
+  const client2 = CollabJSON.fromJSON(JSON.parse(JSON.stringify(client1.toJSON())), { clientId: "c2" });
+
+  // Both clients delete the same item
+  client1.deleteItem([0]);
+  client2.deleteItem([0]);
+
+  // Exchange ops
+  const ops1 = client1.ops;
+  const ops2 = client2.ops;
+
+  for (const op of ops2) {
+    client1.applyOp(op);
+  }
+  for (const op of ops1) {
+    client2.applyOp(op);
+  }
+
+  const data1 = client1.getData();
+  const data2 = client2.getData();
+  assert.strictEqual(data1.length, 0, "client1 should have empty array after concurrent deletes");
+  assert.strictEqual(data2.length, 0, "client2 should have empty array after concurrent deletes");
+});
+
+test("moveItem throws on out-of-bounds fromIndex", () => {
+  const doc = new CollabJSON("[]", { clientId: "c1" });
+  doc.addItem([0], { name: "A" });
+  doc.addItem([1], { name: "B" });
+
+  assert.throws(
+    () => doc.moveItem([], -1, 1),
+    /fromIndex out of bounds/,
+    "moveItem should throw for negative fromIndex"
+  );
+  assert.throws(
+    () => doc.moveItem([], 5, 1),
+    /fromIndex out of bounds/,
+    "moveItem should throw for fromIndex >= length"
+  );
+});
+
+test("moveItem throws on out-of-bounds toIndex", () => {
+  const doc = new CollabJSON("[]", { clientId: "c1" });
+  doc.addItem([0], { name: "A" });
+  doc.addItem([1], { name: "B" });
+
+  assert.throws(
+    () => doc.moveItem([], 0, -1),
+    /toIndex out of bounds/,
+    "moveItem should throw for negative toIndex"
+  );
+  assert.throws(
+    () => doc.moveItem([], 0, 10),
+    /toIndex out of bounds/,
+    "moveItem should throw for toIndex > length"
+  );
+});
+
+test("addItem throws on index out of bounds", () => {
+  const doc = new CollabJSON("[]", { clientId: "c1" });
+  doc.addItem([0], { name: "A" });
+
+  assert.throws(
+    () => doc.addItem([5], { name: "B" }),
+    /Index out of bounds/,
+    "addItem should throw when index > sortedItems.length"
+  );
+});
+
+test("updateItem on tombstoned path: update is ignored when delete is newer", () => {
+  const doc = new CollabJSON("[]", { clientId: "c1" });
+  doc.addItem([0], { name: "item1" });
+  doc.commitOps();
+
+  // Delete the item
+  doc.deleteItem([0]);
+
+  const dataBeforeUpdate = doc.getData();
+  assert.strictEqual(dataBeforeUpdate.length, 0, "Item should be deleted");
+
+  // Try to apply an older update to the deleted item
+  const data = doc.getData({ includeMetadata: true });
+  // Get the item id from internal structure
+  const internalItems = doc.root.items;
+  const itemIds = Object.keys(internalItems);
+  assert.strictEqual(itemIds.length, 1, "One tombstone exists");
+  const itemId = itemIds[0];
+  const tombstoneTs = internalItems[itemId].updated;
+
+  // Apply an older update — should be ignored
+  const staleTs = tombstoneTs - 1;
+  doc.applyOp({
+    type: "ADD_ITEM",
+    path: [],
+    itemId,
+    data: { name: "resurrected" },
+    sortKey: "m",
+    timestamp: staleTs,
+    clientId: "other",
+  });
+
+  const afterData = doc.getData();
+  assert.strictEqual(afterData.length, 0, "Stale ADD should not resurrect a tombstoned item");
+});
+
+test("Three-client convergence with DVV filtering", () => {
+  // Create initial state on server
+  const server = new CollabJSON("[]", { clientId: "server" });
+  server.addItem([0], { name: "initial" });
+  server.commitOps();
+
+  // Clone to three clients
+  const serverJson = JSON.parse(JSON.stringify(server.toJSON()));
+  const c1 = CollabJSON.fromJSON(serverJson, { clientId: "c1" });
+  const c2 = CollabJSON.fromJSON(serverJson, { clientId: "c2" });
+  const c3 = CollabJSON.fromJSON(serverJson, { clientId: "c3" });
+
+  // Each client makes a unique change
+  c1.addItem([1], { name: "from-c1" });
+  c2.addItem([1], { name: "from-c2" });
+  c3.addItem([1], { name: "from-c3" });
+
+  // Sync c1 with server
+  const syncReq1 = c1.getSyncRequest();
+  const syncRes1 = server.getSyncResponse(syncReq1);
+  c1.applySyncResponse(syncRes1);
+  server.commitOps();
+
+  // Sync c2 with server
+  const syncReq2 = c2.getSyncRequest();
+  const syncRes2 = server.getSyncResponse(syncReq2);
+  c2.applySyncResponse(syncRes2);
+  server.commitOps();
+
+  // Sync c3 with server
+  const syncReq3 = c3.getSyncRequest();
+  const syncRes3 = server.getSyncResponse(syncReq3);
+  c3.applySyncResponse(syncRes3);
+  server.commitOps();
+
+  // Sync c1 again to get c2 and c3 ops
+  const syncReq1b = c1.getSyncRequest();
+  const syncRes1b = server.getSyncResponse(syncReq1b);
+  c1.applySyncResponse(syncRes1b);
+
+  // Sync c2 again to get c1 and c3 ops
+  const syncReq2b = c2.getSyncRequest();
+  const syncRes2b = server.getSyncResponse(syncReq2b);
+  c2.applySyncResponse(syncRes2b);
+
+  // Sync c3 again to get c1 and c2 ops
+  const syncReq3b = c3.getSyncRequest();
+  const syncRes3b = server.getSyncResponse(syncReq3b);
+  c3.applySyncResponse(syncRes3b);
+
+  const names1 = c1.getData().map((i) => i.name).sort();
+  const names2 = c2.getData().map((i) => i.name).sort();
+  const names3 = c3.getData().map((i) => i.name).sort();
+  const namesServer = server.getData().map((i) => i.name).sort();
+
+  assert.deepStrictEqual(names1, namesServer, "c1 should converge with server");
+  assert.deepStrictEqual(names2, namesServer, "c2 should converge with server");
+  assert.deepStrictEqual(names3, namesServer, "c3 should converge with server");
+  assert.ok(namesServer.includes("from-c1"), "server should have c1 item");
+  assert.ok(namesServer.includes("from-c2"), "server should have c2 item");
+  assert.ok(namesServer.includes("from-c3"), "server should have c3 item");
+});
+
 runTests();

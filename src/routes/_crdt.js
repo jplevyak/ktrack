@@ -64,7 +64,7 @@ export class CollabJSON {
     // Combines physical time (in a rough integer sense via counter) with a client ID tie-breaker
     // to ensure total ordering of events across distributed systems.
     this.clock = Math.floor(this.clock) + 1;
-    return this.clock + this._idToFloat(this.id);
+    return this.clock + this._idToFloat(this.clientId);
   }
 
   _mergeClock(remoteTimestamp) {
@@ -303,9 +303,6 @@ export class CollabJSON {
 
       for (const key in source) {
         if (metaSource && metaSource[key] && metaSource[key]._deleted) {
-          if (includeMetadata) {
-            continue;
-          }
           continue;
         }
 
@@ -1008,7 +1005,7 @@ export class CollabJSON {
         }
 
         // LWW on the sortKey specifically.
-        if (op.timestamp > (itemToMove.updated || 0)) {
+        if (op.timestamp >= (itemToMove.updated || 0)) {
           itemToMove.sortKey = op.sortKey;
           itemToMove.updated = op.timestamp;
         }
@@ -1048,7 +1045,7 @@ export class CollabJSON {
           }
         }
 
-        if (targetMeta) {
+        if (targetMeta && op.timestamp > (targetMeta.updated || 0)) {
           targetMeta._deleted = true;
           targetMeta.updated = op.timestamp;
         }
@@ -1204,7 +1201,7 @@ export class CollabJSON {
       return doc;
     }
 
-    doc.root = state.snapshot || state.root || {};
+    doc.root = state.root || state.snapshot || {};
     doc.snapshot = state.snapshot;
     doc.snapshotDvv = new Map(Object.entries(state.snapshotDvv || {}));
 
