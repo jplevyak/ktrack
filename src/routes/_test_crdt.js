@@ -1245,7 +1245,7 @@ test("fromJSON prefers root over snapshot", () => {
 
   const json = doc.toJSON();
   // Simulate a state where snapshot is stale but root has newer data
-  json.snapshot = { [Symbol.for ? "__crdt_array" : "__crdt_array"]: true, items: {} };
+  json.snapshot = { _crdt_array_: true, items: {} };
   // root should take precedence
   const restored = CollabJSON.fromJSON(json);
   const data = restored.getData();
