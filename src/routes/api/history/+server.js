@@ -1,5 +1,3 @@
-import LevelPkg from "level";
-const { Level } = LevelPkg;
 import { prune_history, make_history } from "../../_util.js";
 import { do_post, do_upload } from "../_post.js";
 
