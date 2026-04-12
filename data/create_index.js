@@ -1,5 +1,5 @@
 import { create_elasticlunr } from "../src/routes/_elasticlunr.js";
-import * as fs from 'fs';
+import * as fs from "fs";
 
 var elasticlunr = create_elasticlunr();
 

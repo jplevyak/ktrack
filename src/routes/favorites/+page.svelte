@@ -1,5 +1,9 @@
 <script>
-  import { afterUpdate, onDestroy } from "svelte";
+  import { afterUpdate, onDestroy, onMount } from "svelte";
+
+  onMount(() => {
+    syncManager.syncIfNeeded();
+  });
   import Food from "../_food.svelte";
   import {
     today_store,
@@ -7,9 +11,9 @@
     favorites_store,
     profile_store,
     add_item,
-    sync_favorites,
     save_favorite,
     check_for_new_day,
+    syncManager,
   } from "../_stores.js";
   import { create_elasticlunr } from "../_elasticlunr.js";
 
@@ -22,7 +26,6 @@
   let added_count = 0;
   let editing = undefined;
   let editing_replace_index = undefined;
-  let force_sync_favorites = true;
   let profile = undefined;
   let today = undefined;
   let edit = undefined;
@@ -37,17 +40,18 @@
     favorites = value;
     create_index();
     update_results();
-    if (force_sync_favorites) {
-      force_sync_favorites = false;
-      sync_favorites(favorites, profile, true);
-    }
   });
   const unsubscribe_today = today_store.subscribe((t) => {
-    today = check_for_new_day(t, profile);
+    today = t;
   });
-  const unsubscribe_edit = edit_store.subscribe((value) => {
-    edit = value;
+  const unsubscribe_edit = edit_store.subscribe((e) => {
+    edit = e;
   });
+
+  const favorites_status = favorites_store.status;
+
+  $: (today, check_for_new_day(today, profile));
+
   onDestroy(() => {
     unsubscribe_today();
     unsubscribe_edit();
@@ -62,8 +66,9 @@
       this.saveDocument(false);
     });
     if (favorites != undefined) {
-      for (var i in favorites.items) {
-        index.addDoc({ i: i, name: favorites.items[i].name });
+      let favorites_data = favorites.getData();
+      for (var i in favorites_data) {
+        index.addDoc({ i: i, name: favorites_data[i].name });
       }
     }
   }
@@ -81,58 +86,51 @@
   }
 
   function update_results() {
+    let favorites_data = favorites.getData();
     results_map = undefined;
     if (search_value == undefined || search_value == "") {
-      results = [...favorites.items];
+      results = [...favorites_data];
       return;
     }
     results_map = new Map();
     if (!index) create_index();
     let found = index.search(search_value);
     results = [];
-    for (let f in found) {
-      results_map.set(f, found[f].ref);
-      results.push(favorites.items[found[f].ref]);
-    }
+    found.forEach((f, i) => {
+      results_map.set(i, f.ref);
+      results.push(favorites_data[f.ref]);
+    });
   }
 
   function save(favs) {
-    favs.updated = Date.now();
-    force_sync_favorites = true;
     favorites_store.set(favs);
   }
 
-  afterUpdate(() => {
-    if (editing == undefined) {
-      let search_box = document.getElementById("search_string");
-      function search_results() {
-        search_value = search_box.value;
-        update_results();
-      }
-      search_box.onchange = search_results;
-      document.getElementById("search").onclick = search_results;
-      document.getElementById("create").onclick = function () {
-        editing = make_item();
-      };
-      document.getElementById("clear_input").onclick = () => {
-        document.getElementById("search_string").value = "";
-        search_value = "";
-        update_results();
-      };
-    } else {
-      document.getElementById("cancel").onclick = function () {
-        editing_replace_index = undefined;
-        editing = undefined;
-      };
-      document.getElementById("save").onclick = function () {
-        let edited = { ...editing };
-        edited.updated = Date.now();
-        save_favorite(edited, profile, editing_replace_index);
-        editing_replace_index = undefined;
-        editing = undefined;
-      };
-    }
-  });
+  function search_results() {
+    // search_value is bound to the input, so just update results
+    update_results();
+  }
+
+  function create_favorite() {
+    editing = make_item();
+  }
+
+  function clear_search() {
+    search_value = "";
+    update_results();
+  }
+
+  function cancel_edit() {
+    editing_replace_index = undefined;
+    editing = undefined;
+  }
+
+  function save_edit() {
+    let edited = { ...editing };
+    save_favorite(edited, profile, editing_replace_index);
+    editing_replace_index = undefined;
+    editing = undefined;
+  }
 
   function do_msg(event) {
     if (event.status == "completed") return;
@@ -145,54 +143,43 @@
     if (change == "del") {
       let y = confirm("Do you want to delete the favorite?");
       if (!y) return;
-      item.updated = Date.now();
-      item.del = true;
+      let i = index;
+      if (results_map != undefined) {
+        i = results_map.get(index);
+      }
+      favorites.deleteItem([Number(i)]);
       save(favorites);
     } else if (change == "edit") {
       editing_replace_index = index;
-      if (results_map != undefined)
-        editing_replace_index = results_map.get(index);
+      if (results_map != undefined) editing_replace_index = results_map.get(index);
+      editing_replace_index = Number(editing_replace_index);
       let edit = { ...item };
-      delete edit.del;
       edit.source = "custom";
       editing = edit;
     } else if (change == "dup") {
       let edit = { ...item };
       edit.name = edit.name + " (dup)";
-      delete edit.del;
       edit.source = "custom";
       editing = edit;
     } else if (change == "up") {
       let i = index;
       if (results_map != undefined) i = results_map.get(index);
+      i = Number(i);
       let j = i - 1;
-      while (j >= 0) {
-        if (favorites.items[j].del == undefined) {
-          let favs = favorites;
-          let f = favorites.items[i];
-          f.updated = Date.now();
-          favs.items.splice(i, 1);
-          favs.items.splice(j, 0, f);
-          save(favs);
-          return;
-        }
-        j = j - 1;
+      if (j >= 0) {
+        favorites.moveItem([], i, i - 1);
+        save(favorites);
+        return;
       }
     } else if (change == "down") {
       let i = index;
       if (results_map != undefined) i = results_map.get(index);
+      i = Number(i);
       let j = i + 1;
-      while (j < favorites.items.length) {
-        if (favorites.items[j].del == undefined) {
-          let favs = favorites;
-          let f = favs.items[i];
-          f.updated = Date.now();
-          favs.items.splice(i, 1);
-          favs.items.splice(j, 0, f);
-          save(favs);
-          return;
-        }
-        j = j + 1;
+      if (j < favorites.getData().length) {
+        favorites.moveItem([], i, i + 1);
+        save(favorites);
+        return;
       }
     } else if (change > 0) {
       add_item(item, today, edit, profile);
@@ -206,81 +193,64 @@
 </svelte:head>
 
 {#if editing == undefined}
-  Search <input type="text" id="search_string" />
-  <button type="button" id="search">Search</button>
-  <button type="button" id="clear_input">Clear</button>
-  <button type="button" id="create">Create New Favorite</button>
+  Search <input
+    type="text"
+    id="search_string"
+    bind:value={search_value}
+    on:input={search_results}
+  />
+  <button type="button" id="search" on:click={search_results}>Search</button>
+  <button type="button" id="clear_input" on:click={clear_search}>Clear</button>
+  <button type="button" id="create" on:click={create_favorite}>Create New Favorite</button>
   &nbsp;&nbsp; Added: {added_count}
-  <br /><br />
+
+  <div style="min-height: 1.5em; margin-top: 0.25em;">
+    {#if $favorites_status && $favorites_status != "idle"}
+      <b>🟡 Unsaved changes: {$favorites_status}</b>
+    {:else}
+      &nbsp;
+    {/if}
+  </div>
+  <br />
   {#if favorites != undefined}
     {#each results as f, i}
-      {#if f.del == undefined}
-        <Food
-          name={f.name}
-          notes={f.notes}
-          index={i}
-          mcg={f.mcg}
-          fiber={f.fiber}
-          unit={f.unit}
-          servings={f.servings}
-          source={f.source}
-          use_edit="true"
-          use_dup="true"
-          use_add="true"
-          use_del="true"
-          use_move="true"
-          on:message={do_msg}
-        />
-      {/if}
+      <Food
+        name={f.name}
+        notes={f.notes}
+        index={i}
+        mcg={f.mcg}
+        fiber={f.fiber}
+        unit={f.unit}
+        servings={f.servings}
+        source={f.source}
+        use_edit="true"
+        use_dup="true"
+        use_add="true"
+        use_del="true"
+        use_move="true"
+        on:message={do_msg}
+      />
     {/each}
   {/if}
 {:else}
   <table>
-  <tbody>
-    <tr
-      ><th>Name</th><th
-        ><input class="val" type="text" bind:value={editing.name} /></th
-      ></tr
-    >
-    <tr
-      ><th>Notes</th><th
-        ><input class="val" type="text" bind:value={editing.notes} /></th
-      ></tr
-    >
-    <tr
-      ><th>mcg</th><th>
-        <input class="val" type="number" bind:value={editing.mcg} /></th
-      ></tr
-    >
-    <tr
-      ><th>fiber</th><th>
-        <input class="val" type="number" bind:value={editing.fiber} /></th
-      ></tr
-    >
-    <tr
-      ><th>Unit</th><th
-        ><input class="val" type="text" bind:value={editing.unit} /></th
-      ></tr
-    >
-    <tr
-      ><th>Servings</th><th
-        ><input
-          class="val"
-          type="number"
-          step="0.1"
-          bind:value={editing.servings}
-        /></th
-      ></tr
-    >
-    <tr
-      ><th>Source</th><th
-        ><input class="val" type="text" bind:value={editing.source} /></th
-      ></tr
-    >
-  </tbody>
+    <tbody>
+      <tr><th>Name</th><th><input class="val" type="text" bind:value={editing.name} /></th></tr>
+      <tr><th>Notes</th><th><input class="val" type="text" bind:value={editing.notes} /></th></tr>
+      <tr><th>mcg</th><th> <input class="val" type="number" bind:value={editing.mcg} /></th></tr>
+      <tr><th>fiber</th><th> <input class="val" type="number" bind:value={editing.fiber} /></th></tr
+      >
+      <tr><th>Unit</th><th><input class="val" type="text" bind:value={editing.unit} /></th></tr>
+      <tr
+        ><th>Servings</th><th
+          ><input class="val" type="number" step="0.1" bind:value={editing.servings} /></th
+        ></tr
+      >
+      <tr><th>Source</th><th><input class="val" type="text" bind:value={editing.source} /></th></tr>
+    </tbody>
   </table>
-  <br /><button type="button" id="cancel">cancel</button>
-  <button type="button" id="save">save</button>
+  <br /><button type="button" id="cancel" on:click={cancel_edit}>cancel</button>
+  <button type="button" id="save" on:click={save_edit}>save</button>
 {/if}
 
 <style>

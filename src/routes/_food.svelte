@@ -68,11 +68,14 @@
 
 <div class="food" style="line-height:25px">
   {name}{#if servings != undefined}, <b>{servings.toFixed(3)}</b> servings{/if} @
-  {mcg == undefined ? "unknown" : mcg} mcg/{unit}, {#if use_notes} {notes}, {/if}
-  {(fiber == undefined || fiber == "") ? "unknown" : fiber} g fiber/{unit}
+  {mcg == undefined ? "unknown" : mcg} mcg/{unit}, {#if use_notes}
+    {notes},
+  {/if}
+  {fiber == undefined || fiber == "" ? "unknown" : fiber} g fiber/{unit}
   {#if use_total}= {#if use_grams}{(grams * servings).toFixed(3)}g&nbsp;{/if}<b
       >{(mcg * servings).toFixed(3)}</b
-    > mcg{/if}{#if source}, {source} {/if}
+    > mcg{/if}{#if source}, {source}
+  {/if}
   {#if use_edit}<button on:click={edit}>edit</button>&nbsp{/if}
   {#if use_dup}<button on:click={dup}>dup</button>&nbsp{/if}
   <span style="font-size:100%; whitespace:nowrap; float:right;">
@@ -82,9 +85,12 @@
       <button on:click={up} class="but">^</button>
       <button on:click={down} class="but">v</button>
     {/if}
-    {#if use_dec} <button on:click={dec} class="but">&lt</button>{/if}
-    {#if use_inc} <button on:click={inc} class="but">&gt</button>{/if}
-    {#if use_add} <button on:click={inc} class="but">+</button>{/if}
+    {#if use_dec}
+      <button on:click={dec} class="but">&lt</button>{/if}
+    {#if use_inc}
+      <button on:click={inc} class="but">&gt</button>{/if}
+    {#if use_add}
+      <button on:click={inc} class="but">+</button>{/if}
   </span>
 </div>
 

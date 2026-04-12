@@ -186,7 +186,22 @@ for fdc_id, k in fdc_id2k.items():
 print('no_reverse_name', no_reverse_name)
 print('no_reverse_fdc_id', no_reverse_fdc_id)
 
-data = sorted(data, key=lambda x: x["name"])
+def remove_duplicates(a):
+    if not a:
+        return 0  # Handle empty list case
+    i = 0
+    for j in range(1, len(a)):
+        if a[j] != a[i]:
+            i += 1
+            a[i] = a[j]
+    del a[i+1:]
+    return i + 1
+
+data = sorted(data,key=lambda x: str(x));
+
+print('size', len(data));
+print('size without duplicates', remove_duplicates(data))
+print('new size', len(data));
 
 with open('_foods.json', 'w') as out:
     json.dump(data, out)

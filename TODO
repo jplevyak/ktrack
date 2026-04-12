@@ -1,0 +1,10 @@
+Extend the history to serveral hundred.
+Check the compression path the prune path
+Check the path which combines update operations to prevent repeated >>>> from blowing out history.
+- remove id and sortKey from the download information or better yet move
+them into the metadata so that they don't appear unless optionally requested
+in getData()
+- remove the 'metadata' subdivision for lists if that makes it similar to basic objects
+which have all the data in 'data' (similar to 'items').
+Store hashed passwords rather than plaintext
+The 'Final Upsert' logic in applyOp for UPDATE_ITEM only handles object wrappers. If the parentContainer is a CRDT array wrapper, the update will be ignored. This means updateItem cannot be used to append to an array by index if the index doesn't exist. While addItem is the preferred way to add to arrays, updateItem should ideally behave consistently across types or explicitly handle array upserts.

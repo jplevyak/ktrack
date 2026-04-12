@@ -30,11 +30,14 @@
     profile = p;
   });
   const unsubscribe_today = today_store.subscribe((t) => {
-    today = check_for_new_day(t, profile);
+    today = t;
   });
-  const unsubscribe_edit = edit_store.subscribe((value) => {
-    edit = value;
+  const unsubscribe_edit = edit_store.subscribe((e) => {
+    edit = e;
   });
+
+  $: (today, check_for_new_day(today, profile));
+
   onDestroy(() => {
     unsubscribe_profile();
     unsubscribe_today();
@@ -50,7 +53,9 @@
       }
       let found = search.search(search_box.value);
       results = [];
-      for (let f of found) results.push(foods[f.ref]);
+      let results_set = new Set();
+      for (let f of found) results_set.add(f.ref);
+      for (let f of results_set) results.push(foods[f]);
     }
     search_box.onchange = search_results;
     document.getElementById("search").onclick = search_results;

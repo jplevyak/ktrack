@@ -2,15 +2,12 @@
   import { onMount, onDestroy } from "svelte";
   import {
     logout,
-    reset_data,
+    syncManager,
     profile_store,
     save_profile,
     today_store,
-    sync_today,
     favorites_store,
-    sync_favorites,
     history_store,
-    sync_history,
   } from "../_stores.js";
   import { make_profile } from "../_util.js";
 
@@ -54,27 +51,65 @@
     unsubscribe_profile();
   });
 
-  function clear_data() {
-    let answer = confirm("Do you really want to delete all the local data? ");
-    if (!answer) return;
-    reset_data();
+  function download_json(filename, data) {
+    if (!data) return;
+    const blob = new Blob([JSON.stringify(data.getData(), null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 
-  function force_sync() {
-    sync_today(today, profile, true);
-    sync_favorites(favorites, profile, true);
-    sync_history(history, profile, true);
-    today = today;
-    favorites = favorites;
-    history = history;
+  function upload_json(name, store, file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        let data = JSON.parse(e.target.result);
+
+        // Preprocessing removed: ID generation handled by CRDT configuration
+
+        if (profile && profile.username && profile.password) {
+          const credentials = btoa(`${profile.username}:${profile.password}`);
+          const response = await fetch(`/api/${name}`, {
+            method: "PUT",
+            headers: {
+              Authorization: `Basic ${credentials}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(data),
+          });
+          if (response.ok) {
+            store.sync();
+          } else {
+            alert("Upload failed");
+          }
+        } else {
+          store.update((doc) => {
+            doc.updateItem([], data);
+            return doc;
+          });
+        }
+      } catch (error) {
+        console.error("Error uploading JSON:", error);
+        alert("Failed to upload JSON. Check console for details.");
+      }
+    };
+    reader.readAsText(file);
   }
 
-  onMount(() => {
+  onMount(async () => {
     let username_input = document.getElementById("username");
     let password_input = document.getElementById("password");
     let old_password_input = document.getElementById("old_password");
     let save = document.getElementById("save");
-    function changed() {
+    async function changed() {
       if (profile == undefined) {
         console.log("profile undefined");
         return;
@@ -90,15 +125,11 @@
         profile.username = username_input.value;
         profile.password = password_input.value;
         profile.old_password = old_password_input.value;
-        profile.updated = Date.now();
-        save_profile(profile);
-        force_sync();
+        await save_profile(profile);
       }
     }
     save.onclick = changed;
     document.getElementById("logout").onclick = logout;
-    document.getElementById("reset").onclick = clear_data;
-    document.getElementById("sync").onclick = force_sync;
   });
 </script>
 
@@ -115,67 +146,54 @@
 </ul>
 
 <h1>Profile</h1>
-Add username and password to store data on the ktrack server. Users concerned about
-privacy should run their own server. Contact server administration if the password
-is lost.
+Add username and password to store data on the ktrack server. Users concerned about privacy should run
+their own server. Contact server administration if the password is lost.
 <br />
 <br />
 {#if profile != undefined}
   Status: <b>{profile.message}</b><br />
   Username: <input type="text" id="username" value={profile.username} /><br />
-  Password: <input type="password" id="password" value={profile.password} /><br
-  />
+  Password: <input type="password" id="password" value={profile.password} /><br />
   Old Password (when updating Password)
   <input type="text" id="old_password" value={profile.old_password} /><br />
   <button type="button" id="save">Login/Save</button>
 {/if}
 <input type="button" id="logout" value="Logout" />
-<input type="button" id="reset" value="Reset All Data" />
-<input type="button" id="sync" value="Force Sync All Data" />
+<button on:click={() => syncManager.syncAll(true)}>Sync</button>
 <br /><br />
-Today
-<ul>
-  <li>
-    Server Check Time: {today.server_checked
-      ? new Date(today.server_checked).toString()
-      : "unsynced"}
-  </li>
-  <li>
-    Server Sync Time: {today.server_synced
-      ? new Date(today.server_synced).toString()
-      : "unsynced"}
-  </li>
-</ul>
-Favorites
-<ul>
-  <li>
-    Server Check Time: {favorites.server_checked
-      ? new Date(favorites.server_checked).toString()
-      : "unsynced"}
-  </li>
-  <li>
-    Server Sync Time: {favorites.server_synced
-      ? new Date(favorites.server_synced).toString()
-      : "unsynced"}
-  </li>
-</ul>
-History
-<ul>
-  <li>
-    Server Check Time: {history.server_checked
-      ? new Date(history.server_checked).toString()
-      : "unsynced"}
-  </li>
-  <li>
-    Server Sync Time: {history.server_synced
-      ? new Date(history.server_synced).toString()
-      : "unsynced"}
-  </li>
-</ul>
+Today <button on:click={() => download_json("today.json", today)}>Download</button>
+<input
+  type="file"
+  id="upload_today"
+  style="display:none"
+  accept=".json"
+  on:change={(e) => upload_json("today", today_store, e.target.files[0])}
+/>
+<button on:click={() => document.getElementById("upload_today").click()}>Upload</button><br />
+
+Favorites <button on:click={() => download_json("favorites.json", favorites)}>Download</button>
+<input
+  type="file"
+  id="upload_favorites"
+  style="display:none"
+  accept=".json"
+  on:change={(e) => upload_json("favorites", favorites_store, e.target.files[0])}
+/>
+<button on:click={() => document.getElementById("upload_favorites").click()}>Upload</button><br />
+
+History <button on:click={() => download_json("history.json", history)}>Download</button>
+<input
+  type="file"
+  id="upload_history"
+  style="display:none"
+  accept=".json"
+  on:change={(e) => upload_json("history", history_store, e.target.files[0])}
+/>
+<button on:click={() => document.getElementById("upload_history").click()}>Upload</button><br />
+
+<br />
+Server Check Time: {today && today.checked ? new Date(today.checked).toString() : "unsynced"}<br />
+Server Sync Time: {today && today.synced ? new Date(today.synced).toString() : "unsynced"}
 
 <style>
-  ul {
-    margin: 0 0 1em 0;
-    line-height: 1.5;
-  }
 </style>

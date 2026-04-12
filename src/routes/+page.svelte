@@ -1,15 +1,19 @@
 <script>
   import { goto } from "$app/navigation";
-  import { afterUpdate, onDestroy } from "svelte";
+  import { afterUpdate, onDestroy, onMount } from "svelte";
   import Food from "./_food.svelte";
+
+  onMount(() => {
+    syncManager.syncIfNeeded();
+  });
   import {
     weekdays,
     months,
-    compare_date,
     get_total,
     get_total_fiber,
     make_today,
     compute_averages,
+    get_date_info,
   } from "./_util.js";
   import {
     today_store,
@@ -19,7 +23,8 @@
     save_today,
     save_favorite,
     save_history,
-    sync_today,
+    check_for_new_day,
+    syncManager,
   } from "./_stores.js";
 
   let total = 0;
@@ -30,15 +35,15 @@
   let profile = undefined;
   let editing = undefined;
   let editing_index = undefined;
-  let server_checked = false;
   let resolution = 0.0001;
   let edit = undefined;
   let day = undefined;
 
+  // Access the status store from the custom store object
+  const today_status = today_store.status;
+
   // straddle all small moves.
-  let stops = [
-    0.2, 0.25, 0.3, 0.3333333333, 0.4, 0.5, 0.6, 0.6666666666, 0.7, 0.75, 0.8,
-  ];
+  let stops = [0.2, 0.25, 0.3, 0.3333333333, 0.4, 0.5, 0.6, 0.6666666666, 0.7, 0.75, 0.8];
   let rstops = [...stops].sort((x, y) => y - x);
   let small_stops = [0.0, 0.015625, 0.03125, 0.0625, 0.1, 0.125, 0.2];
   let rsmall_stops = [...small_stops].sort((x, y) => y - x);
@@ -47,75 +52,62 @@
     profile = p;
   });
   const unsubscribe_today = today_store.subscribe((t) => {
-    let new_day = make_today();
-    if (t.year == undefined || compare_date(t, new_day) < 0) {
-      save_today(new_day, profile);
-      day = new_day;
-    } else {
-      today = t;
-      if (!server_checked) {
-        server_checked = true;
-        sync_today(today, profile);
-        save_history(today, profile);
-      }
-      if (edit == undefined) day = today;
-      else day = edit;
-    }
+    today = t;
   });
   const unsubscribe_history = history_store.subscribe((value) => {
     history = value;
   });
 
   const unsubscribe_edit = edit_store.subscribe((d) => {
-    if (d != undefined) {
-      if (Date.now() - d.start_edit > 10 * 60 * 1000) {
-        // 10 min.
-        edit_store.update(function (d) {
-          return undefined;
-        });
+    let edit_data = d ? d.getData() : undefined;
+    if (edit_data != undefined && edit_data.start_edit) {
+      if (Date.now() - edit_data.start_edit > 10 * 60 * 1000 /* 10 min */) {
+        edit_store.set(undefined);
         d = undefined;
       }
     }
     edit = d;
-    if (edit == undefined) day = today;
-    else day = edit;
   });
   onDestroy(() => {
     unsubscribe_today();
     unsubscribe_profile();
     unsubscribe_edit();
+    unsubscribe_history();
   });
 
-  $: averages = compute_averages(history);
+  $: (today, check_for_new_day(today, profile));
+  $: day = edit || today;
+  $: date_info = day ? get_date_info(day.getData()) : null;
+  $: all_items = day ? day.getData().items : [];
+  $: food_items = all_items.filter((item) => typeof item.mcg !== "undefined");
+  $: total = get_total(all_items);
+  $: [total_fiber, fiber_unknown] = get_total_fiber(all_items);
+  $: averages =
+    history && history.getData ? compute_averages(history.getData()) || [0, 0, 0] : [0, 0, 0];
 
-  function save_item(item) {
-    item.updated = Date.now();
-    day.updated = item.updated;
-    if (compare_date(day, today) == 0) {
+  function save_day() {
+    if (edit == undefined) {
       save_today(day, profile);
     } else {
-      save_history(day, profile);
+      edit_store.set(day);
     }
   }
 
-  afterUpdate(() => {
-    if (editing != undefined) {
-      document.getElementById("cancel").onclick = function () {
-        editing = undefined;
-      };
-      document.getElementById("save").onclick = function () {
-        day.items[editing_index] = editing;
-        save_item(editing);
-        editing = undefined;
-      };
-    }
-    if (edit != undefined) {
-      document.getElementById("done").onclick = function () {
-        edit_store.set(undefined);
-        goto("/history");
-      };
-    }
-  });
+  function cancel_edit() {
+    editing = undefined;
+  }
+
+  function save_edit() {
+    day.updateItem(["items", editing_index], editing);
+    save_day();
+    editing = undefined;
+  }
+
+  function done_edit() {
+    save_history(day, profile);
+    edit_store.set(undefined);
+    goto("/history");
+  }
 
   // Move to p2 if between p1 and p2.
   function fix_change(x, p1, p2) {
@@ -135,8 +127,7 @@
   function get_change(servings, change) {
     let fractional_part = servings - Math.floor(servings);
     let s = change > 0 ? stops : rstops;
-    if (servings <= 0.2 + resolution)
-      s = change > 0 ? small_stops : rsmall_stops;
+    if (servings <= 0.2 + resolution) s = change > 0 ? small_stops : rsmall_stops;
     let r;
     for (let i = 0; i < s.length - 1; i++)
       if ((r = fix_change(fractional_part, s[i], s[i + 1]))) return r;
@@ -146,83 +137,116 @@
   }
 
   function do_msg(event) {
-    if (event.status == "completed") return;
-    let index = event.detail.index;
-    if (index < 0 || index >= day.items.length) {
+    if (event.status == "completed" || !day) return;
+
+    const index_in_food_items = event.detail.index;
+    if (index_in_food_items < 0 || index_in_food_items >= food_items.length) {
       return;
     }
+
+    const item_data = food_items[index_in_food_items];
+    const original_index = all_items.findIndex((item) => item === item_data);
+    if (original_index === -1) return;
+
     let change = event.detail.change;
-    let item = day.items[index];
+
     if (change == "del") {
-      item.del = true;
-      save_item(item);
-    } else if (event.detail.change == "fav") {
-      save_favorite(item, profile);
-    } else if (event.detail.change == "edit") {
-      editing = { ...item };
-      editing_index = index;
+      day.deleteItem(["items", original_index]);
+      save_day();
+    } else if (change == "fav") {
+      save_favorite(item_data, profile);
+    } else if (change == "edit") {
+      editing = { ...item_data };
+      editing_index = original_index;
     } else {
-      change = get_change(item.servings, change);
-      item.servings += change;
+      let servings_change = get_change(item_data.servings, change);
       // round to prevent small errors from accumulating.
-      item.servings = parseFloat(item.servings.toFixed(6));
-      save_item(item);
+      let new_servings = parseFloat((item_data.servings + servings_change).toFixed(6));
+      day.updateItem(["items", original_index, "servings"], new_servings);
+      save_day();
     }
   }
-
-  $: total = get_total(day);
-  $: [total_fiber, fiber_unknown] = get_total_fiber(day);
 </script>
 
 <svelte:head>
   <title>KTrack - Day</title>
 </svelte:head>
 
-Averages [3, 5, 7] days: [{averages[0].toFixed(1)}, {averages[1].toFixed(1)}, {averages[2].toFixed(
-  1
-)}]<br />
+Averages [3, 5, 7] days: [{(averages[0] || 0).toFixed(1)}, {(averages[1] || 0).toFixed(1)}, {(
+  averages[2] || 0
+).toFixed(1)}]<br />
 <b
-  >Date: {weekdays[day.day]}
-  {months[day.month]}
-  {day.date}, {day.year}
+  >Date: {#if date_info}{weekdays[date_info.day]}
+    {months[date_info.month]}
+    {date_info.date}, {date_info.year}{/if}
   {#if edit != undefined}<span style="color:red">Editing History</span>
-    <button type="button" id="done">done</button>{/if}
-</b><br /><br />
+    <button type="button" id="done" on:click={done_edit}>done</button>{/if}
+</b>
+<div style="min-height: 1.5em; margin-top: 0.25em;">
+  {#if $today_status && $today_status != "idle"}
+    <b>🟡 Unsaved changes: {$today_status}</b>
+  {:else}
+    &nbsp;
+  {/if}
+</div>
+<br />
 {#if editing == undefined}
-  {#each day.items as f, i}
-    {#if f.del == undefined}
-      <Food
-        name={f.name}
-        notes={f.notes}
-        index={i}
-        mcg={f.mcg}
-        fiber={f.fiber}
-        unit={f.unit}
-        servings={f.servings}
-        source={f.source}
-        use_edit="true"
-        use_fav="true"
-        use_dec="true"
-        use_inc="true"
-        use_del="true"
-        on:message={do_msg}
-      />
-    {/if}
+  {#each food_items as f, i}
+    <Food
+      name={f.name}
+      notes={f.notes}
+      index={i}
+      mcg={f.mcg}
+      fiber={f.fiber}
+      unit={f.unit}
+      servings={f.servings}
+      source={f.source}
+      use_edit="true"
+      use_fav="true"
+      use_dec="true"
+      use_inc="true"
+      use_del="true"
+      on:message={do_msg}
+    />
   {/each}
-  Total: {total.toFixed(2)} Total fiber: {total_fiber.toFixed(2)} {#if fiber_unknown} * some unknown * {/if}
+  Total: {total.toFixed(2)} Total fiber: {total_fiber.toFixed(2)}
+  {#if fiber_unknown}
+    * some unknown *
+  {/if}
 {:else}
   <table>
-    <colgroup> <col ><col > </colgroup>
+    <colgroup> <col /><col /> </colgroup>
     <tbody>
-    <tr><th>Name</th><th><input class="val" type="text" bind:value={editing.name} readonly /></th></tr>
-    <tr><th>Notes</th><th><input class="val" type="text" bind:value={editing.notes} /></th></tr>
-    <tr><th>mcg</th><th><input class="val" type="number" bind:value={editing.mcg} readonly /></th></tr>
-    <tr><th>fiber</th><th><input class="val" type="number" bind:value={editing.fiber} readonly /></th></tr>
-    <tr><th>Unit</th><th><input class="val" type="text" bind:value={editing.unit} readonly /></th></tr>
-    <tr><th>Servings</th><th ><input class="val" type="number" step="0.1" bind:value={editing.servings} /></th></tr>
-    <tr><th>Source</th><th ><input class="val" type="text" bind:value={editing.source} readonly /></th></tr>
+      <tr
+        ><th>Name</th><th><input class="val" type="text" bind:value={editing.name} readonly /></th
+        ></tr
+      >
+      <tr><th>Notes</th><th><input class="val" type="text" bind:value={editing.notes} /></th></tr>
+      <tr
+        ><th>mcg</th><th><input class="val" type="number" bind:value={editing.mcg} readonly /></th
+        ></tr
+      >
+      <tr
+        ><th>fiber</th><th
+          ><input class="val" type="number" bind:value={editing.fiber} readonly /></th
+        ></tr
+      >
+      <tr
+        ><th>Unit</th><th><input class="val" type="text" bind:value={editing.unit} readonly /></th
+        ></tr
+      >
+      <tr
+        ><th>Servings</th><th
+          ><input class="val" type="number" step="0.1" bind:value={editing.servings} /></th
+        ></tr
+      >
+      <tr
+        ><th>Source</th><th
+          ><input class="val" type="text" bind:value={editing.source} readonly /></th
+        ></tr
+      >
     </tbody>
   </table>
-  <br /><button type="button" id="cancel">cancel</button>
-  <button type="button" id="save">save</button>
+  <br /><button type="button" id="cancel" on:click={cancel_edit}>cancel</button>
+  <button type="button" id="save" on:click={save_edit}>save</button>
 {/if}
