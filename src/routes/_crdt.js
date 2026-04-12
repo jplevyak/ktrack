@@ -1161,6 +1161,9 @@ export class CollabJSON {
 
           // Ensure structure
           // If parentContainer is Object Wrapper
+          // NOTE: The 'Final Upsert' logic in applyOp for UPDATE_ITEM only handles object wrappers. If the parentContainer is a CRDT array wrapper,
+          // the update will be ignored. This means updateItem cannot be used to append to an array by index if the index doesn't exist.
+          // While addItem is the preferred way to add to arrays, updateItem should ideally behave consistently across types or explicitly handle array upserts.
           if (parentContainer.data && !parentContainer.sortKey && !parentContainer[CRDT_ARRAY_MARKER]) {
             parentContainer.data[finalKey] = this._plainToCrdt(op.data, op.timestamp, parentContainer.data[finalKey]);
             parentContainer.metadata ||= {};
