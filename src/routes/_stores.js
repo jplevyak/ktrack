@@ -176,7 +176,7 @@ export function synced_store(key, initialValue, sync, fromJSON) {
 }
 
 export const index_store = writable(undefined);
-export const edit_store = local_writable("edit", undefined);
+export const edit_store = synced_store("edit", undefined, sync_dummy, collab_from_json);
 
 async function sync_profile(profile) {
   if (profile.password == "") {
