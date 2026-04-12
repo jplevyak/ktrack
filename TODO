@@ -5,4 +5,4 @@ Check the path which combines update operations to prevent repeated >>>> from bl
 them into the metadata so that they don't appear unless optionally requested
 in getData()
 - remove the 'metadata' subdivision for lists if that makes it similar to basic objects
-which have all the data in 'data' (similar to 'items'.
+which have all the data in 'data' (similar to 'items').
