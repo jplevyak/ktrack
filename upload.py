@@ -66,7 +66,7 @@ def upload(url, username, password, filename, convert_fav=False, convert_hist=Fa
         data = convert_legacy_history(data)
     
     # Use HTTP Basic Authentication
-    response = requests.put(url, json=data, auth=(username, password))
+    response = requests.put(url, json=data, auth=(username, password), timeout=30)
     
     if response.status_code == 200:
         print(f"Successfully uploaded {filename}")
