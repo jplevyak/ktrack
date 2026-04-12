@@ -1,6 +1,3 @@
-import LevelPkg from "level";
-const { Level } = LevelPkg;
-import { error } from "@sveltejs/kit";
 import { CollabJSON } from "../_crdt.js";
 
 import { profile } from "./_dbs.js";
@@ -83,8 +80,10 @@ export async function do_upload(req, dbname, db, prune, defaultJSON) {
   }
 
   const base64Credentials = authHeader.split(" ")[1];
-  const credentials = atob(base64Credentials);
-  const [username, password] = credentials.split(":");
+  const credentials = Buffer.from(base64Credentials, "base64").toString("utf8");
+  const colonIndex = credentials.indexOf(":");
+  const username = credentials.slice(0, colonIndex);
+  const password = credentials.slice(colonIndex + 1);
 
   if (!username || !password) {
     return new Response(JSON.stringify({ err: "Invalid credentials format" }), { status: 401 });
