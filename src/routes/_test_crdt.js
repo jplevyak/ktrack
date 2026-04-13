@@ -1530,4 +1530,29 @@ test("Three-client convergence with DVV filtering", () => {
   assert.ok(namesServer.includes("from-c3"), "server should have c3 item");
 });
 
+test("updateItem as upsert for array", () => {
+  const doc = new CollabJSON("[]");
+  doc.updateItem([0], "first");
+  assert.deepStrictEqual(doc.getData(), ["first"]);
+
+  doc.updateItem([1], "second");
+  assert.deepStrictEqual(doc.getData(), ["first", "second"]);
+
+  // Nested upsert
+  const objDoc = new CollabJSON("{}");
+  objDoc.updateItem(["a", 0], "nested-first");
+  // Note: currently updateItem creates objects for missing path segments.
+  // So 'a' will be an object. Then it tries to set property '0' in it.
+  // If we want 'a' to be an array, we'd need more logic in applyOp traversal.
+  // But let's check current behavior.
+  const data = objDoc.getData();
+  assert.deepStrictEqual(data.a["0"], "nested-first");
+});
+
+test("updateItem as upsert for existing array", () => {
+  const doc = new CollabJSON('["a", "b"]');
+  doc.updateItem([2], "c");
+  assert.deepStrictEqual(doc.getData(), ["a", "b", "c"]);
+});
+
 runTests();

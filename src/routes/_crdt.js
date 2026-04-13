@@ -1161,13 +1161,52 @@ export class CollabJSON {
 
           // Ensure structure
           // If parentContainer is Object Wrapper
-          // NOTE: The 'Final Upsert' logic in applyOp for UPDATE_ITEM only handles object wrappers. If the parentContainer is a CRDT array wrapper,
-          // the update will be ignored. This means updateItem cannot be used to append to an array by index if the index doesn't exist.
-          // While addItem is the preferred way to add to arrays, updateItem should ideally behave consistently across types or explicitly handle array upserts.
-          if (parentContainer.data && !parentContainer.sortKey && !parentContainer[CRDT_ARRAY_MARKER]) {
-            parentContainer.data[finalKey] = this._plainToCrdt(op.data, op.timestamp, parentContainer.data[finalKey]);
+          if (
+            parentContainer.data &&
+            !parentContainer.sortKey &&
+            !parentContainer[CRDT_ARRAY_MARKER]
+          ) {
+            parentContainer.data[finalKey] = this._plainToCrdt(
+              op.data,
+              op.timestamp,
+              parentContainer.data[finalKey],
+              op.path
+            );
             parentContainer.metadata ||= {};
             parentContainer.metadata[finalKey] = { updated: op.timestamp, _deleted: false };
+          } else if (parentContainer[CRDT_ARRAY_MARKER]) {
+            // Final Upsert for Arrays: allow updateItem to act as an upsert/append by index.
+            const index = typeof finalKey === "number" ? finalKey : parseInt(finalKey);
+            if (!isNaN(index)) {
+              const sortedItems = this._getSortedItems(parentContainer);
+              // We only handle it if it's within bounds for an append or if it's an existing index
+              // that somehow wasn't found (though node branch usually handles that).
+              // If we are here, it's because 'node' was null.
+              if (index >= 0 && index <= sortedItems.length) {
+                const previousItem = sortedItems[index - 1] || null;
+                const nextItem = sortedItems[index] || null;
+                const previousKey = previousItem ? previousItem.sortKey : null;
+                const nextKey = nextItem ? nextItem.sortKey : null;
+                const newSortKey = this._generateSortKey(previousKey, nextKey);
+
+                // Use op.itemId if provided (it might have been resolved by _applyAndStore)
+                // or generate a deterministic one based on the operation.
+                const newItemId = op.itemId || `${op.clientId}-${op.timestamp}`;
+
+                let item = parentContainer.items[newItemId];
+                item ||= parentContainer.items[newItemId] = { id: newItemId };
+
+                if (!item.updated || op.timestamp >= item.updated) {
+                  item.data = this._plainToCrdt(op.data, op.timestamp, item.data, [
+                    ...op.path,
+                    newItemId,
+                  ]);
+                  item.sortKey = newSortKey;
+                  item.updated = op.timestamp;
+                  item._deleted = false;
+                }
+              }
+            }
           }
         }
 
