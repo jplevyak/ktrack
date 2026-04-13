@@ -35,7 +35,7 @@ Returns the current state of the document as a plain JavaScript object or array.
 
 - `path` (Array, optional): A path array to retrieve a specific subtree or value. If omitted, returns the entire document.
 - `options` (Object, optional):
-    - `includeMetadata` (Boolean): If `true`, injects system fields (`_id`, `_sortKey`, `_updated`, `_deleted`) into the returned objects for debugging or advanced usage.
+  - `includeMetadata` (Boolean): If `true`, injects system fields (`_id`, `_sortKey`, `_updated`, `_deleted`) into the returned objects for debugging or advanced usage.
 
 ### `addItem(path, data, itemId)`
 

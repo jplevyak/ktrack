@@ -131,7 +131,7 @@ export function createSyncedStore(key, initialValue, sync, fromJSON, deps) {
   } = writable(initialValue, () => {
     if (!browser) return;
     // We rely on the manager's global interval now, or we can ensure it's started
-    return () => { };
+    return () => {};
   });
 
   // Helper methods for the manager
@@ -306,7 +306,7 @@ export function save_history(day, profile, stores) {
         ...day_data,
       },
       sortKey,
-      day_data.timestamp
+      day_data.timestamp,
     );
 
     const limit = merge_history_limit || 50;
@@ -385,7 +385,7 @@ export function check_for_new_day(t, profile, stores) {
       // Check if today is already in history to avoid redundant "dirty" updates
       const history_data = history.getData();
       const t_data = t.getData();
-      const exists = history_data.some(item => item.timestamp === t_data.timestamp);
+      const exists = history_data.some((item) => item.timestamp === t_data.timestamp);
 
       if (!exists) {
         save_history(t, profile, stores);

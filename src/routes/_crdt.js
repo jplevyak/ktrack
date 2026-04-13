@@ -210,7 +210,7 @@ export class CollabJSON {
       // Create Wrapped Object Structure:
       // { data: { ...usersFields }, metadata: { ...systemFields } }
       // This strict separation prevents user keys from colliding with system metadata.
-      // CRITICAL: We enforce strict {data, metadata} structure for objects. 
+      // CRITICAL: We enforce strict {data, metadata} structure for objects.
       // Unlike "plain" JSON, we never store user keys directly on the node to ensure metadata fields
       // (like _ts) are never overwritten by user data with the same name.
 
@@ -225,7 +225,6 @@ export class CollabJSON {
       for (const key in data) {
         const existingChild = existingData[key] || null;
 
-
         // Resolve existing metadata, handling default _ts
         let meta = existingMeta[key];
         if (!meta && existingChild && existingMeta._ts) {
@@ -238,7 +237,10 @@ export class CollabJSON {
           wrapper.metadata[key] = meta;
         } else {
           // Incoming is newer.
-          wrapper.data[key] = this._plainToCrdt(data[key], timestamp, existingChild, [...path, key]);
+          wrapper.data[key] = this._plainToCrdt(data[key], timestamp, existingChild, [
+            ...path,
+            key,
+          ]);
           wrapper.metadata[key] = { updated: timestamp, _deleted: false };
         }
       }
@@ -591,7 +593,7 @@ export class CollabJSON {
         }
       }
     } else {
-      const source = (actualNode.data && !actualNode.sortKey) ? actualNode.data : actualNode;
+      const source = actualNode.data && !actualNode.sortKey ? actualNode.data : actualNode;
       for (const key in source) {
         if (key === "metadata") {
           continue;
@@ -619,8 +621,8 @@ export class CollabJSON {
 
   /**
    * Adds or updates an item in a CRDT List (Array).
-   * 
-   * @param {string[]} path - Path to the ITEM itself (e.g. ['foo', 'items', 'item_id']). 
+   *
+   * @param {string[]} path - Path to the ITEM itself (e.g. ['foo', 'items', 'item_id']).
    *                          NOTE: This method automatically slices the last segment off to get the parent Array path.
    * @param {Object} data - The content of the item.
    * @param {number|null} sortKey - Optional fractional index for ordering.
@@ -651,7 +653,8 @@ export class CollabJSON {
     if (targetId in items && !items[targetId]._deleted) {
       const existingItem = items[targetId];
 
-      const sortKeyMatches = (sortKey === undefined || sortKey === null) || (existingItem.sortKey === sortKey);
+      const sortKeyMatches =
+        sortKey === undefined || sortKey === null || existingItem.sortKey === sortKey;
 
       if (sortKeyMatches) {
         // Smart Update: Diff the data against the existing item's data
@@ -686,7 +689,6 @@ export class CollabJSON {
     }
 
     const index = keyOrIndex;
-
 
     const result = this._traverse(parentPath);
     if (!result || !result.node || !result.node[CRDT_ARRAY_MARKER]) {
@@ -833,7 +835,11 @@ export class CollabJSON {
     // If data is not object, or node is not object, or array mismatch:
     // Full replace necessary for that specific leaf.
     const isDataObj = typeof data === "object" && data !== null && !Array.isArray(data);
-    const isNodeObj = typeof current === "object" && current !== null && !Array.isArray(current) && !current[CRDT_ARRAY_MARKER];
+    const isNodeObj =
+      typeof current === "object" &&
+      current !== null &&
+      !Array.isArray(current) &&
+      !current[CRDT_ARRAY_MARKER];
 
     if (!isDataObj || !isNodeObj) {
       // Simple equality check to avoid redundant leaf update
@@ -862,7 +868,8 @@ export class CollabJSON {
     // A. Recursively Check Properties in Data
     for (const key in data) {
       const subPath = [...path, key];
-      if (key in innerData && !this._isDeleted(source, key)) { // Check deletion on Wrapper
+      if (key in innerData && !this._isDeleted(source, key)) {
+        // Check deletion on Wrapper
         // Exists: Recurse
         this._generateDiffOps(subPath, data[key], innerData[key]);
       } else {
@@ -925,7 +932,7 @@ export class CollabJSON {
         }
       }
     } else {
-      const source = (node.data && !node.sortKey) ? node.data : node;
+      const source = node.data && !node.sortKey ? node.data : node;
       for (const key in source) {
         if (key === "metadata") {
           continue;
@@ -1005,9 +1012,17 @@ export class CollabJSON {
         }
 
         // LWW on the sortKey specifically.
-        if (op.timestamp >= (itemToMove.updated || 0)) {
+        const currentUpdated = itemToMove.updated || 0;
+        const currentClientId = itemToMove.clientId || "";
+
+        const wins =
+          op.timestamp > currentUpdated ||
+          (op.timestamp === currentUpdated && op.clientId > currentClientId);
+
+        if (wins) {
           itemToMove.sortKey = op.sortKey;
           itemToMove.updated = op.timestamp;
+          itemToMove.clientId = op.clientId;
         }
 
         break;
@@ -1036,18 +1051,38 @@ export class CollabJSON {
 
           // Logic for Wrapped Object
           let targetUpdated = 0;
+          let targetClientId = "";
           if (container.metadata[key]) {
-            targetUpdated = container.metadata[key].updated;
+            targetUpdated = container.metadata[key].updated || 0;
+            targetClientId = container.metadata[key].clientId || "";
           }
 
-          if (op.timestamp > targetUpdated) {
-            container.metadata[key] = { updated: op.timestamp, _deleted: true };
+          const wins =
+            op.timestamp > targetUpdated ||
+            (op.timestamp === targetUpdated && op.clientId > targetClientId);
+
+          if (wins) {
+            container.metadata[key] = {
+              updated: op.timestamp,
+              clientId: op.clientId,
+              _deleted: true,
+            };
           }
         }
 
-        if (targetMeta && op.timestamp > (targetMeta.updated || 0)) {
-          targetMeta._deleted = true;
-          targetMeta.updated = op.timestamp;
+        if (targetMeta) {
+          const targetUpdated = targetMeta.updated || 0;
+          const targetClientId = targetMeta.clientId || "";
+
+          const wins =
+            op.timestamp > targetUpdated ||
+            (op.timestamp === targetUpdated && op.clientId > targetClientId);
+
+          if (wins) {
+            targetMeta._deleted = true;
+            targetMeta.updated = op.timestamp;
+            targetMeta.clientId = op.clientId;
+          }
         }
 
         break;
@@ -1061,26 +1096,33 @@ export class CollabJSON {
 
         const updateRes = this._traverse(op.path);
         if (updateRes && updateRes.parent) {
-
           const { parent, key, node } = updateRes;
 
           let itemUpdated = 0;
+          let itemClientId = "";
           if (parent[CRDT_ARRAY_MARKER]) {
             itemUpdated = node ? node.updated : 0;
+            itemClientId = node ? node.clientId : "";
           } else {
             // Object Wrapper
             if (parent.metadata && parent.metadata[key]) {
-              itemUpdated = parent.metadata[key].updated;
+              itemUpdated = parent.metadata[key].updated || 0;
+              itemClientId = parent.metadata[key].clientId || "";
             }
           }
 
-          if (itemUpdated && op.timestamp <= itemUpdated) {
+          const wins =
+            op.timestamp > itemUpdated ||
+            (op.timestamp === itemUpdated && op.clientId > itemClientId);
+
+          if (!wins) {
             break;
           }
 
           if (parent[CRDT_ARRAY_MARKER]) {
             node.data = this._plainToCrdt(op.data, op.timestamp, node.data);
             node.updated = op.timestamp;
+            node.clientId = op.clientId;
             node._deleted = false;
           } else {
             // Wrapped Object Write
@@ -1089,7 +1131,11 @@ export class CollabJSON {
             // Update the key in .data
             parent.data[key] = this._plainToCrdt(op.data, op.timestamp, parent.data[key], op.path);
             parent.metadata ||= {};
-            parent.metadata[key] = { updated: op.timestamp, _deleted: false };
+            parent.metadata[key] = {
+              updated: op.timestamp,
+              clientId: op.clientId,
+              _deleted: false,
+            };
           }
         } else if (op.path.length > 0) {
           // Create path (upsert)
@@ -1144,7 +1190,7 @@ export class CollabJSON {
 
           // Unwrap Object Wrapper
           // If we encounter a populated wrapper, unwrap it (ONLY if it's an array item wrapper that holds an object wrapper inside?)
-          // No, wait. 
+          // No, wait.
           // Structural hierarchy:
           // 1. Array Item Wrapper: { data: {ObjectWrapper}, sortKey:..., id:... }  -> Unwrap to data (ObjectWrapper)
           // 2. Object Wrapper: { data: {...}, metadata: {...} } -> DO NOT UNWRAP. We write 'into' it.
@@ -1170,7 +1216,7 @@ export class CollabJSON {
               op.data,
               op.timestamp,
               parentContainer.data[finalKey],
-              op.path
+              op.path,
             );
             parentContainer.metadata ||= {};
             parentContainer.metadata[finalKey] = { updated: op.timestamp, _deleted: false };
@@ -1462,5 +1508,4 @@ export class CollabJSON {
     });
     return { ops: opsForClient, dvv: Object.fromEntries(this.dvv) };
   }
-
 }

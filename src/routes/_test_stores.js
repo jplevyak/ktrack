@@ -1,5 +1,10 @@
-
-import { add_item, save_history, save_favorite, check_for_new_day, save_profile } from "./_stores_common.js";
+import {
+  add_item,
+  save_history,
+  save_favorite,
+  check_for_new_day,
+  save_profile,
+} from "./_stores_common.js";
 import { make_today, make_history, make_favorites, get_date_info } from "./_util.js";
 import assert from "assert";
 import { CollabJSON } from "./_crdt.js"; // Needed for instanceof check inside stores code if relevant, or just util usage
@@ -37,13 +42,13 @@ test("add_item does not inject 'id' field", () => {
   const today_store = {
     update: (fn) => {
       fn(today);
-    }
+    },
   };
 
   const stores = {
     today_store,
-    edit_store: { set: () => { } },
-    history_store: { update: () => { } }
+    edit_store: { set: () => {} },
+    history_store: { update: () => {} },
   };
 
   // CLEAN INPUT (No redundant ID)
@@ -70,7 +75,7 @@ test("save_history upserts day and respects limit", () => {
 
   // Mock history store
   const history_store = {
-    update: (fn) => fn(history)
+    update: (fn) => fn(history),
   };
   const stores = { history_store };
 
@@ -91,7 +96,7 @@ test("save_history upserts day and respects limit", () => {
 test("save_favorite manages favorites list", () => {
   const favorites = make_favorites();
   const favorites_store = {
-    update: (fn) => fn(favorites)
+    update: (fn) => fn(favorites),
   };
   const stores = { favorites_store };
 
@@ -130,10 +135,12 @@ test("check_for_new_day handles rollover", () => {
   let today_val = today;
 
   const today_store = {
-    set: (val) => { today_val = val; }
+    set: (val) => {
+      today_val = val;
+    },
   };
   const history_store = {
-    update: () => { } // save_history called
+    update: () => {}, // save_history called
   };
   const stores = { today_store, history_store };
 
@@ -167,7 +174,9 @@ test("check_for_new_day handles rollover", () => {
 test("save_profile updates store and triggers sync", async () => {
   let savedProfile = null;
   const profile_store = {
-    set: (val) => { savedProfile = val; }
+    set: (val) => {
+      savedProfile = val;
+    },
   };
   const stores = { profile_store };
 
@@ -189,15 +198,21 @@ test("check_for_new_day updates history correctly", async () => {
   // Mock stores
   let today_val = null;
   const today_store = {
-    set: (val) => { today_val = val; },
-    get: () => today_val
+    set: (val) => {
+      today_val = val;
+    },
+    get: () => today_val,
   };
 
   let history_val = make_history();
   const history_store = {
-    update: (fn) => { fn(history_val); },
-    set: (val) => { history_val = val; },
-    get: () => history_val
+    update: (fn) => {
+      fn(history_val);
+    },
+    set: (val) => {
+      history_val = val;
+    },
+    get: () => history_val,
   };
   const stores = { today_store, history_store };
 
@@ -220,7 +235,11 @@ test("check_for_new_day updates history correctly", async () => {
 
   // console.log("Rollover History Items:", history_items.map(i => i.timestamp));
 
-  assert.strictEqual(history_items.length, 2, `Expected 2 history items, found ${history_items.length}`);
+  assert.strictEqual(
+    history_items.length,
+    2,
+    `Expected 2 history items, found ${history_items.length}`,
+  );
 
   // Verify Sort Order (Latest First)
   // Current day should be [0]
@@ -228,13 +247,17 @@ test("check_for_new_day updates history correctly", async () => {
   const currentYear = new Date().getFullYear();
   const firstYear = parseInt(history_items[0].timestamp.split("-")[0]);
   assert.ok(firstYear >= currentYear, "History sort order incorrect? Expected newer item first.");
-  assert.strictEqual(parseInt(history_items[1].timestamp.split("-")[0]), 2020, "Expected old day to be the second item.");
+  assert.strictEqual(
+    parseInt(history_items[1].timestamp.split("-")[0]),
+    2020,
+    "Expected old day to be the second item.",
+  );
 });
 
 test("save_history updates nested items (e.g. servings)", () => {
   const history = make_history();
   const history_store = {
-    update: (fn) => fn(history)
+    update: (fn) => fn(history),
   };
   const stores = { history_store };
 
@@ -260,7 +283,11 @@ test("save_history updates nested items (e.g. servings)", () => {
   // 5. Verify History updated
   historyData = history.getData();
   assert.strictEqual(historyData.length, 1, "Should still be 1 day");
-  assert.strictEqual(historyData[0].items[0].servings, 2.5, "Servings should be updated in history");
+  assert.strictEqual(
+    historyData[0].items[0].servings,
+    2.5,
+    "Servings should be updated in history",
+  );
 });
 
 test("simultaneous client updates sync correctly", () => {
@@ -283,21 +310,22 @@ test("simultaneous client updates sync correctly", () => {
   const storesB = { history_store: { update: (fn) => fn(clientB_history) } };
 
   // 2. Both clients start with same base state (e.g. Day 1 with Apple @ 1.0)
-  // In real app, they would have synced this from server. 
+  // In real app, they would have synced this from server.
   // Let's seed server and sync to both.
   const dayBase = make_today("2023-01-01");
   dayBase.addItem(["items", 0], { name: "Apple", servings: 1.0 }, "Apple");
 
-  // Save to Server "manually" or via one client + sync. 
+  // Save to Server "manually" or via one client + sync.
   // Let's doing via Client A + Sync.
   save_history(dayBase, {}, storesA);
 
   // Sync A -> Server (initial sync to get server up to speed)
   let reqA = clientA_history.getSyncRequest();
-  if (reqA.ops) reqA.ops.forEach(op => {
-    server_history.applyOp(op);
-    server_history.history.push(op);
-  });
+  if (reqA.ops)
+    reqA.ops.forEach((op) => {
+      server_history.applyOp(op);
+      server_history.history.push(op);
+    });
 
   // Sync Server -> B (B gets initial state from server)
   let reqB = clientB_history.getSyncRequest();
@@ -324,17 +352,19 @@ test("simultaneous client updates sync correctly", () => {
 
   // A -> Server
   reqA = clientA_history.getSyncRequest();
-  if (reqA.ops) reqA.ops.forEach(op => {
-    server_history.applyOp(op);
-    server_history.history.push(op);
-  });
+  if (reqA.ops)
+    reqA.ops.forEach((op) => {
+      server_history.applyOp(op);
+      server_history.history.push(op);
+    });
 
   // B -> Server
   reqB = clientB_history.getSyncRequest();
-  if (reqB.ops) reqB.ops.forEach(op => {
-    server_history.applyOp(op);
-    server_history.history.push(op);
-  });
+  if (reqB.ops)
+    reqB.ops.forEach((op) => {
+      server_history.applyOp(op);
+      server_history.history.push(op);
+    });
 
   // Sync Server -> A
   reqA = clientA_history.getSyncRequest();
@@ -357,8 +387,5 @@ test("simultaneous client updates sync correctly", () => {
   // We expect B (3.0) to win because it happened 'later' in execution (wall clock timestamp).
   assert.strictEqual(valA, 3.0, "Later update (B) should win");
 });
-
-
-
 
 runTests();

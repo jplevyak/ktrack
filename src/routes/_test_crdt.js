@@ -372,7 +372,7 @@ test("Sync with a pruned server sends snapshot", () => {
   let req1 = client1.getSyncRequest();
   server.getSyncResponse(req1);
 
-  server.prune(() => { });
+  server.prune(() => {});
   assert.strictEqual(server.history.length, 100);
   assert.ok(server.snapshot);
 
@@ -906,7 +906,7 @@ test("Redundant Update Check", () => {
   assert.strictEqual(initialOpsCount, 1, "Initial add should create 1 op");
 
   const path = doc.findPath("item1");
-  const propPath = [...path, 'name'];
+  const propPath = [...path, "name"];
 
   // Redundant update
   doc.updateItem(propPath, "original");
@@ -937,8 +937,8 @@ test("Delete Pruning (Updates)", () => {
 
   // Expectation: The UPDATE_ITEM should be gone. The DELETE_ITEM should be present.
   const ops = doc.ops;
-  const hasUpdate = ops.some(op => op.type === "UPDATE_ITEM");
-  const hasDelete = ops.some(op => op.type === "DELETE_ITEM");
+  const hasUpdate = ops.some((op) => op.type === "UPDATE_ITEM");
+  const hasDelete = ops.some((op) => op.type === "DELETE_ITEM");
 
   assert.strictEqual(hasUpdate, false, "Pending update should be pruned");
   assert.strictEqual(hasDelete, true, "Delete op should be present (since item existed on server)");
@@ -984,7 +984,7 @@ test("diffUpdate: Implicit Deletions", () => {
   doc.diffUpdate([], { a: 1 });
 
   const ops = doc.ops;
-  const deleteOp = ops.find(op => op.type === "DELETE_ITEM");
+  const deleteOp = ops.find((op) => op.type === "DELETE_ITEM");
 
   assert.ok(deleteOp, "Should generate delete op");
   assert.deepStrictEqual(deleteOp.path, ["b"]);
@@ -997,7 +997,7 @@ test("diffUpdate: Nested Additions", () => {
   doc.diffUpdate([], { a: 1, b: { c: 3 } });
 
   const ops = doc.ops;
-  const addOp = ops.find(op => op.type === "UPDATE_ITEM" && op.path.includes("b"));
+  const addOp = ops.find((op) => op.type === "UPDATE_ITEM" && op.path.includes("b"));
 
   assert.ok(addOp);
   assert.deepStrictEqual(addOp.path, ["b"]);
@@ -1006,17 +1006,16 @@ test("diffUpdate: Nested Additions", () => {
 
 test("save_history behavior: diffUpdate compresses repeated serving updates", () => {
   // 1. Setup 'History' doc (Root Array, mirroring make_history)
-  const history = new CollabJSON('[]', {
+  const history = new CollabJSON("[]", {
     idGenerator: (item) => item.timestamp,
-    sortKeyGenerator: (item) => item.timestamp ? -parseInt(item.timestamp.replace(/-/g, "").slice(0, 8)) : null
+    sortKeyGenerator: (item) =>
+      item.timestamp ? -parseInt(item.timestamp.replace(/-/g, "").slice(0, 8)) : null,
   });
 
   // 2. Setup 'Today' data
   const todayData = {
     timestamp: "2023-01-01",
-    items: [
-      { id: "food1", name: "Apple", servings: 1.0 }
-    ]
+    items: [{ id: "food1", name: "Apple", servings: 1.0 }],
   };
 
   // 3. Simulate first save_history (Upsert)
@@ -1026,7 +1025,7 @@ test("save_history behavior: diffUpdate compresses repeated serving updates", ()
     ["items"],
     { ...todayData, id: todayData.timestamp },
     -20230101,
-    todayData.timestamp
+    todayData.timestamp,
   );
 
   const initialOps = history.ops.length;
@@ -1043,7 +1042,7 @@ test("save_history behavior: diffUpdate compresses repeated serving updates", ()
     ["items"],
     { ...todayData, id: todayData.timestamp },
     -20230101,
-    todayData.timestamp
+    todayData.timestamp,
   );
 
   // Check ops
@@ -1056,7 +1055,7 @@ test("save_history behavior: diffUpdate compresses repeated serving updates", ()
     ["items"],
     { ...todayData, id: todayData.timestamp },
     -20230101,
-    todayData.timestamp
+    todayData.timestamp,
   );
 
   // Should compress
@@ -1068,7 +1067,7 @@ test("save_history behavior: diffUpdate compresses repeated serving updates", ()
     ["items"],
     { ...todayData, id: todayData.timestamp },
     -20230101,
-    todayData.timestamp
+    todayData.timestamp,
   );
 
   assert.strictEqual(history.ops.length, 2, "Repeated Upsert (Diff) should be compressed");
@@ -1086,7 +1085,7 @@ test("save_history behavior: diffUpdate compresses repeated serving updates", ()
 
 test("getData supports includeMetadata", () => {
   const doc = new CollabJSON("[]", {
-    idGenerator: () => "custom-id"
+    idGenerator: () => "custom-id",
   });
   doc.addItem([0], { name: "test" });
 
@@ -1110,7 +1109,7 @@ test("idGenerator uses path context for nested items", () => {
         return item.name;
       }
       return null; // UUID fallback
-    }
+    },
   });
 
   const dayData = { timestamp: "2023-01-01", items: [] };
@@ -1155,7 +1154,11 @@ test("Array DELETE with LWW: stale DELETE should not override newer ADD/UPDATE",
 
   // Item should still be present because stale delete should be ignored
   const afterData = doc.getData();
-  assert.strictEqual(afterData.length, 1, "Stale DELETE should not remove item added with newer timestamp");
+  assert.strictEqual(
+    afterData.length,
+    1,
+    "Stale DELETE should not remove item added with newer timestamp",
+  );
 });
 
 test("Array DELETE with LWW: newer DELETE should override older ADD", () => {
@@ -1189,7 +1192,9 @@ test("Concurrent MOVE_ITEM convergence: two clients both move items converge", (
   client1.commitOps();
 
   // Clone state to client2
-  const client2 = CollabJSON.fromJSON(JSON.parse(JSON.stringify(client1.toJSON())), { clientId: "c2" });
+  const client2 = CollabJSON.fromJSON(JSON.parse(JSON.stringify(client1.toJSON())), {
+    clientId: "c2",
+  });
 
   // client1 moves item 0 to position 2 (A -> end)
   client1.moveItem([], 0, 2);
@@ -1229,7 +1234,11 @@ test("fromJSON / toJSON round-trip preserves all fields", () => {
   assert.strictEqual(restored.clock, doc.clock, "clock should round-trip");
   assert.deepStrictEqual(restored.history, doc.history, "history should round-trip");
   assert.deepStrictEqual(restored.ops, doc.ops, "ops should round-trip");
-  assert.deepStrictEqual(Object.fromEntries(restored.dvv), Object.fromEntries(doc.dvv), "dvv should round-trip");
+  assert.deepStrictEqual(
+    Object.fromEntries(restored.dvv),
+    Object.fromEntries(doc.dvv),
+    "dvv should round-trip",
+  );
   assert.strictEqual(restored.checked, doc.checked, "checked should round-trip");
   assert.strictEqual(restored.synced, doc.synced, "synced should round-trip");
 
@@ -1266,8 +1275,16 @@ test("fromSnapshot initializes document from snapshot and snapshotDvv", () => {
   const doc = CollabJSON.fromSnapshot(snapshotData, snapshotDvv, source.id);
 
   assert.ok(doc.root, "fromSnapshot should set root");
-  assert.deepStrictEqual(Object.fromEntries(doc.snapshotDvv), snapshotDvv, "fromSnapshot should set snapshotDvv");
-  assert.deepStrictEqual(Object.fromEntries(doc.dvv), snapshotDvv, "fromSnapshot should initialize dvv from snapshotDvv");
+  assert.deepStrictEqual(
+    Object.fromEntries(doc.snapshotDvv),
+    snapshotDvv,
+    "fromSnapshot should set snapshotDvv",
+  );
+  assert.deepStrictEqual(
+    Object.fromEntries(doc.dvv),
+    snapshotDvv,
+    "fromSnapshot should initialize dvv from snapshotDvv",
+  );
   assert.ok(doc.clock >= 0, "fromSnapshot should initialize clock");
 });
 
@@ -1281,7 +1298,11 @@ test("fromOps replays operations to build state", () => {
   const doc = CollabJSON.fromOps(ops);
 
   const data = doc.getData();
-  assert.strictEqual(data.name, "op-item", "fromOps should replay UPDATE_ITEM and produce correct data");
+  assert.strictEqual(
+    data.name,
+    "op-item",
+    "fromOps should replay UPDATE_ITEM and produce correct data",
+  );
 });
 
 test("fromOps with empty/null returns empty document", () => {
@@ -1355,7 +1376,10 @@ test("purgeTombstones with minTimestamp preserves newer tombstones", () => {
   // Access internal array structure to verify tombstones
   const items = doc.root.items;
   assert.ok(!items[oldId], "Old tombstone should be purged (updated < minTimestamp)");
-  assert.ok(items[newId] && items[newId]._deleted, "New tombstone should be preserved (updated >= minTimestamp)");
+  assert.ok(
+    items[newId] && items[newId]._deleted,
+    "New tombstone should be preserved (updated >= minTimestamp)",
+  );
 });
 
 test("Concurrent delete-delete: two clients both delete same item converge", () => {
@@ -1363,7 +1387,9 @@ test("Concurrent delete-delete: two clients both delete same item converge", () 
   client1.addItem([0], { name: "shared" });
   client1.commitOps();
 
-  const client2 = CollabJSON.fromJSON(JSON.parse(JSON.stringify(client1.toJSON())), { clientId: "c2" });
+  const client2 = CollabJSON.fromJSON(JSON.parse(JSON.stringify(client1.toJSON())), {
+    clientId: "c2",
+  });
 
   // Both clients delete the same item
   client1.deleteItem([0]);
@@ -1394,12 +1420,12 @@ test("moveItem throws on out-of-bounds fromIndex", () => {
   assert.throws(
     () => doc.moveItem([], -1, 1),
     /fromIndex out of bounds/,
-    "moveItem should throw for negative fromIndex"
+    "moveItem should throw for negative fromIndex",
   );
   assert.throws(
     () => doc.moveItem([], 5, 1),
     /fromIndex out of bounds/,
-    "moveItem should throw for fromIndex >= length"
+    "moveItem should throw for fromIndex >= length",
   );
 });
 
@@ -1411,12 +1437,12 @@ test("moveItem throws on out-of-bounds toIndex", () => {
   assert.throws(
     () => doc.moveItem([], 0, -1),
     /toIndex out of bounds/,
-    "moveItem should throw for negative toIndex"
+    "moveItem should throw for negative toIndex",
   );
   assert.throws(
     () => doc.moveItem([], 0, 10),
     /toIndex out of bounds/,
-    "moveItem should throw for toIndex > length"
+    "moveItem should throw for toIndex > length",
   );
 });
 
@@ -1427,7 +1453,7 @@ test("addItem throws on index out of bounds", () => {
   assert.throws(
     () => doc.addItem([5], { name: "B" }),
     /Index out of bounds/,
-    "addItem should throw when index > sortedItems.length"
+    "addItem should throw when index > sortedItems.length",
   );
 });
 
@@ -1517,10 +1543,22 @@ test("Three-client convergence with DVV filtering", () => {
   const syncRes3b = server.getSyncResponse(syncReq3b);
   c3.applySyncResponse(syncRes3b);
 
-  const names1 = c1.getData().map((i) => i.name).sort();
-  const names2 = c2.getData().map((i) => i.name).sort();
-  const names3 = c3.getData().map((i) => i.name).sort();
-  const namesServer = server.getData().map((i) => i.name).sort();
+  const names1 = c1
+    .getData()
+    .map((i) => i.name)
+    .sort();
+  const names2 = c2
+    .getData()
+    .map((i) => i.name)
+    .sort();
+  const names3 = c3
+    .getData()
+    .map((i) => i.name)
+    .sort();
+  const namesServer = server
+    .getData()
+    .map((i) => i.name)
+    .sort();
 
   assert.deepStrictEqual(names1, namesServer, "c1 should converge with server");
   assert.deepStrictEqual(names2, namesServer, "c2 should converge with server");
@@ -1553,6 +1591,109 @@ test("updateItem as upsert for existing array", () => {
   const doc = new CollabJSON('["a", "b"]');
   doc.updateItem([2], "c");
   assert.deepStrictEqual(doc.getData(), ["a", "b", "c"]);
+});
+
+// --- Boundary Condition Tests ---
+
+test("moveItem same index is no-op", () => {
+  const doc = new CollabJSON('["a", "b", "c"]');
+  const initialOps = doc.ops.length;
+  doc.moveItem([], 1, 1);
+  assert.strictEqual(doc.ops.length, initialOps, "moveItem to same index should not generate ops");
+  assert.deepStrictEqual(doc.getData(), ["a", "b", "c"]);
+});
+
+test("moveItem to boundaries", () => {
+  const doc = new CollabJSON('["a", "b", "c"]');
+
+  // Move 'b' to start
+  doc.moveItem([], 1, 0);
+  assert.deepStrictEqual(doc.getData(), ["b", "a", "c"]);
+
+  // Move 'a' to end
+  doc.moveItem([], 1, 3);
+  assert.deepStrictEqual(doc.getData(), ["b", "c", "a"]);
+});
+
+test("updateItem with null", () => {
+  const doc = new CollabJSON('{"a": 1}');
+  doc.updateItem(["a"], null);
+  assert.strictEqual(doc.getData().a, null);
+
+  doc.updateItem(["b"], null);
+  assert.strictEqual(doc.getData().b, null);
+});
+
+test("type switching: primitive to object", () => {
+  const doc = new CollabJSON('{"a": 1}');
+  doc.updateItem(["a"], { b: 2 });
+  assert.deepStrictEqual(doc.getData(), { a: { b: 2 } });
+});
+
+test("getData through primitive path returns undefined", () => {
+  const doc = new CollabJSON('{"a": 1}');
+  assert.strictEqual(doc.getData(["a", "b"]), undefined);
+});
+
+test("_generateSortKey precision limits", () => {
+  const doc = new CollabJSON("[]");
+  // Force two very close keys
+  const key1 = 1.0;
+  const key2 = 1.0000000000000002; // Very close to 1.0 in IEEE 754
+
+  // Directly test the internal method
+  const mid = doc._generateSortKey(key1, key2);
+  assert.ok(mid > key1, "Should generate a key greater than previous");
+  assert.ok(mid !== key1 && mid !== key2, "Should not be equal to boundaries");
+});
+
+test("LWW Tie-breaking: Client ID as secondary sort", () => {
+  const doc1 = new CollabJSON('{"val": 0}', { clientId: "A" });
+  const doc2 = new CollabJSON('{"val": 0}', { clientId: "B" });
+
+  const ts = 100;
+  // opB has higher clientId than opA
+  const opA = { type: "UPDATE_ITEM", path: ["val"], data: "fromA", timestamp: ts, clientId: "A" };
+  const opB = { type: "UPDATE_ITEM", path: ["val"], data: "fromB", timestamp: ts, clientId: "B" };
+
+  // Apply in order A then B
+  doc1.applyOp(opA);
+  doc1.applyOp(opB);
+  assert.strictEqual(doc1.getData().val, "fromB", "B should win over A (B > A)");
+
+  // Apply in order B then A
+  doc2.applyOp(opB);
+  doc2.applyOp(opA);
+  assert.strictEqual(
+    doc2.getData().val,
+    "fromB",
+    "B should win over A regardless of application order",
+  );
+});
+
+test("deleteItem on non-existent path", () => {
+  const doc = new CollabJSON('{"a": 1}');
+  const initialOps = doc.ops.length;
+  doc.deleteItem(["non-existent"]);
+  assert.strictEqual(
+    doc.ops.length,
+    initialOps,
+    "Deleting non-existent key should not generate ops if not found",
+  );
+
+  doc.deleteItem(["a", "b", "c"]);
+  assert.strictEqual(doc.ops.length, initialOps);
+});
+
+test("addItem with existing ID updates item", () => {
+  const doc = new CollabJSON("[]", { idGenerator: () => "item1" });
+  doc.addItem([0], { name: "initial" });
+  const id = doc.getData({ includeMetadata: true })[0]._id;
+
+  doc.addItem([1], { name: "updated" }, id);
+  const data = doc.getData();
+  assert.strictEqual(data.length, 1, "Should not add a second item with same ID");
+  assert.strictEqual(data[0].name, "updated");
 });
 
 runTests();
